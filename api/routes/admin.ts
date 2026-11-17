@@ -1,3 +1,4 @@
+import { voteEnvironment } from "../../shared/vote/environment.ts";
 import { DatasetAbort, stageDataset } from "../db/dataset.ts";
 import { roundKey } from "../../shared/vote/keys.ts";
 import { voteCorrectionRoutes } from "./vote-corrections.ts";
@@ -46,8 +47,8 @@ import { newId } from "../lib/ids.ts";
 import {
   currentVote,
   roundOf,
-  VOTE_ROUND_KEY,
   type VoteRoundSetting,
+  voteSettingKey,
 } from "../services/vote-active.ts";
 import { adminBatch } from "../../shared/vote/admin-batch.ts";
 import { type Tier, tierName } from "../../shared/vote/ballot.ts";
@@ -132,7 +133,9 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
 
   /** Admin → Vote: the round the site runs, read from its contract (a test round on
    * Sepolia, the real vote on Ethereum), and the pool's ETH while it waits to be sold. */
-  const roundSetting = async () => (await db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY)) ?? {};
+  const roundSetting = async () =>
+    (await db.meta.get<VoteRoundSetting>(voteSettingKey(deps.voteEnvironment ?? "production"))) ??
+      {};
   const roundJson = async () => {
     const s = await roundSetting();
     const set = roundOf(s);
@@ -183,6 +186,9 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       ? "sepolia"
       : null;
     if (!chain) throw new HttpError(400, "chain is sepolia or ethereum");
+    if (chain !== (deps.voteEnvironment === "test" ? "sepolia" : "ethereum")) {
+      throw new HttpError(400, "The network does not match this vote environment.");
+    }
     const chainName = chain === "ethereum" ? "Ethereum" : "Sepolia";
     const rpc = chain === "ethereum" ? deps.config.rpcEndpoints[0] : deps.config.sepoliaRpcUrl;
     if (!rpc) throw new HttpError(503, `No ${chainName} RPC is configured.`);
@@ -219,26 +225,35 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       deps.log(`vote round read ${contract}: ${e instanceof Error ? e.message : String(e)}`);
       throw new HttpError(502, `Couldn't read the round from ${chainName}. Try again.`);
     }
-    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
-      refuseWhileRealOpen(cur ?? {}, {
-        contract: manifest.contract,
-        chainId: manifest.chainId,
-        kind: manifest.kind,
-      });
-      const { test: _, ...rest } = cur ?? {};
-      return { ...rest, round: { manifest, at: deps.now(), by: c.var.user!.address } };
-    });
+    if (voteEnvironment(manifest) !== (deps.voteEnvironment ?? "production")) {
+      throw new HttpError(400, "The round does not match this vote environment.");
+    }
+    await db.meta.update<VoteRoundSetting>(
+      voteSettingKey(deps.voteEnvironment ?? "production"),
+      (cur) => {
+        refuseWhileRealOpen(cur ?? {}, {
+          contract: manifest.contract,
+          chainId: manifest.chainId,
+          kind: manifest.kind,
+        });
+        const { test: _, ...rest } = cur ?? {};
+        return { ...rest, round: { manifest, at: deps.now(), by: c.var.user!.address } };
+      },
+    );
     changedRound();
     return c.json({ ...(await roundJson()), warnings });
   });
   /** No round on the site: the vote pages say there's none. */
   r.delete("/vote-round/round", requireRecentAuth(deps.now), async (c) => {
     await jsonBody(c, []);
-    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
-      refuseWhileRealOpen(cur ?? {});
-      const { test: _, round: __, ...rest } = cur ?? {};
-      return rest;
-    });
+    await db.meta.update<VoteRoundSetting>(
+      voteSettingKey(deps.voteEnvironment ?? "production"),
+      (cur) => {
+        refuseWhileRealOpen(cur ?? {});
+        const { test: _, round: __, ...rest } = cur ?? {};
+        return rest;
+      },
+    );
     changedRound();
     return c.json(await roundJson());
   });
@@ -250,10 +265,13 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       throw new HttpError(400, "The ETH amount isn't a number.");
     }
     if (typeof body.sold !== "boolean") throw new HttpError(400, "sold must be true or false");
-    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
-      const { pool: _, ...rest } = cur ?? {};
-      return eth === null ? rest : { ...rest, pool: { eth, sold: body.sold as boolean } };
-    });
+    await db.meta.update<VoteRoundSetting>(
+      voteSettingKey(deps.voteEnvironment ?? "production"),
+      (cur) => {
+        const { pool: _, ...rest } = cur ?? {};
+        return eth === null ? rest : { ...rest, pool: { eth, sold: body.sold as boolean } };
+      },
+    );
     changedRound();
     return c.json(await roundJson());
   });

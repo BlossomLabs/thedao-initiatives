@@ -67,9 +67,9 @@ const M = vi.hoisted(() =>
   }) as unknown as VoteManifest
 );
 
-vi.mock("../../shared/vote/manifest", async (original) => ({
-  ...await original<typeof import("../../shared/vote/manifest")>(),
-  ROUND: M,
+vi.mock("~/lib/vote-round", async (original) => ({
+  ...await original<typeof import("~/lib/vote-round")>(),
+  useRound: () => M,
 }));
 vi.mock("~/hooks/use-board", () => ({
   boardKey: ["board"],
@@ -797,7 +797,7 @@ for (const failed of [false, true]) {
     await serve(1500, 1499);
     vi.setSystemTime(1_500_000);
     localStorage.setItem(
-      `vote-tiers:${M.chainId}:${M.contract.toLowerCase()}:1`,
+      `vote-tiers:test:${M.chainId}:${M.contract.toLowerCase()}:1`,
       JSON.stringify({ alpha: "S", beta: "B" }),
     );
     flow.failed = failed;

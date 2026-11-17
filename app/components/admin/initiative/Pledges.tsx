@@ -1,3 +1,4 @@
+import { useRound } from "~/lib/vote-round";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PencilLine, Trash2, Upload } from "lucide-react";
 import type { Hex } from "viem";
@@ -25,7 +26,7 @@ import {
   type SettleState,
   TOO_LONG,
 } from "~/lib/pledge-flow";
-import { MAINNET_CHAIN_ID, ROUND } from "../../../../shared/vote/manifest";
+import { MAINNET_CHAIN_ID, type VoteManifest } from "../../../../shared/vote/manifest";
 import type { AdminInitiativePage, Pledge } from "~/lib/api-types";
 import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
@@ -47,7 +48,8 @@ const RECORDING_ROW = "Recording on-chain…";
 /** How long the browser waits for a pledge's receipt, like a ballot's. */
 const RECEIPT_WAIT_MS = 3 * 60_000;
 /** The round's chain (read when needed: the active round loads with the page). */
-const chainName = (): VoteChain => ROUND.chainId === MAINNET_CHAIN_ID ? "Ethereum" : "Sepolia";
+const chainName = (round: VoteManifest): VoteChain =>
+  round.chainId === MAINNET_CHAIN_ID ? "Ethereum" : "Sepolia";
 
 const busyOf = (e: unknown): Busy | null => {
   if (apiCode(e) !== "pledge_pending" || !(e instanceof ApiError)) return null;
@@ -63,6 +65,7 @@ const busyOf = (e: unknown): Busy | null => {
  * like a ballot. `send` resolves once saved, and throws the reason otherwise.
  */
 function usePledgeSend(base: string) {
+  const ROUND = useRound();
   const wallet = useWallet();
   const ensureChain = useEnsureVoteChain();
   const qc = useQueryClient();
@@ -77,7 +80,7 @@ function usePledgeSend(base: string) {
     ) => {
       setPhase({ kind: "idle" });
       const deps: PledgeFlowDeps<PreparedPledge> = {
-        chain: chainName(),
+        chain: chainName(ROUND),
         plain: async () => {
           try {
             await api(path, opts);
@@ -139,7 +142,7 @@ function usePledgeSend(base: string) {
           }
         },
         waitReceipt: async (hash) =>
-          (await voteClient().waitForTransactionReceipt({ hash, timeout: RECEIPT_WAIT_MS }))
+          (await voteClient(ROUND).waitForTransactionReceipt({ hash, timeout: RECEIPT_WAIT_MS }))
             .status,
         settle: async (pid, hash) =>
           (await api<{ state: SettleState }>(`${base}/pledges/${pid}/settle`, {
@@ -153,7 +156,7 @@ function usePledgeSend(base: string) {
       if (end.kind === "failed") throw new Error(end.reason);
       return end;
     },
-    [base, wallet, ensureChain, qc],
+    [base, wallet, ensureChain, qc, ROUND],
   );
   return { send, phase };
 }
@@ -175,33 +178,41 @@ export function outcomeOf(end: PledgePhase, done: string, retryOfNew: boolean) {
 /** Where an on-chain pledge's send stands, in the ballot's words: one line, and the
  * transaction once there is one. Nothing outside the vote. */
 export function PledgeSendStatus({ phase }: { phase: PledgePhase }) {
+  const ROUND = useRound();
   const tx = "hash" in phase && phase.hash ? phase.hash : undefined;
   let text: string | null = null;
   if (phase.kind === "signing") {
     text = "Sign the pledge in your wallet. It’s a signature, not a payment.";
   } else if (phase.kind === "waiting" && phase.earlier) {
-    text =
-      `An earlier change to this pledge is on its way: waiting for ${chainName()} to record it. Yours wasn’t sent.`;
+    text = `An earlier change to this pledge is on its way: waiting for ${
+      chainName(ROUND)
+    } to record it. Yours wasn’t sent.`;
   } else if (phase.kind === "relaying" || phase.kind === "waiting") {
-    text = `Waiting for ${chainName()} to record it. Usually under a minute.`;
+    text = `Waiting for ${chainName(ROUND)} to record it. Usually under a minute.`;
   } else if (phase.kind === "failed" && tx && phase.reason === TOO_LONG) {
-    text =
-      `${chainName()} is taking long. It was sent and may still land; the table shows it once it does.`;
+    text = `${
+      chainName(ROUND)
+    } is taking long. It was sent and may still land; the table shows it once it does.`;
   } else if (phase.kind === "failed" && tx && phase.earlier) {
     text = `The earlier change to this pledge, not yours.`;
   } else if ((phase.kind === "saved" || phase.kind === "recorded") && tx) {
     text = phase.earlier
-      ? `The earlier change to this pledge was recorded on ${chainName()}.`
-      : `Recorded on ${chainName()}.`;
+      ? `The earlier change to this pledge was recorded on ${chainName(ROUND)}.`
+      : `Recorded on ${chainName(ROUND)}.`;
   }
   if (!text && !tx) return null;
   return (
     <p className="small dim m-0 flex flex-wrap items-center gap-x-3 gap-y-1" role="status">
       {text && <span>{text}</span>}
       {tx && (
-        <a href={etherscanTx(tx, chainName())} target="_blank" rel="noreferrer" className="tnum">
+        <a
+          href={etherscanTx(tx, chainName(ROUND))}
+          target="_blank"
+          rel="noreferrer"
+          className="tnum"
+        >
           {tx.slice(0, 6)}…{tx.slice(-4)} on{" "}
-          {chainName() === "Ethereum" ? "Etherscan" : "Sepolia Etherscan"}
+          {chainName(ROUND) === "Ethereum" ? "Etherscan" : "Sepolia Etherscan"}
         </a>
       )}
     </p>

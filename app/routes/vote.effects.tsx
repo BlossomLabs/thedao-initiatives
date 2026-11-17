@@ -34,7 +34,7 @@ const BEFORE: Partial<Record<string, Tier>> = { [A]: "S", [B]: "A", [C]: "A", [D
 const AFTER: Partial<Record<string, Tier>> = { [A]: "S", [B]: "S", [C]: "B", [D]: "B", [E]: "A" };
 
 /**
- * /vote/effects: every animation of the vote on one page, each with a button that plays
+ * /vote-test/effects: every animation of the vote on one page, each with a button that plays
  * it, on the real components with made-up initiatives. Nothing is sent or donated.
  */
 export default function VoteEffects() {
@@ -49,7 +49,8 @@ export default function VoteEffects() {
           Each one plays here on its own, on made-up initiatives. On the real pages they play when
           it happens while the page is open. With reduced motion on, the colours and glows stay; the
           pops, flips and counting don't. The{" "}
-          <Link to="/vote/results/s-settling" className="text-dao-green">example results</Link>{" "}
+          <Link to="/vote-test/results/s-settling" className="text-dao-green">example results</Link>
+          {" "}
           show them in place.
         </p>
       </header>
@@ -142,7 +143,7 @@ function BallotCountedEffect() {
               upToDate
               canSend={false}
               sendLabel="Send my ballot"
-              resultsHref="/vote/effects"
+              resultsHref="/vote-test/effects"
               onSend={() => {}}
               onSelfSend={() => {}}
               onRetry={() => {}}

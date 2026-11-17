@@ -31,9 +31,10 @@ export interface Deps {
   maintenance: Maintenance;
   /** A fixed vote round (tests); absent until a contract is deployed (routes answer 503). */
   vote?: VoteRound;
-  /** The site's vote round now (services/vote-active.ts): the built-in one, or the
-   * Sepolia test round admins set in its place. Wins over `vote`. Read it through
-   * `currentVote(deps)`. */
+  voteEnvironment?: import("../../shared/vote/environment.ts").VoteEnvironment;
+  testVoteRound?: (() => Promise<VoteRound | undefined>) & { forget?: () => void };
+  /** Production resolver, or the environment resolver in a scoped request.
+   * Wins over the fixed test dependency `vote`; use `currentVote(deps)`. */
   voteRound?: (() => Promise<VoteRound | undefined>) & { forget?: () => void };
   /** Handed work a request starts but doesn't wait for (the vote's gap to the next
    * tier). Absent, it just runs; tests collect it so they can wait for it. */

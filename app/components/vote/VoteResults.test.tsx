@@ -7,16 +7,16 @@ import { api } from "~/lib/api";
 import { usdK } from "~/lib/format";
 import { confettiBurst } from "~/components/donate/Celebration";
 import { encodeBallot } from "../../../shared/vote/ballot";
-import { ROUND } from "../../../shared/vote/manifest";
+import { useRound } from "~/lib/vote-round";
+const ROUND = useRound();
 import VoteResults from "./VoteResults";
 import { liveInputsFrom, liveInputsJson } from "../../../shared/vote/live-inputs";
 import { withGift } from "../../../shared/vote/next-tier";
 import { jumps, threatOf } from "../../../shared/vote/threat";
 import { effectiveRanks } from "../../../vote/shared/ranks";
 
-vi.mock("../../../shared/vote/manifest", async (original) => ({
-  ...await original<typeof import("../../../shared/vote/manifest")>(),
-  ROUND: {
+vi.mock("~/lib/vote-round", async (original) => {
+  const fixture = {
     kind: "test",
     chainId: 11155111,
     contract: "0x1000000000000000000000000000000000000001",
@@ -31,8 +31,9 @@ vi.mock("../../../shared/vote/manifest", async (original) => ({
       { goalUsd: "60000000000", rfp: false, groups: [] },
       { goalUsd: "30000000000", rfp: false, groups: [] },
     ],
-  },
-}));
+  };
+  return { ...await original<typeof import("~/lib/vote-round")>(), useRound: () => fixture };
+});
 const signedIn = vi.hoisted(() => ({
   address: null as string | null,
   badge: null as number | null,
@@ -247,7 +248,7 @@ it("an RPC hiccup keeps the last result", async () => {
   );
   expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
   vi.mocked(api).mockRejectedValue(new Error("rpc down"));
-  await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }).catch(() => {}));
+  await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }).catch(() => {}));
   expect(screen.getByText(/would be funded by 1 ballot/)).toBeInTheDocument();
   expect(screen.queryByText(/updated .* ago/i)).toBeNull();
 });
@@ -757,7 +758,7 @@ it("once the figures count the donation, the real result takes over, still '+$X 
   await donateToBeta("9000");
   await within(daoBallot()).findByText("+$9,000 yours");
   // Figures without it yet (Beta still asks $30K): still held where the preview put it.
-  await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }));
+  await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
   expect(within(daoBallot()).getByText("+$9,000 yours")).toBeInTheDocument();
   // Counted: Beta asks $21K, and the live tally funds it in A-Tier, not where the preview had it.
   vi.mocked(api).mockResolvedValue(
@@ -765,7 +766,7 @@ it("once the figures count the donation, the real result takes over, still '+$X 
       asks: [usdMicro(50_000), usdMicro(21_000)],
     }),
   );
-  await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }));
+  await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
   const chip = await within(daoBallot()).findByLabelText(
     "Beta audits, funded if it ended now, $9,000 of it yours",
   );
@@ -1431,7 +1432,7 @@ describe("while the page is open", () => {
     await screen.findByText(/Test vote/i);
     return async (round: Record<string, unknown>) => {
       vi.mocked(api).mockResolvedValue(round);
-      await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }));
+      await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
     };
   }
 

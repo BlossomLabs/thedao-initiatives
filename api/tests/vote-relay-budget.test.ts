@@ -1,3 +1,4 @@
+import { voteRequestPath } from "./vote-path.ts";
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   custom,
@@ -255,7 +256,7 @@ Deno.test("public ballot relay offers self-send for an expensive owner without c
         }]),
     };
     const submit = () =>
-      h.req("/api/vote/ballot", {
+      h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
         method: "POST",
         json: { tokenId: "1", nonce: "1", ballot: "0x010101", signature: "0x1234" },
       });

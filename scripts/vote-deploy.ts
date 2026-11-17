@@ -7,6 +7,7 @@
 // (badges: Admin → Vote, or scripts/vote-sim.ts):
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
 //     deno task vote-deploy [--minter 0x…] [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
+// --duration-hours 27 sets the duration from opening to the final cutoff.
 // For a longer rehearsal, --until <ISO date with time zone> sets the final cutoff;
 // --setup-minutes 10 opens ten minutes after deployment (default: 30).
 // --window-minutes 30 --windows 9 gives each tier nine windows, halving from 30 minutes.
@@ -396,6 +397,7 @@ export function planDonationSetup(o: {
 
 export type TestTiming = {
   until?: number;
+  durationHours?: number;
   setupMinutes?: number;
   initialWindow?: number;
   maxWindows?: number;
@@ -405,17 +407,26 @@ export type TestTiming = {
 export function parseTestTiming(a: {
   real?: boolean;
   until?: string;
+  "duration-hours"?: string;
   "setup-minutes"?: string;
   "window-minutes"?: string;
   windows?: string;
 }): TestTiming {
-  const flags = ["until", "setup-minutes", "window-minutes", "windows"] as const;
+  const flags = ["until", "duration-hours", "setup-minutes", "window-minutes", "windows"] as const;
   if (a.real && flags.some((flag) => a[flag] !== undefined)) {
     throw new Error(
-      "--until, --setup-minutes, --window-minutes and --windows are only for test votes",
+      "--until, --duration-hours, --setup-minutes, --window-minutes and --windows are only for test votes",
     );
   }
   const timing: TestTiming = {};
+  if (a["duration-hours"] !== undefined) {
+    if (a.until !== undefined) throw new Error("Choose --duration-hours or --until, not both");
+    const n = Number(a["duration-hours"]);
+    if (!Number.isFinite(n) || n <= 0 || !Number.isSafeInteger(n * 3600)) {
+      throw new Error("--duration-hours must be positive and resolve to whole seconds");
+    }
+    timing.durationHours = n;
+  }
   if (a.until !== undefined) {
     const value = a.until.trim();
     const t = Date.parse(value);
@@ -458,7 +469,8 @@ export function voteSchedule(now: number, timing: TestTiming = {}) {
     maxWindows: timing.maxWindows ?? TEST_WINDOWS.maxWindows,
   };
   const span = tierMax(windows);
-  const s = timing.until === undefined ? opensAt + VOTING_MINUTES * 60 : timing.until - 3 * span;
+  const until = timing.durationHours === undefined ? timing.until : opensAt + timing.durationHours * 3600;
+  const s = until === undefined ? opensAt + VOTING_MINUTES * 60 : until - 3 * span;
   if (!Number.isSafeInteger(s + 3 * span)) throw new Error("The test schedule is out of range");
   if (s <= opensAt) {
     throw new Error(
@@ -806,6 +818,7 @@ async function main() {
       "minter",
       "contract",
       "until",
+      "duration-hours",
       "setup-minutes",
       "window-minutes",
       "windows",

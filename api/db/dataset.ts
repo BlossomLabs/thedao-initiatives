@@ -51,6 +51,7 @@ const DURABLE = new Set([
 export function transientVoteKey(input: Deno.KvKey): boolean {
   if (input[0] !== "vote") return false;
   if (input[1] === "relayer" && (input.length === 2 || input.length === 4)) return true;
+  if (input[1] === "production" || input[1] === "test") input = [input[0], ...input.slice(2)];
   const key = typeof input[1] === "number" ? [input[0], ...input.slice(2)] : input;
   if (typeof key[1] !== "string" || !/^0x[0-9a-f]{40}$/i.test(key[1])) return false;
   return (key.length === 5 && (key[2] === "pending" || key[2] === "pledge-outcome")) ||

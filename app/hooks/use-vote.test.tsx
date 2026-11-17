@@ -1,6 +1,14 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { ROUND } from "../../shared/vote/manifest";
+import { NO_ROUND } from "../../shared/vote/manifest";
+const ROUND = { ...NO_ROUND };
+vi.mock(
+  "~/lib/vote-round",
+  async (original) => ({
+    ...await original<typeof import("~/lib/vote-round")>(),
+    useRound: () => ROUND,
+  }),
+);
 import { roundPollInterval, type RoundView } from "./use-vote";
 import { useBallotSubmit } from "./use-vote-send";
 
@@ -10,7 +18,7 @@ vi.mock("~/hooks/use-vote-chain", () => ({ useEnsureVoteChain: () => () => Promi
 
 it("switching to another badge drops the last badge's ballot (no Retry of the wrong one)", () => {
   sessionStorage.setItem(
-    `vote-last:${ROUND.chainId}:${ROUND.contract.toLowerCase()}:12`,
+    `vote-last:test:${ROUND.chainId}:${ROUND.contract.toLowerCase()}:12`,
     JSON.stringify({ tokenId: "12", nonce: "1", ballot: "0x01", signature: "0x02" }),
   );
   const { result, rerender } = renderHook(({ id }) => useBallotSubmit(id), {
@@ -50,7 +58,7 @@ it("switching chains at the same contract and badge clears an in-memory last sen
   const original = ROUND.chainId;
   try {
     sessionStorage.setItem(
-      `vote-last:${original}:${ROUND.contract.toLowerCase()}:42`,
+      `vote-last:test:${original}:${ROUND.contract.toLowerCase()}:42`,
       JSON.stringify({ tokenId: "42", nonce: "1", ballot: "0x01", signature: "0x02" }),
     );
     const { result, rerender, unmount } = renderHook(() => useBallotSubmit(42n));
@@ -99,11 +107,13 @@ it("a send finishing after a chain switch only saves under its original round", 
     });
     expect(result.current.last).toBeNull();
     expect(result.current.phase.kind).toBe("idle");
-    expect(sessionStorage.getItem(`vote-last:${ROUND.chainId}:${ROUND.contract.toLowerCase()}:77`))
+    expect(
+      sessionStorage.getItem(`vote-last:test:${ROUND.chainId}:${ROUND.contract.toLowerCase()}:77`),
+    )
       .toBeNull();
     expect(
       JSON.parse(
-        sessionStorage.getItem(`vote-last:${original}:${ROUND.contract.toLowerCase()}:77`)!,
+        sessionStorage.getItem(`vote-last:test:${original}:${ROUND.contract.toLowerCase()}:77`)!,
       ),
     ).toMatchObject({ hash });
   } finally {

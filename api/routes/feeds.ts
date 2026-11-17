@@ -19,6 +19,7 @@ import { gunzip, gzip } from "../lib/gzip.ts";
 export const FEED_PATHS = [
   "/llms.txt",
   "/vote/llms.txt",
+  "/vote-test/llms.txt",
   "/llms-full.txt",
   "/api/initiatives.json",
   "/api/initiatives.schema.json",
@@ -151,7 +152,7 @@ export async function withdrawnNow(
 
 export function feedRoutes(
   feeds: FeedCache,
-  deps?: Pick<Deps, "vote" | "voteRound">,
+  deps?: Pick<Deps, "vote" | "voteRound" | "voteEnvironment">,
   /** The vote's replay (its few-second cache): which projects are withdrawn now. */
   replay?: VoteReplay,
 ) {

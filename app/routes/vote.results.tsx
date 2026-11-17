@@ -17,7 +17,7 @@ export function meta() {
   return [{ title: "Example vote results · TheDAO" }, { name: "robots", content: "noindex" }];
 }
 
-/** /vote/results/:id: the vote results at one moment of the vote, as an example anyone
+/** /vote-test/results/:id: the vote results at one moment of the vote, as an example anyone
  * can open (mock-round.ts): the real round's dates, the board's initiatives, a made-up
  * tally. Nothing is donated from it. */
 export default function ExampleResults() {
@@ -58,7 +58,7 @@ export default function ExampleResults() {
     view: figures?.for === base ? figures.view : base.view,
   };
 
-  if (!kind) return <Navigate to="/vote/results/s-settling" replace />;
+  if (!kind) return <Navigate to="/vote-test/results/s-settling" replace />;
   if (!example) return null;
   return <VoteResults example={example} />;
 }

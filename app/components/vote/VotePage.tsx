@@ -1,3 +1,4 @@
+import { useRound, useVoteBase } from "~/lib/vote-round";
 import { ballotStorageKey } from "../../../shared/vote/keys";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
@@ -50,13 +51,13 @@ import {
   type Tier,
   tierName,
 } from "../../../shared/vote/ballot";
-import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
+import { rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
 import { poolName, PoolNote } from "~/components/vote/pool";
 import { askOf, servedAsks, withdrawnProjects } from "~/lib/vote-results";
 
-const closed = (m = ROUND) => voteNow() / 1000 >= m.closesAt;
-const notOpenYet = (m = ROUND) => voteNow() / 1000 < m.opensAt;
-const REAL = (m = ROUND) => m.kind === "real";
+const closed = (m: VoteManifest) => voteNow() / 1000 >= m.closesAt;
+const notOpenYet = (m: VoteManifest) => voteNow() / 1000 < m.opensAt;
+const REAL = (m: VoteManifest) => m.kind === "real";
 const microUsd = (v: string) => Number(BigInt(v) / 10_000n) / 100;
 /** The shake on why a ballot can't be sent (app.css), none with reduced motion. */
 const NUDGE = "motion-safe:animate-reason-nudge";
@@ -64,10 +65,10 @@ const NUDGE = "motion-safe:animate-reason-nudge";
 const ASKS_PENDING = "The asks are being worked out; try again in a minute.";
 const closeTextOf = (m: VoteManifest) => <When at={m.closesAt} />;
 
-const tiersKey = (n: number) => ballotStorageKey("tiers", ROUND, n);
-function loadTiers(n: number): Partial<Record<string, Tier>> {
+const tiersKey = (n: number, m: VoteManifest) => ballotStorageKey("tiers", m, n);
+function loadTiers(n: number, m: VoteManifest): Partial<Record<string, Tier>> {
   try {
-    return JSON.parse(localStorage.getItem(tiersKey(n)) ?? "{}");
+    return JSON.parse(localStorage.getItem(tiersKey(n, m)) ?? "{}");
   } catch {
     return {};
   }
@@ -75,18 +76,18 @@ function loadTiers(n: number): Partial<Record<string, Tier>> {
 
 /** What this voter skipped on badge n's ballot: this browser only, never sent (a skipped
  * initiative is as unranked as the list). */
-const skippedKey = (n: number) => ballotStorageKey("skipped", ROUND, n);
+const skippedKey = (n: number, m: VoteManifest) => ballotStorageKey("skipped", m, n);
 /** No skips saved for badge n in this browser yet (not even an empty list). */
-function skipsUnset(n: number): boolean {
+function skipsUnset(n: number, m: VoteManifest): boolean {
   try {
-    return localStorage.getItem(skippedKey(n)) === null;
+    return localStorage.getItem(skippedKey(n, m)) === null;
   } catch {
     return false;
   }
 }
-function loadSkipped(n: number): Set<string> {
+function loadSkipped(n: number, m: VoteManifest): Set<string> {
   try {
-    const v = JSON.parse(localStorage.getItem(skippedKey(n)) ?? "[]");
+    const v = JSON.parse(localStorage.getItem(skippedKey(n, m)) ?? "[]");
     return new Set(Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
   } catch {
     return new Set();
@@ -169,6 +170,9 @@ export default function VotePage(
     [mockKind, mockCards],
   );
   /** The round on this page: a dev mock's fictional one, or the real one. */
+
+  const ROUND = useRound();
+  const voteBase = useVoteBase();
   const R = mockData?.round ?? ROUND;
   const found = info.data === "none" ? undefined : info.data;
   const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : found;
@@ -276,11 +280,11 @@ export default function VotePage(
   const mockPrefilled = useRef<MockKind | null>(null);
   useEffect(() => {
     if (n === null) return;
-    setTiers(mock ? {} : loadTiers(n));
-    setSkipped(mock ? new Set() : loadSkipped(n));
+    setTiers(mock ? {} : loadTiers(n, R));
+    setSkipped(mock ? new Set() : loadSkipped(n, R));
     // Each visit to a mock starts it over, its prefill too.
     mockPrefilled.current = null;
-  }, [n, mock, mockKind, R.chainId, R.contract]);
+  }, [n, mock, mockKind, R.kind, R.chainId, R.contract]);
   const setSkip = (slug: string, skip: boolean) => {
     setSkipped((prev) => {
       if (prev.has(slug) === skip) return prev;
@@ -288,7 +292,7 @@ export default function VotePage(
       if (skip) next.add(slug);
       else next.delete(slug);
       try {
-        if (n !== null && !mock) localStorage.setItem(skippedKey(n), JSON.stringify([...next]));
+        if (n !== null && !mock) localStorage.setItem(skippedKey(n, R), JSON.stringify([...next]));
       } catch { /* storage unavailable */ }
       return next;
     });
@@ -300,7 +304,7 @@ export default function VotePage(
       if (prev.size) return prev;
       const next = new Set(slugs);
       try {
-        if (n !== null && !mock) localStorage.setItem(skippedKey(n), JSON.stringify(slugs));
+        if (n !== null && !mock) localStorage.setItem(skippedKey(n, R), JSON.stringify(slugs));
       } catch { /* storage unavailable */ }
       return next;
     });
@@ -312,7 +316,7 @@ export default function VotePage(
       const next = { ...prev, [slug]: tier };
       if (!tier) delete next[slug];
       try {
-        if (n !== null && !mock) localStorage.setItem(tiersKey(n), JSON.stringify(next));
+        if (n !== null && !mock) localStorage.setItem(tiersKey(n, R), JSON.stringify(next));
       } catch { /* storage unavailable */ }
       return next;
     });
@@ -343,10 +347,10 @@ export default function VotePage(
   // the round is known: never over a ballot that counts or a draft in this browser.
   const identity = useReviewIdentity();
   const fresh = Boolean(rv) && n !== null && !countedNow && !mock &&
-    Object.keys(loadTiers(n)).length === 0;
+    Object.keys(loadTiers(n, R)).length === 0;
   // Skips are this browser's own: a ballot already sent (S-Tier settled, another device)
   // still gets its 1–2★ skipped the first time it's shown here.
-  const noSkips = Boolean(rv) && n !== null && !mock && skipsUnset(n);
+  const noSkips = Boolean(rv) && n !== null && !mock && skipsUnset(n, R);
   const ratings = useBadgeRatings(
     n === null ? null : ratingsToken(R.kind, n, identity?.tokenIds),
     fresh || noSkips,
@@ -387,7 +391,7 @@ export default function VotePage(
   const replaceTiers = (next: Partial<Record<string, Tier>>) => {
     setTiers(next);
     try {
-      if (n !== null && !mock) localStorage.setItem(tiersKey(n), JSON.stringify(next));
+      if (n !== null && !mock) localStorage.setItem(tiersKey(n, R), JSON.stringify(next));
     } catch { /* storage unavailable */ }
   };
 
@@ -805,8 +809,8 @@ export default function VotePage(
           : upToDateNow
           ? "Counted"
           : countedHex
-          ? "Resend my ballot"
-          : "Send my ballot",
+          ? `Resubmit ${R.kind === "real" ? "production" : "test"} ballot`
+          : `Submit ${R.kind === "real" ? "production" : "test"} ballot`,
         ready: canSend || sheetNews,
         summary,
       },
@@ -871,7 +875,7 @@ export default function VotePage(
         </header>
         {R.schedule && <RoundBox schedule={R.schedule} rv={rv} />}
         <div className="flex justify-center">
-          <LinkButton variant="primary" to={REAL(R) ? "/" : "/vote"}>
+          <LinkButton variant="primary" to={voteBase}>
             Follow the results live
           </LinkButton>
         </div>
@@ -958,8 +962,10 @@ export default function VotePage(
                 canSend={!busy && sending > 0 && !broken}
                 // Not ready, it stays as it is, disabled: the ballot box's line says what
                 // the ballot still needs. With a ballot that counts already, it's a resend.
-                sendLabel={countedHex ? "Resend my ballot" : "Send my ballot"}
-                resultsHref={REAL(R) ? "/" : "/vote"}
+                sendLabel={countedHex
+                  ? `Resubmit ${R.kind === "real" ? "production" : "test"} ballot`
+                  : `Submit ${R.kind === "real" ? "production" : "test"} ballot`}
+                resultsHref={voteBase}
                 onSend={() => {
                   if (broken) return;
                   setSendRoute("relay");

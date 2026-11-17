@@ -35,14 +35,14 @@ export function hasView(k: MockKind, view: MockView): boolean {
   return true;
 }
 export function exampleUrl(k: MockKind, view: MockView): string {
-  if (view === "results") return `/vote/results/${momentOf(k)}`;
-  return `/vote/mock/${k}${view === "edit" ? "/edit" : ""}`;
+  if (view === "results") return `/vote-test/results/${momentOf(k)}`;
+  return `/vote-test/mock/${k}${view === "edit" ? "/edit" : ""}`;
 }
 /** The example on screen, from its path. */
 export function exampleAt(pathname: string): { kind: MockKind; view: MockView } | null {
-  const r = pathname.match(/^\/vote\/results\/([^/]+)\/?$/);
+  const r = pathname.match(/^\/vote-test\/results\/([^/]+)\/?$/);
   if (r) return isResultMockId(r[1]) ? { kind: RESULT_MOCKS[r[1]], view: "results" } : null;
-  const b = pathname.match(/^\/vote\/mock\/([^/]+)(\/edit)?\/?$/);
+  const b = pathname.match(/^\/vote-test\/mock\/([^/]+)(\/edit)?\/?$/);
   if (b && isMockKind(b[1])) return { kind: b[1], view: b[2] ? "edit" : "yours" };
   return null;
 }

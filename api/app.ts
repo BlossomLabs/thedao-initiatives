@@ -49,6 +49,13 @@ export function createApp(
   lock: SiteLock = siteLockFor(deps),
   site?: StaticSite,
 ) {
+  const sourceDeps = deps;
+  deps = Object.assign(Object.create(sourceDeps), { voteEnvironment: "production" });
+  const testDeps: Deps = Object.create(sourceDeps);
+  Object.defineProperties(testDeps, {
+    voteEnvironment: { value: "test" },
+    voteRound: { get: () => sourceDeps.testVoteRound },
+  });
   const app = new Hono<Vars>();
   // These namespaces must never fall through to the SPA, even for unknown API routes.
   // /api/* also matches /api itself in Hono.
@@ -145,6 +152,7 @@ export function createApp(
 
   app.route("/healthz", healthRoutes(deps));
   const votes = voteRoutes(deps);
+  const testVotes = voteRoutes(testDeps);
   // Before /api/initiatives, so /api/initiatives.json is never read as a slug.
   app.route("/", feedRoutes(feedCache, deps, votes.replay));
   app.route("/api/auth", authRoutes(deps));
@@ -155,6 +163,7 @@ export function createApp(
   app.route("/api/uploads", uploadRoutes(deps));
   app.route("/api/watchlist", watchlistRoutes(deps));
   app.route("/api/vote", votes);
+  app.route("/api/vote-test", testVotes);
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));
@@ -162,6 +171,21 @@ export function createApp(
   app.route("/api/admin/audit", auditRoutes(deps));
   app.route("/api/reviews", reviewRoutes(deps));
   app.route("/api/admin", adminRoutes(deps, votes.replay));
+  // Reuse only vote administration and its auth middleware, never unrelated admin actions.
+  const testAdmin = adminRoutes(testDeps, testVotes.replay);
+  for (const route of testAdmin.routes) {
+    if (route.path === "/*" || route.path === "*" || route.path.startsWith("/vote-round")) {
+      app.on(
+        route.method,
+        "/api/admin" + route.path.replace("/vote-round", "/vote-test-round"),
+        route.handler,
+      );
+    }
+  }
+  const testFeeds = feedRoutes(feedCache, testDeps, testVotes.replay);
+  for (const route of testFeeds.routes) {
+    if (route.path === "/vote/llms.txt") app.on(route.method, "/vote-test/llms.txt", route.handler);
+  }
   app.route("/initiative", markdownRoutes(deps, feedCache));
 
   if (site) {

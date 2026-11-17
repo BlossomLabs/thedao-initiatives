@@ -1,10 +1,11 @@
+import { useRound, useVoteApi } from "~/lib/vote-round";
 import { ballotStorageKey, roundId } from "../../shared/vote/keys";
 /** Sending a ballot and waiting for mints: the wallet, signing and the chain client.
  * Kept apart from use-vote.ts so the pages that only show the vote never load it. */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPublicClient, type Hex, http, type PublicClient } from "viem";
 import { signTypedData, writeContract } from "wagmi/actions";
-import { api, ApiError } from "~/lib/api";
+import { ApiError } from "~/lib/api";
 import { apiCode, type RoundView } from "~/hooks/use-vote";
 import { useWallet } from "~/context/wallet";
 import { liveConnector } from "~/lib/wallet-store";
@@ -19,7 +20,7 @@ import {
   submitBallot,
 } from "~/lib/vote-flow";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
-import { MAINNET_CHAIN_ID, ROUND, voteChain, type VoteManifest } from "../../shared/vote/manifest";
+import { MAINNET_CHAIN_ID, voteChain, type VoteManifest } from "../../shared/vote/manifest";
 import { checkBallotTx, replayedBallot } from "../../shared/vote/receipt";
 import { contractOwner, recordVote } from "../../shared/vote/record";
 
@@ -31,7 +32,7 @@ const WAIT_MS = 3 * 60_000;
 
 let client: { chainId: number; pub: PublicClient } | null = null;
 /** Reads the round's chain from the browser (receipts, nonces, self-send). */
-export const voteClient = (m: VoteManifest = ROUND): PublicClient => {
+export const voteClient = (m: VoteManifest): PublicClient => {
   if (client?.chainId !== m.chainId) {
     client = {
       chainId: m.chainId,
@@ -52,10 +53,10 @@ const read = <T>(m: VoteManifest, functionName: string, args: readonly unknown[]
     args: args as never,
   }) as Promise<T>;
 
-const storeKey = (tokenId: bigint, m: VoteManifest = ROUND) => ballotStorageKey("last", m, tokenId);
-function loadLast(tokenId: bigint): Signed | null {
+const storeKey = (tokenId: bigint, m: VoteManifest) => ballotStorageKey("last", m, tokenId);
+function loadLast(tokenId: bigint, m: VoteManifest): Signed | null {
   try {
-    const raw = sessionStorage.getItem(storeKey(tokenId));
+    const raw = sessionStorage.getItem(storeKey(tokenId, m));
     if (!raw) return null;
     const v = JSON.parse(raw);
     return { ...v, tokenId: BigInt(v.tokenId), nonce: BigInt(v.nonce) };
@@ -76,7 +77,7 @@ function saveLast(s: Signed | null, m: VoteManifest) {
 export async function waitResult(
   hash: Hex,
   expect: { tokenId: bigint; nonce: bigint; ballot: Hex },
-  m: VoteManifest = ROUND,
+  m: VoteManifest,
 ) {
   const pub = voteClient(m);
   const receipt = await pub.waitForTransactionReceipt({ hash, timeout: WAIT_MS });
@@ -90,23 +91,32 @@ export async function waitResult(
 
 /** Sign, relay, wait and check one ballot; Retry and the last send survive a reload. */
 export function useBallotSubmit(tokenId: bigint | null) {
+  const ROUND = useRound();
+  const api = useVoteApi();
+
   const wallet = useWallet();
   const ensureChain = useEnsureVoteChain();
   const [phase, setPhase] = useState<BallotPhase>({ kind: "idle" });
   const [last, setLast] = useState<Signed | null>(
-    () => (tokenId === null ? null : loadLast(tokenId)),
+    () => (tokenId === null ? null : loadLast(tokenId, ROUND)),
   );
   // Another badge (the picker): its own last ballot and a fresh status, never this one's.
   const identity = `${roundId(ROUND)}:${tokenId}`;
   const [forToken, setForToken] = useState(identity);
   if (forToken !== identity) {
     setForToken(identity);
-    setLast(tokenId === null ? null : loadLast(tokenId));
+    setLast(tokenId === null ? null : loadLast(tokenId, ROUND));
     setPhase({ kind: "idle" });
   }
 
   const active = useRef(identity);
   active.current = identity;
+  useEffect(() => {
+    active.current = identity;
+    return () => {
+      active.current = "";
+    };
+  }, [identity]);
   const m = useMemo(() => ({ ...ROUND }), [identity, ROUND]);
   const setCurrentPhase = useCallback((p: BallotPhase) => {
     if (active.current === identity) setPhase(p);

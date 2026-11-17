@@ -51,7 +51,7 @@ Deno.test("correction batches require admins, fresh authentication, current sett
   };
   try {
     const admin = await h.mint(ADMIN, true);
-    const path = "/api/admin/vote-round/corrections";
+    const path = "/api/admin/vote-test-round/corrections";
     const json = { action: "group", revision: "4", id: "0", name: "Corrected" };
     const post = (body: unknown, token = admin) =>
       h.req(path, { method: "POST", token, json: body });

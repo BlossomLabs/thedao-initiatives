@@ -10,7 +10,7 @@ import { threatsAsync } from "../../../shared/vote/threat";
 import { effectiveRanks } from "../../../vote/shared/ranks";
 import type { VoteManifest } from "../../../shared/vote/manifest";
 
-/** Examples of the ballot through the vote, public at `/vote/mock/<kind>` (and in dev at
+/** Examples of the ballot through the vote, public at `/vote-test/mock/<kind>` (and in dev at
  * `?mock=<kind>`): the real round's dates and the board's real proposals, with a made-up
  * pool, voters and ballot. Nothing is sent from them. In the order they happen. */
 export const MOCKS = [
@@ -427,7 +427,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   return { round, view, skipped };
 }
 
-/** Examples of the vote results, public at `/vote/results/<id>`: the round at each moment
+/** Examples of the vote results, public at `/vote-test/results/<id>`: the round at each moment
  * the ballot's examples show (a variant, prefilled or never voted, shows the same round).
  * `s-settled` is the first name of `spent`'s, kept so links to it still work. */
 export const RESULT_MOCKS = {

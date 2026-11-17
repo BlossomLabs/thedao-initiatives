@@ -25,6 +25,8 @@ const menuLink = ({ isActive }: { isActive: boolean }) =>
 
 const LINKS = [
   { to: "/", label: "Initiatives", end: true },
+  { to: "/vote", label: "Production vote" },
+  { to: "/vote-test", label: "Test vote" },
   { to: "/submit", label: "Suggest an initiative" },
 ];
 

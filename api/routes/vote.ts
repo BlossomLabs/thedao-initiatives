@@ -556,7 +556,13 @@ export function voteRoutes(deps: Deps) {
     }
   };
   const limit = async (name: string, ip: string | null) => {
-    if (!(await deps.db.rateLimit(`vote-${name}:${ip ?? "?"}`, PER_MINUTE, 60))) {
+    if (
+      !(await deps.db.rateLimit(
+        `vote-${deps.voteEnvironment ?? "production"}-${name}:${ip ?? "?"}`,
+        PER_MINUTE,
+        60,
+      ))
+    ) {
       throw new HttpError(429, "slow down");
     }
   };

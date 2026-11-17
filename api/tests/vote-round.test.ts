@@ -1,3 +1,4 @@
+import { voteRequestPath } from "./vote-path.ts";
 import { assertEquals } from "@std/assert";
 import { privateKeyToAccount } from "viem/accounts";
 import { bytesToHex, type Hex, parseSignature, signatureToCompactSignature, zeroHash } from "viem";
@@ -250,7 +251,7 @@ async function setup(m: VoteManifest = manifest) {
 
 /** Admin → Vote's "give a badge", by an admin with a recent sign-in. */
 async function give(h: Awaited<ReturnType<typeof harness>>, to: string) {
-  return await h.req("/api/admin/vote-round/badge", {
+  return await h.req(voteRequestPath(h.deps, "/api/admin/vote-round/badge"), {
     method: "POST",
     token: await h.mint(ADMIN, true),
     json: { address: to },
@@ -274,11 +275,15 @@ const BALLOT = bytesToHex(encodeBallot(manifest.slugs, { a: "S", c: "A" }));
 
 Deno.test("vote round mine: the signed-in account's badges, or none; needs a session", async () => {
   const { h, state } = await setup();
-  assertEquals((await h.req("/api/vote/mine")).status, 401);
+  assertEquals((await h.req(voteRequestPath(h.deps, "/api/vote/mine"))).status, 401);
   const token = await h.mint(PLAIN);
-  assertEquals(await j(await h.req("/api/vote/mine", { token })), { ids: [] });
+  assertEquals(await j(await h.req(voteRequestPath(h.deps, "/api/vote/mine"), { token })), {
+    ids: [],
+  });
   state.owners.set(17n, PLAIN);
-  assertEquals(await j(await h.req("/api/vote/mine", { token })), { ids: [17] });
+  assertEquals(await j(await h.req(voteRequestPath(h.deps, "/api/vote/mine"), { token })), {
+    ids: [17],
+  });
   h.close();
 });
 
@@ -286,7 +291,9 @@ Deno.test("real round mine: every voting badge the account holds, in order", asy
   const { h, state } = await setup(real);
   state.badges.set(PLAIN.toLowerCase(), [40, 12]);
   const token = await h.mint(PLAIN);
-  assertEquals(await j(await h.req("/api/vote/mine", { token })), { ids: [12, 40] });
+  assertEquals(await j(await h.req(voteRequestPath(h.deps, "/api/vote/mine"), { token })), {
+    ids: [12, 40],
+  });
   h.close();
 });
 
@@ -294,7 +301,11 @@ Deno.test("real round: no test badges, ETH or TestUSD from admins, no gas drip",
   const { h, state } = await setup(real);
   const token = await h.mint(PLAIN);
   state.owners.set(17n, PLAIN);
-  const gas = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
+  const gas = await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
+    method: "POST",
+    token,
+    json: { tokenId: "17" },
+  });
   assertEquals([gas.status, (await j(gas)).code], [404, "off"]);
   for (
     const [path, json] of [
@@ -303,7 +314,7 @@ Deno.test("real round: no test badges, ETH or TestUSD from admins, no gas drip",
       ["test-usd", { address: OTHER.address, usd: 100 }],
     ] as const
   ) {
-    const res = await h.req(`/api/admin/vote-round/${path}`, {
+    const res = await h.req(voteRequestPath(h.deps, `/api/admin/vote-round/${path}`), {
       method: "POST",
       token: await h.mint(ADMIN, true),
       json,
@@ -317,12 +328,12 @@ Deno.test("real round: no test badges, ETH or TestUSD from admins, no gas drip",
 Deno.test("real round ballot: the badge's owner votes; another wallet's signature is refused", async () => {
   const { h, state } = await setup(real);
   state.owners.set(12n, VOTER.address);
-  const ok = await h.req("/api/vote/ballot", {
+  const ok = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
   });
   assertEquals(ok.status, 200);
-  const bad = await h.req("/api/vote/ballot", {
+  const bad = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(OTHER, 12n, 1n, BALLOT, real),
   });
@@ -334,14 +345,14 @@ Deno.test("real round ballot: the relay pays for at most 5 ballots per badge", a
   const { h, state } = await setup(real);
   state.owners.set(12n, VOTER.address);
   for (let i = 1; i <= 5; i++) {
-    const res = await h.req("/api/vote/ballot", {
+    const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
       method: "POST",
       json: await signedBallot(VOTER, 12n, BigInt(i), BALLOT, real),
     });
     assertEquals(res.status, 200, `relay ${i}`);
     state.nonces.set(12n, BigInt(i));
   }
-  const over = await h.req("/api/vote/ballot", {
+  const over = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(VOTER, 12n, 6n, BALLOT, real),
   });
@@ -353,7 +364,7 @@ Deno.test("real round ballot: a relayer low on gas says to send it yourself", as
   const { h, state } = await setup(real);
   state.owners.set(12n, VOTER.address);
   state.balances.set(RELAYER, 0n);
-  const res = await h.req("/api/vote/ballot", {
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
   });
@@ -364,8 +375,14 @@ Deno.test("real round ballot: a relayer low on gas says to send it yourself", as
 
 Deno.test("vote relayer: admins see its address and balance; nobody else", async () => {
   const { h } = await setup(real);
-  assertEquals((await h.req("/api/vote/relayer", { token: await h.mint(PLAIN) })).status, 403);
-  const res = await h.req("/api/vote/relayer", { token: await h.mint(ADMIN, true) });
+  assertEquals(
+    (await h.req(voteRequestPath(h.deps, "/api/vote/relayer"), { token: await h.mint(PLAIN) }))
+      .status,
+    403,
+  );
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/relayer"), {
+    token: await h.mint(ADMIN, true),
+  });
   assertEquals(await j(res), { address: RELAYER, balanceWei: (10n ** 18n).toString(), chainId: 1 });
   h.close();
 });
@@ -373,7 +390,7 @@ Deno.test("vote relayer: admins see its address and balance; nobody else", async
 Deno.test("admin badge: mints the next free badge to the address; admins only", async () => {
   const { h, state } = await setup();
   assertEquals(
-    (await h.req("/api/admin/vote-round/badge", {
+    (await h.req(voteRequestPath(h.deps, "/api/admin/vote-round/badge"), {
       method: "POST",
       token: await h.mint(PLAIN),
       json: { address: PLAIN },
@@ -409,7 +426,10 @@ Deno.test("vote round ballot: relays record() with the signature as r and vs (pl
   const { h, state } = await setup();
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 200);
   const { r, yParityAndS } = signatureToCompactSignature(parseSignature(body.signature));
   assertEquals(state.sent, [{
@@ -441,7 +461,7 @@ Deno.test("admin ETH and TestUSD: sent by the relayer to the address, within lim
     ],
   });
   const send = async (path: string, json: unknown) =>
-    (await h.req(`/api/admin/vote-round/${path}`, {
+    (await h.req(voteRequestPath(h.deps, `/api/admin/vote-round/${path}`), {
       method: "POST",
       token: await h.mint(ADMIN, true),
       json,
@@ -464,7 +484,10 @@ Deno.test("vote round ballot: refusals", async () => {
   const { h, state } = await setup();
   state.owners.set(17n, VOTER.address);
   const post = async (body: unknown) => {
-    const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+    const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+      method: "POST",
+      json: body,
+    });
     return [res.status, (await j(res)).code];
   };
   const zero = bytesToHex(Uint8Array.from([0, 255, 255]));
@@ -487,8 +510,13 @@ Deno.test("vote round ballot: a second relay of the same nonce returns the pendi
   const { h, state } = await setup();
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
-  const first = await j(await h.req("/api/vote/ballot", { method: "POST", json: body }));
-  const again = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const first = await j(
+    await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), { method: "POST", json: body }),
+  );
+  const again = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(again.status, 409);
   const out = await j(again);
   assertEquals([out.code, out.hash], ["pending", first.hash]);
@@ -504,17 +532,17 @@ Deno.test("vote round ballots: latest per badge, only before the close, cached b
     { tokenId: "1", ballot: "0xffff01", timestamp: NOW - 80 },
     { tokenId: "2", ballot: "0x010101", timestamp: manifest.closesAt },
   ];
-  const res = await h.req("/api/vote/ballots");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballots"));
   assertEquals(res.status, 200);
   const body = await j(res);
   assertEquals(body.ballots, [
     { tokenId: "1", ballot: "0xffff01" },
     { tokenId: "2", ballot: "0xff01ff" },
   ]);
-  await h.req("/api/vote/ballots");
+  await h.req(voteRequestPath(h.deps, "/api/vote/ballots"));
   assertEquals(state.ballotReads, 1);
   h.clock.now += 6;
-  await h.req("/api/vote/ballots");
+  await h.req(voteRequestPath(h.deps, "/api/vote/ballots"));
   assertEquals(state.ballotReads, 2);
   h.close();
 });
@@ -522,9 +550,9 @@ Deno.test("vote round ballots: latest per badge, only before the close, cached b
 Deno.test("vote round ballots: closed results are revalidated after the short memory cache", async () => {
   const { h, state } = await setup();
   h.clock.now = manifest.closesAt + 60 * 60;
-  await h.req("/api/vote/ballots");
+  await h.req(voteRequestPath(h.deps, "/api/vote/ballots"));
   h.clock.now += 24 * 60 * 60;
-  await h.req("/api/vote/ballots");
+  await h.req(voteRequestPath(h.deps, "/api/vote/ballots"));
   assertEquals(state.ballotReads, 2);
   h.close();
 });
@@ -535,7 +563,11 @@ Deno.test("vote round gas: tops up a low balance once per badge, only for its ow
   const token = await h.mint(PLAIN);
   const other = await h.mint(OTHER.address);
   const gas = (t: string) =>
-    h.req("/api/vote/gas", { method: "POST", token: t, json: { tokenId: "17" } });
+    h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
+      method: "POST",
+      token: t,
+      json: { tokenId: "17" },
+    });
 
   const notOwner = await gas(other);
   assertEquals(notOwner.status, 403);
@@ -556,10 +588,18 @@ Deno.test("vote round gas: enough balance already needs no drip and leaves the o
   state.owners.set(17n, PLAIN);
   state.balances.set(PLAIN.toLowerCase(), 10n ** 18n);
   const token = await h.mint(PLAIN);
-  const res = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
+    method: "POST",
+    token,
+    json: { tokenId: "17" },
+  });
   assertEquals(await j(res), { hash: null });
   state.balances.set(PLAIN.toLowerCase(), 0n);
-  const later = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
+  const later = await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
+    method: "POST",
+    token,
+    json: { tokenId: "17" },
+  });
   assertEquals(later.status, 200);
   assertEquals(state.sent.length, 1);
   h.close();
@@ -570,7 +610,11 @@ Deno.test("vote round gas: closed after the vote", async () => {
   state.owners.set(17n, PLAIN);
   const token = await h.mint(PLAIN);
   h.clock.now = manifest.closesAt;
-  const res = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
+    method: "POST",
+    token,
+    json: { tokenId: "17" },
+  });
   assertEquals([res.status, (await j(res)).code], [410, "closed"]);
   h.close();
 });
@@ -584,7 +628,7 @@ Deno.test("vote round ballots: a revoked (burned) badge's earlier ballot no long
     { tokenId: "2", revoked: true, timestamp: NOW - 85 },
     { tokenId: "2", ballot: "0xffff01", timestamp: NOW - 80 },
   ];
-  const body = await j(await h.req("/api/vote/ballots"));
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/ballots")));
   assertEquals(body.ballots, [{ tokenId: "2", ballot: "0xffff01" }]);
   h.close();
 });
@@ -603,9 +647,14 @@ Deno.test("vote round ballot: a pending relay that reverted no longer blocks a r
   const { h, state } = await setup();
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
-  const first = await j(await h.req("/api/vote/ballot", { method: "POST", json: body }));
+  const first = await j(
+    await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), { method: "POST", json: body }),
+  );
   state.txStatus.set(first.hash as string, "reverted");
-  const again = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const again = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(again.status, 200);
   assertEquals(state.sent.length, 2);
   h.close();
@@ -615,11 +664,21 @@ Deno.test("vote round ballot: a pending relay the node never saw frees after a m
   const { h, state } = await setup();
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
-  const first = await j(await h.req("/api/vote/ballot", { method: "POST", json: body }));
+  const first = await j(
+    await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), { method: "POST", json: body }),
+  );
   state.txStatus.set(first.hash as string, "unknown");
-  assertEquals((await h.req("/api/vote/ballot", { method: "POST", json: body })).status, 409);
+  assertEquals(
+    (await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), { method: "POST", json: body }))
+      .status,
+    409,
+  );
   h.clock.now += 61;
-  assertEquals((await h.req("/api/vote/ballot", { method: "POST", json: body })).status, 200);
+  assertEquals(
+    (await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), { method: "POST", json: body }))
+      .status,
+    200,
+  );
   h.close();
 });
 
@@ -627,14 +686,14 @@ Deno.test("vote round ballot: the relay pays for at most 20 ballots per badge", 
   const { h, state } = await setup();
   state.owners.set(17n, VOTER.address);
   for (let i = 1; i <= 20; i++) {
-    const res = await h.req("/api/vote/ballot", {
+    const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
       method: "POST",
       json: await signedBallot(VOTER, 17n, BigInt(i), BALLOT),
     });
     assertEquals(res.status, 200, `relay ${i}`);
     state.nonces.set(17n, BigInt(i));
   }
-  const over = await h.req("/api/vote/ballot", {
+  const over = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(VOTER, 17n, 21n, BALLOT),
   });
@@ -664,7 +723,11 @@ Deno.test("vote round: a new round starts clean (gas and badge numbers are per c
   // Team test round: badge 1 given, and badge 17's gas drip.
   assertEquals((await j(await give(h, OTHER.address))).tokenId, 1);
   assertEquals(
-    (await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } })).status,
+    (await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
+      method: "POST",
+      token,
+      json: { tokenId: "17" },
+    })).status,
     200,
   );
 
@@ -678,7 +741,11 @@ Deno.test("vote round: a new round starts clean (gas and badge numbers are per c
   };
   const third = privateKeyToAccount(`0x${"44".repeat(32)}`).address;
   assertEquals((await j(await give(h, third))).tokenId, 1, "badge 1 is free in the new round");
-  const gas = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
+  const gas = await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
+    method: "POST",
+    token,
+    json: { tokenId: "17" },
+  });
   assertEquals(gas.status, 200, "the badge's one drip is per round");
   h.close();
 });
@@ -710,18 +777,18 @@ Deno.test("the round lists each initiative's gap to the next tier", async () => 
   type Next = { tier: string; gap: string | null };
   type Body = { live: { next?: Record<string, Next> } };
   // The first read starts the search and doesn't wait for it.
-  const first = await j(await h.req("/api/vote/round")) as Body;
+  const first = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(first.live.next, undefined);
   await h.settle();
   // Once it is done, the cached round carries it.
-  const open = await j(await h.req("/api/vote/round")) as Body;
+  const open = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   const next = open.live.next!;
   assertEquals(next.a, undefined, "funded in S-Tier: no next tier");
   assertEquals(next.b.tier, "B");
   assertEquals(next.b.gap, "3000000000");
   // Once the round closes there is no live tally, so nothing to look ahead at.
   h.clock.now = NOW + 7200;
-  const closed = await j(await h.req("/api/vote/round")) as {
+  const closed = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
     closed: boolean;
     live: { next?: unknown };
   };
@@ -736,19 +803,19 @@ Deno.test("round: after a new ballot the gaps from before it are marked stale un
   state.asks = [3_000_000_000n, 3_000_000_000n, 3_000_000_000n];
   state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
   type Body = { accepted: object; live: { next?: object; aheadStale?: boolean } };
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await h.settle();
-  const before = await j(await h.req("/api/vote/round")) as Body;
+  const before = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals([Boolean(before.live.next), before.live.aheadStale], [true, undefined]);
   // Somebody else's ballot: the live tally changes at once; the gaps are a search behind.
   state.logs.push(logOf("3", `${X}01${X}`, NOW - 5, 3));
   h.clock.now += 10;
-  const after = await j(await h.req("/api/vote/round")) as Body;
+  const after = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(Object.keys(after.accepted), ["1", "2", "3"]);
   assertEquals([Boolean(after.live.next), after.live.aheadStale], [true, true]);
   await h.settle();
   h.clock.now += 10;
-  const searched = await j(await h.req("/api/vote/round")) as Body;
+  const searched = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(searched.live.aheadStale, undefined);
   await h.settle();
   h.close();
@@ -762,10 +829,10 @@ Deno.test("round next: who it knocks out is named by slug", async () => {
   state.asks = [70_000_000_000n, 40_000_000_000n, 1n << 60n];
   const backsB = bytesToHex(encodeBallot(qe.slugs, { c: "S", b: "B" })).slice(2);
   state.logs = [logOf("1", backsB, NOW - 100, 1), logOf("2", backsB, NOW - 90, 2)];
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await h.settle();
   type Knock = { slug: string; tier: string };
-  const body = await j(await h.req("/api/vote/round")) as {
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
     live: {
       tiers: Record<string, string>;
       next: Record<string, { gap: string; comesIn: Knock[]; dropsOut: Knock[]; moves: Knock[] }>;
@@ -787,10 +854,12 @@ Deno.test("the round lists the donation that moves each initiative up a tier", a
   state.asks = [70_000_000_000n, 40_000_000_000n, huge];
   const backsB = bytesToHex(encodeBallot(qe.slugs, { c: "S", b: "B" })).slice(2);
   state.logs = [logOf("1", backsB, NOW - 100, 1), logOf("2", backsB, NOW - 90, 2)];
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await h.settle();
   type Give = { tier: string; gap: string | null };
-  const body = await j(await h.req("/api/vote/round")) as { live: { give: Record<string, Give> } };
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    live: { give: Record<string, Give> };
+  };
   const give = body.live.give;
   // c isn't funded, so the search aims for B-Tier, the first tier up; both ballots have
   // it in S-Tier, so the donation that gets it there lands it in S-Tier (#101).
@@ -812,20 +881,24 @@ Deno.test("round next: the same tally inputs are searched once", async () => {
   const collect = h.deps.background!;
   h.deps.background = (work) => (searches++, collect(work));
   // The ballots replay the round too, but need no gaps.
-  await h.req("/api/vote/ballots");
+  await h.req(voteRequestPath(h.deps, "/api/vote/ballots"));
   assertEquals(searches, 0);
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await h.settle();
   // The round cache has expired, but nothing the tally reads has changed.
   h.clock.now += 10;
-  const body = await j(await h.req("/api/vote/round")) as { live: { next?: unknown } };
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    live: { next?: unknown };
+  };
   await h.settle();
   assertEquals(searches, 1);
   assertEquals(body.live.next !== undefined, true);
   // A new ballot changes the inputs: searched again, the last result served meanwhile.
   state.logs.push(logOf("3", `0101${X}`, NOW - 5, 3));
   h.clock.now += 10;
-  const again = await j(await h.req("/api/vote/round")) as { live: { next?: unknown } };
+  const again = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    live: { next?: unknown };
+  };
   assertEquals(again.live.next, body.live.next);
   await h.settle();
   assertEquals(searches, 2);
@@ -852,10 +925,10 @@ type LiveBody = {
 Deno.test("an open round serves each S-Tier initiative's threat", async () => {
   const { h } = await threatSetup();
   // Like the gaps: the first read starts the work and doesn't wait for it.
-  const first = await j(await h.req("/api/vote/round")) as LiveBody;
+  const first = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as LiveBody;
   assertEquals(first.live.threat, undefined);
   await h.settle();
-  const body = await j(await h.req("/api/vote/round")) as LiveBody;
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as LiveBody;
   assertEquals(body.live.next !== undefined, true);
   // a costs $3K of the voters' $6K and nothing else is ranked: no donation elsewhere
   // pushes it out.
@@ -868,10 +941,10 @@ Deno.test("an open round serves each S-Tier initiative's threat", async () => {
 Deno.test("once S-Tier has settled, the threats are A-Tier's", async () => {
   const { h } = await threatSetup();
   h.clock.now = NOW + 700; // S settled at NOW + 660; A is open
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await h.settle();
   h.clock.now += 10;
-  const body = await j(await h.req("/api/vote/round")) as LiveBody;
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as LiveBody;
   assertEquals(body.live.next !== undefined, true, "the search ran");
   // a was S-Tier's; the ballots rank nothing else, so A-Tier funds nothing to threaten.
   assertEquals(body.live.threat, {});
@@ -884,9 +957,9 @@ Deno.test("a failed threat search keeps the gaps", async () => {
   const real = voteSearches.threats;
   voteSearches.threats = () => Promise.reject(new Error("boom"));
   try {
-    await h.req("/api/vote/round");
+    await h.req(voteRequestPath(h.deps, "/api/vote/round"));
     await h.settle();
-    const body = await j(await h.req("/api/vote/round")) as LiveBody;
+    const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as LiveBody;
     assertEquals(body.live.next !== undefined, true);
     assertEquals(body.live.give !== undefined, true);
     assertEquals(body.live.threat, undefined);
@@ -914,11 +987,11 @@ const roundKey = ["vote", qe.contract.toLowerCase(), "round"];
  * this isolate has nothing in memory, and KV has no `final` entry. */
 async function closedCachedElsewhere() {
   const other = await closedSetup();
-  await other.h.req("/api/vote/round");
+  await other.h.req(voteRequestPath(other.h.deps, "/api/vote/round"));
   await other.h.settle();
   const entry = {
     at: other.h.clock.now,
-    body: await j(await other.h.req("/api/vote/round")),
+    body: await j(await other.h.req(voteRequestPath(other.h.deps, "/api/vote/round"))),
     finalKey: "obsolete",
   };
   other.h.close();
@@ -931,15 +1004,15 @@ async function closedCachedElsewhere() {
 Deno.test("a closed round ignores obsolete saved results and computes its what-ifs", async () => {
   const { h, state } = await closedCachedElsewhere();
   type Body = { final?: unknown };
-  const first = await j(await h.req("/api/vote/round")) as Body;
+  const first = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(first.final, undefined);
   assertEquals(state.ballotReads, 1, "replayed to start the search");
   // The search is running: the cached round is served, no second replay.
-  const second = await j(await h.req("/api/vote/round")) as Body;
+  const second = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(second.final, undefined);
   assertEquals(state.ballotReads, 1);
   await h.settle();
-  const done = await j(await h.req("/api/vote/round")) as Body;
+  const done = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(done.final !== undefined, true);
   assertEquals(state.ballotReads, 1);
   await h.settle();
@@ -953,12 +1026,12 @@ Deno.test("an unreadable chain never falls back to an old cached allocation", as
     state.ballotReads++;
     return Promise.reject(new Error("RPC down"));
   };
-  const first = await h.req("/api/vote/round");
+  const first = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(first.status, 503);
   assertEquals((await j(first)).code, "asks_unavailable");
   chain.ballots = ballots;
   h.clock.now += 6;
-  assertEquals((await h.req("/api/vote/round")).status, 200);
+  assertEquals((await h.req(voteRequestPath(h.deps, "/api/vote/round"))).status, 200);
   await h.settle();
   h.close();
 });
@@ -976,13 +1049,13 @@ Deno.test("a closed round serves the final what-ifs", async () => {
     final?: Final;
   };
   // Never waits for the what-ifs.
-  const first = await j(await h.req("/api/vote/round")) as Body;
+  const first = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(first.closed, true);
   assertEquals(first.tiers.map((t) => t.funded), [["a"], ["b"], []]);
   assertEquals(first.final, undefined);
   await h.settle();
   // The short-lived replay is reused; derived what-ifs come with its result.
-  const body = await j(await h.req("/api/vote/round")) as Body;
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   const final = body.final!;
   assertEquals([body.live.next, body.live.lead], [undefined, undefined]);
   assertEquals(final.next.b.tier, "S");
@@ -990,7 +1063,7 @@ Deno.test("a closed round serves the final what-ifs", async () => {
   assertEquals(final.next.a, undefined, "S-Tier has a lead, not a next tier");
   assertEquals(final.lead.a !== undefined && BigInt(final.lead.a) >= 1_000_000_000n, true);
   assertEquals(
-    ((await h.kv.get(["vote", qe.chainId, qe.contract.toLowerCase(), "final"])).value as {
+    ((await h.kv.get(["vote", "test", qe.chainId, qe.contract.toLowerCase(), "final"])).value as {
       final: Final;
     })
       .final,
@@ -1007,7 +1080,7 @@ Deno.test("round: a round too large for one KV value is served, just not cached"
     { length: 4000 },
     (_, i) => logOf(String(i + 1), `01${X}${X}`, NOW - 100, i + 1),
   );
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(res.status, 200);
   assertEquals(Object.keys((await j(res) as { accepted: object }).accepted).length, 4000);
   await h.settle();
@@ -1036,7 +1109,7 @@ Deno.test("cacheSet: a value over the KV limit is skipped, never thrown", async 
 
 Deno.test("round: before S's first tally every tier waits; the live tally funds a", async () => {
   const { h } = await qeSetup();
-  const body = await j(await h.req("/api/vote/round")) as
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as
     & { tiers: { status: string }[] }
     & Record<string, unknown>;
   assertEquals((body.tiers as { status: string }[]).map((t) => t.status), [
@@ -1077,7 +1150,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
 Deno.test("round: historical asks preserve S-Tier awards without storing a settlement", async () => {
   const { h, state } = await qeSetup();
   h.clock.now = NOW + 700; // settled at NOW + 660, but logs before it may still arrive
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(
     (await h.deps.db.kv.get(["vote", qe.contract.toLowerCase(), "settled-w1", "S"])).value,
     null,
@@ -1088,7 +1161,9 @@ Deno.test("round: historical asks preserve S-Tier awards without storing a settl
     stateAt(5, NOW + 690, [10n, 10n, 10n], 200n),
   ];
   h.clock.now += 10;
-  const fresh = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
+  const fresh = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    tiers: { awards: unknown }[];
+  };
   assertEquals(fresh.tiers[0].awards, { a: "150" });
   await h.settle();
   h.close();
@@ -1097,7 +1172,7 @@ Deno.test("round: historical asks preserve S-Tier awards without storing a settl
 Deno.test("round: each badge's share, and what it paid in a settled tier", async () => {
   const { h } = await qeSetup();
   h.clock.now = NOW + 700;
-  const body = await j(await h.req("/api/vote/round")) as {
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
     share: string;
     tiers: { paid?: Record<string, Record<string, string>> }[];
   };
@@ -1111,7 +1186,9 @@ Deno.test("ballots: only what the quiet ending counts (a refused revision isn't 
   const { h, state } = await qeSetup();
   state.logs.push(logOf("1", `${X}01${X}`, NOW + 700, 3)); // moves a out of settled S
   h.clock.now = NOW + 710;
-  const body = await j(await h.req("/api/vote/ballots")) as { ballots: unknown[] };
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/ballots"))) as {
+    ballots: unknown[];
+  };
   assertEquals(body.ballots, [
     { tokenId: "1", ballot: `0x01${X}${X}` },
     { tokenId: "2", ballot: `0x01${X}${X}` },
@@ -1122,7 +1199,9 @@ Deno.test("ballots: only what the quiet ending counts (a refused revision isn't 
 Deno.test("round: a quiet window settles S-Tier; later ask changes never move it", async () => {
   const { h, state } = await qeSetup();
   h.clock.now = NOW + 660 + 30 * 60;
-  const first = await j(await h.req("/api/vote/round")) as { tiers: unknown[] };
+  const first = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    tiers: unknown[];
+  };
   assertEquals(first.tiers[0], {
     tier: "S",
     status: "settled",
@@ -1140,7 +1219,9 @@ Deno.test("round: a quiet window settles S-Tier; later ask changes never move it
     stateAt(5, NOW + 690, [10n, 10n, 10n], 200n),
   ];
   h.clock.now += 10;
-  const later = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
+  const later = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    tiers: { awards: unknown }[];
+  };
   assertEquals(later.tiers[0].awards, { a: "150" });
   await h.settle();
   h.close();
@@ -1152,7 +1233,7 @@ Deno.test("round ballot: a settled tier can't change; registration closes; B set
   state.owners.set(3n, VOTER.address);
   state.nonces.set(1n, 1n);
   h.clock.now = NOW + 700;
-  const moved = await h.req("/api/vote/ballot", {
+  const moved = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(VOTER, 1n, 2n, `0x${X}01${X}`, qe),
   });
@@ -1162,13 +1243,13 @@ Deno.test("round ballot: a settled tier can't change; registration closes; B set
     refusedBody.error ?? refusedBody.message,
     "S-Tier has settled: its initiatives can't move.",
   );
-  const late = await h.req("/api/vote/ballot", {
+  const late = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(VOTER, 3n, 1n, `0x01${X}${X}`, qe),
   });
   assertEquals([late.status, (await j(late)).code], [403, "registration_closed"]);
   h.clock.now = NOW + 800;
-  const over = await h.req("/api/vote/ballot", {
+  const over = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
     method: "POST",
     json: await signedBallot(VOTER, 1n, 2n, `0x0102${X}`, qe),
   });
@@ -1179,7 +1260,7 @@ Deno.test("round ballot: a settled tier can't change; registration closes; B set
 Deno.test("round: an RPC without past state is a 503, not a result", async () => {
   const { h, state } = await qeSetup();
   state.asks = "fail"; // the node pruned the blocks the replay reads
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   const body = await j(res);
   assertEquals([res.status, body.code], [503, "asks_unavailable"]);
   assertEquals(body.error, "The vote results can't be read from the chain right now.");
@@ -1192,7 +1273,7 @@ Deno.test("round: the round's asks come from the chain states, not the board", a
   // The board has none of a, b, c; the chain asks are what the tally and the page use.
   const { h, state, chain } = await qeSetup([10n, 20n, 30n]);
   chain.asks = () => Promise.reject(new Error("the head read is the states' own"));
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(res.status, 200);
   const body = await j(res) as { asks: string[]; live: { inputs: LiveInputsJson } };
   assertEquals(body.asks, ["10", "20", "30"]);
@@ -1210,7 +1291,7 @@ Deno.test("round: a donation inside the S-Tier window shows the tier still settl
   state.states = oneState([150n, 150n, 150n], 200n);
   h.clock.now = NOW + 670;
   type Body = { tiers: { status: string; window?: number; funded?: string[] }[] };
-  const quiet = await j(await h.req("/api/vote/round")) as Body;
+  const quiet = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(quiet.tiers[0].status, "settled", "no change: the first window settles it");
   // A donation at NOW + 630 brings b's ask to $50: both fit, so the window wasn't quiet.
   state.states = [
@@ -1218,7 +1299,7 @@ Deno.test("round: a donation inside the S-Tier window shows the tier still settl
     stateAt(5, NOW + 630, [150n, 50n, 150n], 200n),
   ];
   h.clock.now += 10;
-  const moved = await j(await h.req("/api/vote/round")) as Body;
+  const moved = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(moved.tiers[0].status, "settling");
   assertEquals(moved.tiers[0].window, 2);
   assertEquals(moved.tiers[0].funded!.sort(), ["a", "b"]);
@@ -1230,10 +1311,10 @@ Deno.test("round: a covered project is listed as covered", async () => {
   // b asks $0: covered by donations, in no tier.
   const { h } = await qeSetup([150n, 0n, 150n]);
   type Body = { tiers: { status: string; covered?: string[] }[]; live: { covered: string[] } };
-  const open = await j(await h.req("/api/vote/round")) as Body;
+  const open = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(open.live.covered, ["b"]);
   h.clock.now = NOW + 700;
-  const settled = await j(await h.req("/api/vote/round")) as Body;
+  const settled = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals([settled.tiers[0].status, settled.tiers[0].covered], ["settled", ["b"]]);
   assertEquals(settled.live.covered, [], "covered at S-Tier's settlement: final");
   await h.settle();
@@ -1244,15 +1325,21 @@ Deno.test("round: a settled tier is stable without persisting any result", async
   const { h } = await qeSetup([150n, 0n, 150n]);
   const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   h.clock.now = NOW + 700;
-  const before = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
+  const before =
+    (await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as { tiers: unknown[] })
+      .tiers[0];
   assertEquals((await h.kv.get(key)).value, null);
   h.clock.now = NOW + 660 + 30 * 60;
-  const stored = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
+  const stored =
+    (await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as { tiers: unknown[] })
+      .tiers[0];
   assertEquals((await h.kv.get(key)).value, null);
   assertEquals(stored, before);
   // Read back from the record: the same again.
   h.clock.now += 10;
-  const again = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
+  const again =
+    (await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as { tiers: unknown[] })
+      .tiers[0];
   assertEquals(again, before);
   await h.settle();
   h.close();
@@ -1264,12 +1351,12 @@ Deno.test("round: neither lagging nor caught-up states create authoritative resu
   h.clock.now = NOW + 660 + 30 * 60;
   // The states node stopped before the cutoff at NOW + 660: what came after is unseen.
   state.headAt = NOW + 600;
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals((await h.kv.get(key)).value, null);
   // Once it has caught up, replay still creates no authoritative result cache.
   state.headAt = null;
   h.clock.now += 10;
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals((await h.kv.get(key)).value, null);
   await h.settle();
   h.close();
@@ -1282,7 +1369,7 @@ Deno.test("round: served as of the newest block: past a cutoff by the clock only
   // 3 s before it, so a ballot could still land in a block before the cutoff.
   h.clock.now = NOW + 665;
   state.headAt = NOW + 657;
-  const lagging = await j(await h.req("/api/vote/round")) as Body;
+  const lagging = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(lagging.head.timestamp, NOW + 657);
   assertEquals([lagging.tiers[0].tier, lagging.tiers[0].status], ["S", "settling"]);
   // Nothing settled is stored from it.
@@ -1293,7 +1380,7 @@ Deno.test("round: served as of the newest block: past a cutoff by the clock only
   // The block at NOW + 659: every block before the cutoff is known. S-Tier settles.
   state.headAt = NOW + 659;
   h.clock.now += 10; // past the few seconds a replay is reused
-  const confirmed = await j(await h.req("/api/vote/round")) as Body;
+  const confirmed = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals(confirmed.tiers[0].status, "settled");
   await h.settle();
   h.close();
@@ -1312,7 +1399,7 @@ Deno.test("round: corrupt settlement caches cannot alter coverage, awards or acc
     covered: [],
     withdrawn: [],
   });
-  const body = await j(await h.req("/api/vote/round")) as {
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
     tiers: { funded: string[]; covered: string[]; awards: unknown }[];
   };
   assertEquals(body.tiers[0].funded, ["a"]);
@@ -1331,15 +1418,15 @@ Deno.test("round: a cold chain read answers 503 in time and fills in the backgro
   const reads = { n: 0 };
   h.deps.vote!.states = () => (reads.n++, slow);
   h.deps.vote!.statesWaitMs = 20;
-  const first = await h.req("/api/vote/round");
+  const first = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals([first.status, (await j(first)).code], [503, "asks_unavailable"]);
   // A second request joins the read in flight instead of starting another.
-  const second = await h.req("/api/vote/round");
+  const second = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals([second.status, (await j(second)).code], [503, "asks_unavailable"]);
   assertEquals(reads.n, 1);
   finish();
   await h.settle();
-  assertEquals((await h.req("/api/vote/round")).status, 200);
+  assertEquals((await h.req(voteRequestPath(h.deps, "/api/vote/round"))).status, 200);
   assertEquals(state.ballotReads, 3);
   await h.settle();
   h.close();
@@ -1354,11 +1441,11 @@ Deno.test("round: a request with a newer ballot doesn't join a read that lacks i
   const reads = { n: 0 };
   h.deps.vote!.states = () =>
     ++reads.n === 1 ? first : Promise.resolve(withHead([150n, 150n, 150n], 200n));
-  const a = h.req("/api/vote/round");
+  const a = h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await new Promise((r) => setTimeout(r, 5));
   // A ballot at block 3 the first read has no state for.
   state.logs.push(logOf("3", `01${X}${X}`, NOW - 5, 3));
-  const b = h.req("/api/vote/round");
+  const b = h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await new Promise((r) => setTimeout(r, 5));
   assertEquals(reads.n, 1, "waits for the read in flight before starting its own");
   finish();
@@ -1377,22 +1464,25 @@ Deno.test("round: pinned to one head block, the replay is reused (and joined) un
   let reads = 0;
   h.deps.vote!.states = () => (reads++, Promise.resolve(withHead([150n, 150n, 150n], 200n)));
   // Polls at the same moment join one replay.
-  const both = await Promise.all([h.req("/api/vote/round"), h.req("/api/vote/round")]);
+  const both = await Promise.all([
+    h.req(voteRequestPath(h.deps, "/api/vote/round")),
+    h.req(voteRequestPath(h.deps, "/api/vote/round")),
+  ]);
   assertEquals(both.map((r) => r.status), [200, 200]);
   assertEquals(reads, 1);
   // Past the unpinned 5 s, the same pinned block: the same replay.
   h.clock.now += 20;
-  assertEquals((await h.req("/api/vote/round")).status, 200);
+  assertEquals((await h.req(voteRequestPath(h.deps, "/api/vote/round"))).status, 200);
   assertEquals(reads, 1);
   // The next block: read again, with its ballot.
   state.logs.push(logOf("3", `01${X}${X}`, NOW - 5, 3));
   h.deps.vote!.manifest = { ...h.deps.vote!.manifest, readAt: pin(3, `0x${"bb".repeat(32)}`) };
-  const next = await h.req("/api/vote/round");
+  const next = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(reads, 2);
   assertEquals(Object.keys((await j(next) as { accepted: object }).accepted), ["1", "2", "3"]);
   // Pinned, still capped: a head that stops moving is read again after 30 s.
   h.clock.now += 31;
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(reads, 3);
   await h.settle();
   h.close();
@@ -1406,9 +1496,9 @@ Deno.test("round: a request whose ballots a read in flight covers joins it", asy
   });
   const reads = { n: 0 };
   h.deps.vote!.states = () => (reads.n++, slow);
-  const a = h.req("/api/vote/round");
+  const a = h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await new Promise((r) => setTimeout(r, 5));
-  const b = h.req("/api/vote/round");
+  const b = h.req(voteRequestPath(h.deps, "/api/vote/round"));
   await new Promise((r) => setTimeout(r, 5));
   finish();
   const [ra, rb] = await Promise.all([a, b]);
@@ -1421,7 +1511,7 @@ Deno.test("round ballot: relayed ballots reuse one replay for a few seconds; non
   const { h, state } = await qeSetup();
   state.owners.set(1n, VOTER.address);
   const send = async (nonce: bigint) =>
-    await h.req("/api/vote/ballot", {
+    await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
       method: "POST",
       json: await signedBallot(VOTER, 1n, nonce, `0x0102${X}`, qe),
     });
@@ -1442,18 +1532,18 @@ Deno.test("round: a ballot the RPC returned late can still unsettle S before it 
   h.clock.now = NOW + 700;
   const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   type Body = { tiers: { status: string; forced?: boolean }[] };
-  const first = await j(await h.req("/api/vote/round")) as Body;
+  const first = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   assertEquals([first.tiers[0].status, first.tiers[0].forced], ["settled", false]);
   assertEquals((await h.deps.db.kv.get(key)).value, null);
   // A ballot inside S's window that the RPC hadn't returned: S changed after all.
   state.logs.push(logOf("2", `${X}01${X}`, NOW + 610, 3));
   h.clock.now += 10;
-  const again = await j(await h.req("/api/vote/round")) as Body;
+  const again = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as Body;
   // maxWindows 1: forced at the same cutoff.
   assertEquals([again.tiers[0].status, again.tiers[0].forced], ["settled", true]);
   // Time never creates an authoritative settlement cache.
   h.clock.now = NOW + 660 + 30 * 60;
-  await h.req("/api/vote/round");
+  await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals((await h.deps.db.kv.get(key)).value, null);
   await h.settle();
   h.close();
@@ -1494,17 +1584,19 @@ Deno.test("ballot: outside support preserves edits after S-Tier and A-Tier settl
       state.asks[tier * 3 + 1] -= 1n;
       state.states = [...oneState(goals, 300n), stateAt(2, after, state.asks, 300n)];
       h.clock.now = after + 5;
-      const result = await j(await h.req("/api/vote/round")) as { tiers: { status: string }[] };
+      const result = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+        tiers: { status: string }[];
+      };
       assertEquals(result.tiers[tier].status, "settled");
       const changed = tier === 0 ? "0x01010101050505ff" : "0x01010104040704ff";
-      const refused = await h.req("/api/vote/ballot", {
+      const refused = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
         method: "POST",
         json: await signedBallot(VOTER, 1n, 2n, changed, m),
       });
       assertEquals([refused.status, (await j(refused)).code], [409, "tier_settled"]);
       assertEquals(state.sent.length, 0);
       const revision = tier === 0 ? "0x01010104040704ff" : "0x010101040404ff07";
-      const accepted = await h.req("/api/vote/ballot", {
+      const accepted = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
         method: "POST",
         json: await signedBallot(VOTER, 1n, 2n, revision, m),
       });
@@ -1524,7 +1616,7 @@ Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async
     logOf("1", "01010101", NOW - 100, 1), // S-Tier = a, b, c, d: valid
     logOf("2", `01030303`, NOW - 90, 2), // a rank gap: unreadable
   ];
-  const body = await j(await h.req("/api/vote/round")) as {
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
     accepted: Record<string, string>;
     rejected: { tokenId: string; reason: string }[];
     poolUsd: string;
@@ -1540,7 +1632,7 @@ Deno.test("round: a ballot the contract didn't commit is never counted", async (
   const { h, state } = await setup(ruled);
   state.logs = [logOf("1", "01010101", NOW - 100, 1)];
   state.transcriptOverride = `0x${"ab".repeat(32)}`;
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(res.status, 503);
   const body = await j(res);
   assertEquals(body.code, "transcript_mismatch");
@@ -1557,7 +1649,7 @@ Deno.test("round: a record count or a token's ballot hash the contract disagrees
     state.logs = [logOf("1", "01010101", NOW - 100, 1), logOf("2", "01010101", NOW - 90, 2)];
     if (wrong === "count") state.countOverride = 3n;
     else state.hashOverride = { tokenId: "2", hash: `0x${"cd".repeat(32)}` };
-    const res = await h.req("/api/vote/round");
+    const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
     assertEquals(res.status, 503, wrong);
     assertEquals((await j(res)).code, "transcript_mismatch", wrong);
     h.close();
@@ -1568,7 +1660,7 @@ Deno.test("round: a round from before Nov 14 is read with its legacy transcript"
   const { h, state } = await setup(ruled);
   state.legacyTranscript = true;
   state.logs = [logOf("1", "01010101", NOW - 100, 1)];
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(res.status, 200);
   assertEquals(Object.keys((await j(res) as { accepted: object }).accepted), ["1"]);
   await h.settle();
@@ -1583,7 +1675,7 @@ Deno.test("round: the pool the chain raised shows, but recorded ballots aren't r
     logOf("1", "01010101", NOW - 100, 1),
     logOf("2", "01010101", NOW - 90, 2), // the contract recorded it: the transcript proves it
   ];
-  const body = await j(await h.req("/api/vote/round")) as {
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
     accepted: Record<string, string>;
     poolUsd: string;
   };
@@ -1597,7 +1689,10 @@ Deno.test("ballot: a ballot breaking a rule is refused with its errors, nothing 
   const { h, state } = await setup(ruled);
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, `0x01${X}${X}${X}`, ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 422);
   const out = await j(res) as { code: string; errors: { rule: string }[] };
   assertEquals(out.code, "invalid_ballot");
@@ -1610,7 +1705,10 @@ Deno.test("ballot: a valid ballot is relayed with its proof", async () => {
   const { h, state } = await setup(ruled);
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 200);
   const sent = state.sent[0] as unknown as { args: [{ proof: number[] }[]] };
   assertEquals(sent.args[0][0].proof, [0, 1, 2]);
@@ -1623,7 +1721,10 @@ Deno.test("ballot: judged with the chain's current pool", async () => {
   state.history.pool = [{ block: 1, logIndex: 0, poolUsd: 1_000n }];
   // The asks add up to $400, below 1.5 × the pool: placing all four would pass, so leave one out.
   const body = await signedBallot(VOTER, 17n, 1n, "0x010101ff", ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 422);
   const out = await j(res) as { errors: Record<string, unknown>[] };
   assertEquals(out.errors, [{ rule: "size", requested: "300", needed: "400", pool: "1000" }]);
@@ -1635,7 +1736,10 @@ Deno.test("ballot: a ballot signed before a project was added still relays (shor
   const { h, state } = await setup(ruled);
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, "0x010101", ruled); // a tab that knew 3
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 200);
   const sent = state.sent[0] as unknown as { args: [{ ballot: string; proof: number[] }[]] };
   assertEquals([sent.args[0][0].ballot, sent.args[0][0].proof], ["0x010101", [0, 1, 2]]);
@@ -1650,7 +1754,10 @@ Deno.test("ballot: a rule the contract enforced after a pool change is a 422, no
     'The contract function "record" reverted.\n\nError: BallotTooSmall()',
   );
   const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 422);
   assertEquals((await j(res)).code, "invalid_ballot");
   h.close();
@@ -1661,7 +1768,10 @@ Deno.test("ballot: before voting opens it is a 409 not_open, not a 500", async (
   state.owners.set(17n, VOTER.address);
   h.clock.now = ruled.opensAt - 1;
   const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 409);
   assertEquals((await j(res)).code, "not_open");
   assertEquals(state.sent.length, 0);
@@ -1676,7 +1786,10 @@ Deno.test("ballot: opened by the clock but not yet on-chain is a 409 not_open", 
     'The contract function "record" reverted.\n\nError: VotingNotStarted()',
   );
   const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 409);
   assertEquals((await j(res)).code, "not_open");
   h.close();
@@ -1685,7 +1798,9 @@ Deno.test("ballot: opened by the clock but not yet on-chain is a 409 not_open", 
 Deno.test("the round carries the chain asks", async () => {
   const { h, state } = await setup(ruled);
   state.asks = [10n, 20n, 30n, 40n];
-  const body = await j(await h.req("/api/vote/round")) as { asks?: string[] };
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    asks?: string[];
+  };
   assertEquals(body.asks, ["10", "20", "30", "40"]);
   await h.settle();
   h.close();
@@ -1694,7 +1809,9 @@ Deno.test("the round carries the chain asks", async () => {
 Deno.test("a round without ballot rules still carries the chain asks", async () => {
   const { h, state } = await setup();
   state.asks = [1n, 2n, 3n];
-  const body = await j(await h.req("/api/vote/round")) as { asks?: string[] };
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
+    asks?: string[];
+  };
   assertEquals(body.asks, ["1", "2", "3"]);
   await h.settle();
   h.close();
@@ -1707,7 +1824,10 @@ Deno.test("the relayer judges with chain asks", async () => {
   state.asks = [50n, 50n, 50n, 50n];
   // The asks total $200, below 1.5 × the pool: the minimum is every ask, so leave one out.
   const body = await signedBallot(VOTER, 17n, 1n, "0x010101ff", ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 422);
   const out = await j(res) as { code: string; errors: Record<string, unknown>[] };
   assertEquals(out.code, "invalid_ballot");
@@ -1720,10 +1840,13 @@ Deno.test("asks unavailable: the round and the relay are a 503", async () => {
   const { h, state } = await setup(ruled);
   state.owners.set(17n, VOTER.address);
   state.asks = "fail";
-  const round = await h.req("/api/vote/round");
+  const round = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals([round.status, (await j(round)).code], [503, "asks_unavailable"]);
   const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
-  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: body,
+  });
   assertEquals(res.status, 503);
   assertEquals((await j(res)).code, "asks_unavailable");
   assertEquals(state.sent, []);
@@ -1731,7 +1854,7 @@ Deno.test("asks unavailable: the round and the relay are a 503", async () => {
   // served, without asks, since a ballot can't be judged against them.
   state.asks = [1n];
   h.clock.now += 60;
-  assertEquals("asks" in await j(await h.req("/api/vote/round")), false);
+  assertEquals("asks" in await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))), false);
   await h.settle();
   h.close();
 });
@@ -1740,7 +1863,7 @@ Deno.test("round: held while the chain has a project this site doesn't know yet"
   const { h, state } = await setup(ruled);
   // The admin added a fifth project; the manifest (and so the replay) still has four.
   state.history.addedAt = [null, null, null, null, { block: 5, logIndex: 0 }];
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(res.status, 503);
   assertEquals((await j(res)).code, "round_out_of_date");
   h.close();
@@ -1748,7 +1871,7 @@ Deno.test("round: held while the chain has a project this site doesn't know yet"
 
 Deno.test("the round carries the live tally's inputs, which re-run to its result", async () => {
   const { h } = await threatSetup();
-  const body = await j(await h.req("/api/vote/round")) as {
+  const body = await j(await h.req(voteRequestPath(h.deps, "/api/vote/round"))) as {
     live: { funded: string[]; inputs?: LiveInputsJson };
   };
   const { inp, first } = liveInputsFrom(body.live.inputs!);
@@ -1761,7 +1884,7 @@ Deno.test("the round carries the live tally's inputs, which re-run to its result
 
 Deno.test("test pledge: on the test round's chain only, signed by the admin, then settled", async () => {
   const { h, state } = await setup();
-  const base = "/api/admin/vote-round/test-pledges";
+  const base = "/api/admin/vote-test-round/test-pledges";
   const token = await h.mint(ADMIN, true);
   const post = (path: string, json: unknown) =>
     h.req(`${base}/${path}`, { method: "POST", token, json });
@@ -1808,18 +1931,21 @@ Deno.test("test pledge: on the test round's chain only, signed by the admin, the
 
 Deno.test("test pledge: never in the real vote", async () => {
   const { h } = await setup(real);
-  const res = await h.req("/api/admin/vote-round/test-pledges/a/pledges/prepare", {
-    method: "POST",
-    token: await h.mint(ADMIN, true),
-    json: { amount: "1" },
-  });
+  const res = await h.req(
+    voteRequestPath(h.deps, "/api/admin/vote-round/test-pledges/a/pledges/prepare"),
+    {
+      method: "POST",
+      token: await h.mint(ADMIN, true),
+      json: { amount: "1" },
+    },
+  );
   assertEquals(res.status, 409);
   h.close();
 });
 
 // ------------------------------------------------------------------ withdrawing
 const withdraw = (h: Awaited<ReturnType<typeof harness>>, json: unknown, token: string) =>
-  h.req("/api/admin/vote-round/withdraw", { method: "POST", token, json });
+  h.req(voteRequestPath(h.deps, "/api/admin/vote-round/withdraw"), { method: "POST", token, json });
 const msg = async (res: Response) => ((await j(res)) as { error: string }).error;
 
 Deno.test("withdraw: a Safe batch for the round's contract, audited; admins with a recent sign-in only", async () => {
@@ -1882,7 +2008,9 @@ Deno.test("withdraw: a project settled or covered at a settlement is refused, wi
   assertEquals(covered.status, 409);
   assertEquals(await msg(covered), "This initiative is settled in S-Tier; it can't be withdrawn.");
   // The list says the same, for the page to disable the button.
-  const list = await j(await h.req("/api/admin/vote-round/initiatives", { token })) as {
+  const list = await j(
+    await h.req(voteRequestPath(h.deps, "/api/admin/vote-round/initiatives"), { token }),
+  ) as {
     initiatives: { slug: string; withdrawn: boolean; settledIn: string | null }[];
   };
   assertEquals(list.initiatives.map((x) => [x.slug, x.settledIn]), [
@@ -1920,7 +2048,9 @@ Deno.test("withdraw: once every tier has settled (before the close) the tally is
     await msg(res),
     "Every tier has settled: the vote's tally is final, nothing to withdraw from.",
   );
-  const list = await j(await h.req("/api/admin/vote-round/initiatives", { token })) as {
+  const list = await j(
+    await h.req(voteRequestPath(h.deps, "/api/admin/vote-round/initiatives"), { token }),
+  ) as {
     final: boolean;
     canWithdraw: boolean;
   };
@@ -1936,7 +2066,9 @@ Deno.test("withdraw: a contract from before withdrawals is refused, and the list
   const res = await withdraw(h, { slug: "c", withdrawn: true }, token);
   assertEquals(res.status, 409);
   assertEquals(await msg(res), "This round's contract predates withdrawals.");
-  const list = await j(await h.req("/api/admin/vote-round/initiatives", { token })) as {
+  const list = await j(
+    await h.req(voteRequestPath(h.deps, "/api/admin/vote-round/initiatives"), { token }),
+  ) as {
     final: boolean;
     canWithdraw: boolean;
   };
@@ -1947,12 +2079,13 @@ Deno.test("withdraw: a contract from before withdrawals is refused, and the list
 
 // ------------------------------------------------------------------ the pool on-chain (#103)
 const poolUsdReq = (h: Awaited<ReturnType<typeof harness>>, json: unknown, token: string) =>
-  h.req("/api/admin/vote-round/pool-usd", { method: "POST", token, json });
+  h.req(voteRequestPath(h.deps, "/api/admin/vote-round/pool-usd"), { method: "POST", token, json });
 
 Deno.test("pool on-chain: the contract's last PoolUsdSet, the live ETH price and the dates; admins only", async () => {
   const { h, state } = await setup();
   h.script.ethUsd = 1813.5;
-  const get = (token: string) => h.req("/api/admin/vote-round/pool-usd", { token });
+  const get = (token: string) =>
+    h.req(voteRequestPath(h.deps, "/api/admin/vote-round/pool-usd"), { token });
   assertEquals((await get(await h.mint(PLAIN))).status, 403);
   const token = await h.mint(ADMIN, true);
   // No PoolUsdSet read yet: the deploy's figure.
@@ -1973,7 +2106,9 @@ Deno.test("pool on-chain: the contract's last PoolUsdSet, the live ETH price and
 Deno.test("pool on-chain: no ETH price says so instead of failing", async () => {
   const { h } = await setup();
   h.script.brokenFeeds.add("ETH");
-  const res = await h.req("/api/admin/vote-round/pool-usd", { token: await h.mint(ADMIN, true) });
+  const res = await h.req(voteRequestPath(h.deps, "/api/admin/vote-round/pool-usd"), {
+    token: await h.mint(ADMIN, true),
+  });
   assertEquals((await j(res) as { ethUsd: number | null }).ethUsd, null);
   h.close();
 });
@@ -2037,7 +2172,7 @@ Deno.test("unfunded rounds remain open to public reads, ballots and gas past the
     h.clock.now = manifest.closesAt + 100;
     state.states = oneState([150n, 150n, 150n], 0n).map((s) => ({ ...s, poolInitialized: false }));
     state.owners.set(12n, VOTER.address);
-    const res = await h.req("/api/vote/round");
+    const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
     assertEquals(res.status, 200);
     const body = await j(res);
     assertEquals(body.poolInitialized, false);
@@ -2048,12 +2183,12 @@ Deno.test("unfunded rounds remain open to public reads, ballots and gas past the
       "waiting",
       "waiting",
     ]);
-    const ballot = await h.req("/api/vote/ballot", {
+    const ballot = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
       method: "POST",
       json: await signedBallot(VOTER, 12n, 1n, BALLOT),
     });
     assertEquals(ballot.status, 200);
-    const gas = await h.req("/api/vote/gas", {
+    const gas = await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
       method: "POST",
       token: await h.mint(VOTER.address),
       json: { tokenId: "12" },
@@ -2071,7 +2206,7 @@ Deno.test("ERC-1271 owners relay recordFor with the original variable-length sig
     state.code.set(PLAIN.toLowerCase(), "0x60006000");
     state.contractSignature = "0x123456";
     const send = (signature: Hex) =>
-      h.req("/api/vote/ballot", {
+      h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
         method: "POST",
         json: {
           tokenId: "12",
@@ -2094,7 +2229,7 @@ Deno.test("EIP-7702 owners keep the ECDSA record relay path", async () => {
   try {
     state.owners.set(12n, VOTER.address);
     state.code.set(VOTER.address.toLowerCase(), `0xef0100${"11".repeat(20)}`);
-    const response = await h.req("/api/vote/ballot", {
+    const response = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
       method: "POST",
       json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
     });
@@ -2111,7 +2246,7 @@ Deno.test("same-address rounds on different chains do not share pending ballots,
   const other = fakeChain(otherManifest);
   try {
     state.owners.set(12n, VOTER.address);
-    const first = await h.req("/api/vote/ballot", {
+    const first = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
       method: "POST",
       json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
     });
@@ -2121,13 +2256,13 @@ Deno.test("same-address rounds on different chains do not share pending ballots,
     other.state.owners.set(12n, VOTER.address);
     other.state.balances.set(RELAYER, 10n ** 18n);
     h.deps.vote = { manifest: otherManifest, chain: other.chain, states: other.states };
-    const second = await h.req("/api/vote/ballot", {
+    const second = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
       method: "POST",
       json: await signedBallot(VOTER, 12n, 1n, BALLOT, otherManifest),
     });
     assertEquals(second.status, 200);
     assertEquals(other.state.sent.length, 1);
-    const gas = await h.req("/api/vote/gas", {
+    const gas = await h.req(voteRequestPath(h.deps, "/api/vote/gas"), {
       method: "POST",
       token: await h.mint(VOTER.address),
       json: { tokenId: "12" },

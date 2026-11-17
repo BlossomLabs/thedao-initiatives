@@ -1,14 +1,16 @@
+import { useVoteApi, useVoteEnvironment } from "~/lib/vote-round";
 import { useQuery } from "@tanstack/react-query";
 import { formatEther } from "viem";
-import { api } from "~/lib/api";
 
 type Relayer = { address: string | null; balanceWei: string | null; chainId: number };
 
 /** Admin → Vote: the account that pays for relayed ballots, and what it has left. In
  * the real vote it stops relaying below 0.01 ETH and voters send it themselves. */
 export default function VoteRelayer() {
+  const env = useVoteEnvironment();
+  const api = useVoteApi();
   const q = useQuery({
-    queryKey: ["admin", "vote-relayer"],
+    queryKey: [env, "admin", "vote-relayer"],
     queryFn: ({ signal }) => api<Relayer>("/api/vote/relayer", { signal }),
     refetchInterval: 60_000,
   });

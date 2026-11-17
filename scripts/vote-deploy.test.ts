@@ -617,3 +617,21 @@ Deno.test("poolDrift: how far a hand-set pool is from the live estimate, as a sh
   assertEquals(poolDrift(1_000_000_000_000n, 725_200_000_000n).toFixed(3), "0.379");
   assertEquals(poolDrift(725_200_000_000n, 725_200_000_000n), 0);
 });
+
+Deno.test("voteSchedule: a 27-hour vote reserves its final three hours for nine windows per tier", () => {
+  const timing = parseTestTiming({ "duration-hours": "27", "window-minutes": "30", windows: "9" });
+  const s = voteSchedule(1_800_000_000, timing);
+  const span = tierMax(s);
+  assertEquals(s.maxWindows, 9);
+  assertEquals(span, 3592);
+  assertEquals(s.firstTallyAt[2] + span - s.opensAt, 27 * 3600);
+  assertEquals(s.firstTallyAt[0] - s.opensAt, 24 * 3600 + 24);
+  assertEquals(s.firstTallyAt[1] - s.firstTallyAt[0], span);
+  assertEquals(s.firstTallyAt[2] - s.firstTallyAt[1], span);
+  assertThrows(() => parseTestTiming({ "duration-hours": "27", until: "2026-11-18T12:00:00Z" }), Error, "not both");
+  assertThrows(() => parseTestTiming({ real: true, "duration-hours": "27" }), Error, "test votes");
+  for (const duration of ["0", "-1", "NaN", "Infinity", "0.00001"]) {
+    assertThrows(() => parseTestTiming({ "duration-hours": duration }), Error, "positive");
+  }
+  assertThrows(() => voteSchedule(1_800_000_000, { ...timing, durationHours: 1 }), Error, "voting time");
+});

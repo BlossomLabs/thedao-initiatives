@@ -12,9 +12,9 @@ const { TOKEN, BETA, ME, ZERO } = vi.hoisted(() => ({
   ZERO: "0x0000000000000000000000000000000000000000",
 }));
 
-vi.mock("../../../shared/vote/manifest", async (original) => ({
-  ...await original<typeof import("../../../shared/vote/manifest")>(),
-  ROUND: {
+vi.mock("~/lib/vote-round", async (original) => ({
+  ...await original<typeof import("~/lib/vote-round")>(),
+  useRound: () => ({
     kind: "test",
     chainId: 11155111,
     slugs: ["alpha", "beta"],
@@ -23,7 +23,7 @@ vi.mock("../../../shared/vote/manifest", async (original) => ({
       { symbol: "USD", asset: ZERO, usdFeed: ZERO },
       { symbol: "tUSD", asset: TOKEN, usdFeed: ZERO },
     ],
-  },
+  }),
 }));
 vi.mock("~/components/donate/Celebration", () => ({ confettiBurst: vi.fn() }));
 vi.mock("wagmi/actions", () => ({ writeContract: vi.fn() }));

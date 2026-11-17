@@ -248,7 +248,7 @@ Deno.test("contract vote verification checks the owner's ERC-1271 magic value an
   const { createVoteChain } = await import("../services/vote-chain.ts");
   const { custom, decodeFunctionData, encodeFunctionResult, hashTypedData, parseAbi } =
     await import("viem");
-  const { ROUND } = await import("../../shared/vote/manifest.ts");
+  const { NO_ROUND: ROUND } = await import("../../shared/vote/manifest.ts");
   const { voteTypedData } = await import("../../shared/vote/typed-data.ts");
   const owner = "0x5555555555555555555555555555555555555555" as const;
   const signature = "0x123456" as const;

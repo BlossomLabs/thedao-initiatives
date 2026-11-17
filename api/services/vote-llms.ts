@@ -1,3 +1,4 @@
+import { voteBase, voteEnvironment } from "../../shared/vote/environment.ts";
 /** /vote/llms.txt: what an LLM needs to draft a ballot for the deployed round, in the
  * same words as the ballot page (docs/superpowers/specs/2026-11-11-ballot-rules-design.md):
  * who can vote and revise, how tiers settle, how the tally spends a share, the ballot
@@ -123,7 +124,9 @@ export function voteLlms(
     "- Pasting a draft or signing it is not a counted vote: it must be recorded on-chain and " +
     "accepted. A settlement uses only blocks strictly before its cutoff; do not wait for the " +
     "last moment to send.",
-    `- Before drafting, read [the current round state](${origin}/api/vote/round) for poolUsd, ` +
+    `- Before drafting, read [the current round state](${origin}/api${
+      voteBase(voteEnvironment(m))
+    }/round) for poolUsd, ` +
     "poolInitialized, registrationClosesAt, closed, and each tier's status. While poolInitialized is false, " +
     "registrationClosesAt is null and no tier settles; voting still waits for opensAt. API dollar amounts are decimal " +
     "strings in micro-USD (1,000,000 = $1). For a revision, ask the voter for the ballot that " +

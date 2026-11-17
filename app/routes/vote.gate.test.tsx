@@ -21,7 +21,7 @@ vi.mock("../../shared/vote/manifest", async (original) => {
   return {
     ...m,
     ROUND: {
-      ...m.ROUND,
+      ...m.NO_ROUND,
       get kind() {
         return round.kind;
       },
@@ -47,7 +47,7 @@ vi.mock("~/hooks/use-board", () => ({
           contract: round.contract,
           opensAt: round.opensAt,
           ...(round.kind === "real" && Date.now() / 1000 >= round.opensAt
-            ? { manifest: { kind: "real" } }
+            ? { manifest: { ...round, kind: "real" } }
             : {}),
         },
       },
@@ -58,6 +58,7 @@ vi.mock("~/lib/vote-round", async (original) => ({
   ...await original<typeof import("~/lib/vote-round")>(),
   // The round is the mock above: nothing to set.
   primeRound: () => {},
+  useRound: () => round,
 }));
 vi.mock("~/components/board/BoardPage", () => ({ default: () => <p>the board</p> }));
 vi.mock("~/context/session", () => ({
@@ -151,11 +152,11 @@ it("a test vote's results: an admin sees them without a badge", async () => {
   expect(await screen.findByText("vote results")).toBeInTheDocument();
 });
 
-it("the real vote: /vote goes to the front page", async () => {
+it("the production vote has results at /vote", async () => {
   round.kind = "real";
   const router = at("/vote");
   expect(await screen.findByText("vote results")).toBeInTheDocument();
-  expect(router.state.location.pathname).toBe("/");
+  expect(router.state.location.pathname).toBe("/vote");
 });
 
 it("no vote deployed: /vote says so", async () => {

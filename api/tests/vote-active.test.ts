@@ -2,8 +2,8 @@
 import { assert, assertEquals } from "@std/assert";
 import {
   createActiveVote,
-  VOTE_ROUND_KEY,
   type VoteRoundSetting,
+  voteSettingKey,
 } from "../services/vote-active.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
@@ -69,14 +69,16 @@ Deno.test("admin vote round: the real vote's round can't change or go while it's
     opensAt: NOW - 60,
     closesAt: NOW + 3600,
   };
-  await h.deps.db.meta.set(VOTE_ROUND_KEY, { round: { manifest: realRound, at: 1, by: "x" } });
+  await h.deps.db.meta.set(voteSettingKey("production"), {
+    round: { manifest: realRound, at: 1, by: "x" },
+  });
   const token = await h.mint(ADMIN, true);
   const swap = await h.req("/api/admin/vote-round/round", {
     method: "POST",
     token,
     json: { contract: TEST.contract, chain: "sepolia" },
   });
-  assertEquals(swap.status, 409);
+  assertEquals(swap.status, 400);
   const off = await h.req("/api/admin/vote-round/round", { method: "DELETE", token, json: {} });
   assertEquals(off.status, 409);
   // The same address on the other network is another contract: refused before any read.
@@ -85,7 +87,7 @@ Deno.test("admin vote round: the real vote's round can't change or go while it's
     token,
     json: { contract: realRound.contract, chain: "sepolia" },
   });
-  assertEquals(otherChain.status, 409);
+  assertEquals(otherChain.status, 400);
   // Once it closes, it can go.
   h.clock.now = NOW + 3600;
   const later = await h.req("/api/admin/vote-round/round", {
@@ -160,7 +162,7 @@ Deno.test("admin vote round: a failed chain read doesn't show the RPC's URL", as
   const log = h.deps.log;
   h.deps.log = (m) => (logs.push(m), log(m));
   const admin = await h.mint(ADMIN, true);
-  const res = await h.req("/api/admin/vote-round/round", {
+  const res = await h.req("/api/admin/vote-test-round/round", {
     method: "POST",
     token: admin,
     json: { contract: TEST.contract, chain: "sepolia" },
@@ -188,12 +190,12 @@ Deno.test("boardRound: what the round is for every board, the whole of it once t
 
 Deno.test("vote manifest: kept a few seconds by the browser, a 304 when it hasn't changed", async () => {
   const h = await harness();
-  await h.deps.db.meta.set(VOTE_ROUND_KEY, { round: { manifest: TEST, at: 1, by: "x" } });
-  h.deps.voteRound = createActiveVote({
-    read: () => h.deps.db.meta.get(VOTE_ROUND_KEY),
+  await h.deps.db.meta.set(voteSettingKey("test"), { round: { manifest: TEST, at: 1, by: "x" } });
+  h.deps.testVoteRound = createActiveVote({
+    read: () => h.deps.db.meta.get(voteSettingKey("test")),
     build: (m) => ({ manifest: m } as VoteRound),
   });
-  const first = await h.req("/api/vote/manifest");
+  const first = await h.req("/api/vote-test/manifest");
   assertEquals(first.status, 200);
   assertEquals(
     first.headers.get("Cache-Control"),
@@ -201,7 +203,7 @@ Deno.test("vote manifest: kept a few seconds by the browser, a 304 when it hasn'
   );
   assertEquals(((await j(first)) as { manifest: VoteManifest }).manifest.contract, TEST.contract);
   const etag = first.headers.get("ETag")!;
-  const again = await h.req("/api/vote/manifest", { headers: { "If-None-Match": etag } });
+  const again = await h.req("/api/vote-test/manifest", { headers: { "If-None-Match": etag } });
   assertEquals(again.status, 304);
   h.close();
 });

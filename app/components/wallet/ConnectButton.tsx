@@ -1,3 +1,4 @@
+import { useRound, useVoteBase } from "~/lib/vote-round";
 import { useEffect, useRef, useState } from "react";
 import { BADGE_GLOW_EVENT } from "~/lib/badge-glow";
 import { BadgeHolderMark, BadgeHolderNote } from "~/components/ui/Badge";
@@ -33,7 +34,12 @@ export default function ConnectButton() {
   // The badges this account votes with in the current round (none: no Vote item).
   // An admin's test round can stand in for the built-in one: ask which once signed in.
   const roundKnown = useRoundLoaded(signedIn);
-  const voteBadges = useMyBadges(signedIn ? session!.address : null, roundKnown && roundDeployed());
+  const ROUND = useRound();
+  const voteBase = useVoteBase();
+  const voteBadges = useMyBadges(
+    signedIn ? session!.address : null,
+    roundKnown && roundDeployed(ROUND),
+  );
   const { profileOpen, openProfile } = useProfileDialog();
   const { openWalletPicker, walletPickerOpen } = useWalletPicker();
   const navigate = useNavigate();
@@ -149,7 +155,7 @@ export default function ConnectButton() {
         key: "vote",
         label: "Vote",
         lucide: "vote" as const,
-        onClick: () => void navigate("/vote/ballot"),
+        onClick: () => void navigate(`${voteBase}/ballot`),
       }]
       : []),
     {

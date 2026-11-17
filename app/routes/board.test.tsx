@@ -350,7 +350,7 @@ it("only the first three scored results get labels when there are more proposals
   }
 });
 
-it("during a test vote, the board marks what an admin withdrew from it", async () => {
+it("test withdrawals do not change the public board", async () => {
   flagRound.value = {
     kind: "test",
     chainId: 11155111,
@@ -374,7 +374,8 @@ it("during a test vote, the board marks what an admin withdrew from it", async (
   );
   at("/");
   const beta = (await screen.findAllByText("Beta wallets"))[0].closest("li, [data-initiative-id]")!;
-  await waitFor(() => expect(beta).toHaveTextContent("Withdrawn"));
+  expect(beta).not.toHaveTextContent("Withdrawn");
+  expect(api).not.toHaveBeenCalledWith("/api/vote/round", expect.anything());
   const alpha = screen.getAllByText("Alpha fuzzing")[0].closest("li, [data-initiative-id]")!;
   expect(alpha).not.toHaveTextContent("Withdrawn");
 });

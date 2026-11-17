@@ -33,6 +33,7 @@ export const EARLY_FETCH_SCRIPT = "(function(){var l=location.pathname,path,anon
   "if(l==='/')path=" + JSON.stringify(BOARD_PATH) + ";" +
   "else if(/^\\/(vote(\\/ballot(\\/edit)?)?|admin\\/vote|admin\\/initiatives\\/[^/]+)\\/?$/.test(l))" +
   "path=" + JSON.stringify(ROUND_PATH) + ";" +
+  "else if(/^\\/(?:admin\\/)?vote-test(?:\\/|$)/.test(l))path='/api/vote-test/manifest';" +
   "else if(m){path='/api/initiatives/'+m[1];" +
   "try{var s=JSON.parse(localStorage.getItem(" + JSON.stringify(SESSION_KEY) + ")||'null');" +
   "anon=!(s&&typeof s.address==='string'&&typeof s.expiresAt==='number'&&s.expiresAt*1000>=Date.now())}" +

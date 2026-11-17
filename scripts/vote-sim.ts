@@ -7,12 +7,12 @@
 //     deno task vote-sim [--voters 100] [--revise 40x2,10x3,3x5] [--site https://…]
 //                        [--first-id 1000001] [--rpc http://…] [--dry-run]
 //
-// The round is the one the site runs (its /api/vote/manifest). Each voter mints badge
+// The round is the one the site runs (its /api/vote-test/manifest). Each voter mints badge
 // first-id + i (if no one holds it yet), sends a first ballot between the opening and the
 // S-Tier first tally, and the voters named by --revise change it that many times (40x2:
 // 40 voters, twice each), spread from the S-Tier first tally to the close, each time with
 // one or two small edits (a project moved a tier, placed or taken off), as people do. A revision
-// never moves what a settled tier holds for that voter (the site's /api/vote/round says
+// never moves what a settled tier holds for that voter (the site's /api/vote-test/round says
 // which tiers settled and which ballot counts). Every ballot passes the ballot rules at
 // the chain's asks and pool when it's built. Run it again with the same seed to go on:
 // it reads each badge's nonce from the chain, and what was already sent stays sent.
@@ -282,7 +282,7 @@ async function main() {
   const firstId = BigInt(args["first-id"]);
 
   const { manifest: m } = await getJson<{ manifest: VoteManifest | null }>(
-    `${site}/api/vote/manifest`,
+    `${site}/api/vote-test/manifest`,
   );
   if (!m) throw new Error(`${site} runs no vote right now.`);
   if (m.kind !== "test") {
@@ -386,7 +386,7 @@ async function main() {
   let view: { at: number; v: RoundView } | null = null;
   const roundNow = async () => {
     if (!view || Date.now() - view.at > 5_000) {
-      view = { at: Date.now(), v: await getJson<RoundView>(`${site}/api/vote/round`) };
+      view = { at: Date.now(), v: await getJson<RoundView>(`${site}/api/vote-test/round`) };
     }
     return view.v;
   };

@@ -1,3 +1,4 @@
+import { useVoteBase } from "~/lib/vote-round";
 import { useEffect, useState } from "react";
 import { Bot, Copy, ListOrdered } from "lucide-react";
 import { Button } from "~/components/ui/Button";
@@ -6,7 +7,6 @@ import { cn } from "~/lib/utils";
 import type { Tier } from "../../../shared/vote/ballot";
 import { formatBallotText, parseBallotText } from "../../../shared/vote/ballot-text";
 
-const LLMS = "/vote/llms.txt";
 const PLACEHOLDER = "S-Tier:\n  - slug-a\n  - slug-b\nA-Tier: [slug-c]\nB-Tier: [slug-d]";
 
 /** A short "Copied." that clears itself, or why the copy failed. */
@@ -84,6 +84,7 @@ export default function BallotMenu({ slugs, tiers, onApply }: {
   const [promptCopied, flashPrompt] = useFlash();
   const [ballotCopied, flashBallot] = useFlash();
 
+  const LLMS = `${useVoteBase()}/llms.txt`;
   const llmsUrl = typeof location === "undefined" ? LLMS : `${location.origin}${LLMS}`;
   const placed = Object.keys(tiers).length;
   const tierCount = new Set(Object.values(tiers)).size;

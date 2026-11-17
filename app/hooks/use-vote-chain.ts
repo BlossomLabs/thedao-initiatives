@@ -1,7 +1,8 @@
+import { useRound } from "~/lib/vote-round";
 import { useCallback } from "react";
 import { useWallet } from "~/context/wallet";
 import { liveConnector } from "~/lib/wallet-store";
-import { MAINNET_CHAIN_ID, ROUND } from "../../shared/vote/manifest";
+import { MAINNET_CHAIN_ID } from "../../shared/vote/manifest";
 
 export class WrongChainError extends Error {
   constructor(chainId: number, cause: unknown) {
@@ -15,7 +16,9 @@ export class WrongChainError extends Error {
 /** The round's chain (Ethereum for the real vote, Sepolia for tests): wallets refuse
  * typed data for another chain, so switch before asking for a signature or a
  * transaction. */
-export function useEnsureVoteChain(target: number = ROUND.chainId): () => Promise<void> {
+export function useEnsureVoteChain(requested?: number): () => Promise<void> {
+  const round = useRound();
+  const target = requested ?? round.chainId;
   const wallet = useWallet();
   const { chainId, switchChain } = wallet;
   const connector = liveConnector(wallet);

@@ -1,3 +1,4 @@
+import { VoteEnvironmentBanner, VoteEnvironmentProvider } from "~/components/vote/VoteEnvironment";
 import {
   isRouteErrorResponse,
   Links,
@@ -86,9 +87,18 @@ function Shell(
 export default function App() {
   return (
     <Providers>
-      <Shell banner={<MaintenanceBanner />}>
-        <Outlet />
-      </Shell>
+      <VoteEnvironmentProvider>
+        <Shell
+          banner={
+            <>
+              <MaintenanceBanner />
+              <VoteEnvironmentBanner />
+            </>
+          }
+        >
+          <Outlet />
+        </Shell>
+      </VoteEnvironmentProvider>
       <SupportWidget />
       <AppUpgrade />
     </Providers>

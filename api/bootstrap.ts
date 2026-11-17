@@ -24,7 +24,12 @@ import { reviewTokenIds } from "./chain/reviewer.ts";
 import { MAINNET_CHAIN_ID, type VoteManifest } from "../shared/vote/manifest.ts";
 import { refreshVoteManifest } from "./services/vote-refresh.ts";
 import { slugsByAccount } from "../shared/vote/round-from-chain.ts";
-import { createActiveVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "./services/vote-active.ts";
+import {
+  createActiveVote,
+  migrateVoteSettings,
+  type VoteRoundSetting,
+  voteSettingKey,
+} from "./services/vote-active.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
 
 /** Structured events (audit trail, rate limit breaches) are emitted as one JSON
@@ -76,7 +81,7 @@ export async function createServer(siteOptions?: SiteOptions) {
   /** One per round configuration, shared by its pins (each new head block builds a new
    * VoteRound): logs, finalized prefixes and searches outlive a pin. */
   const memoFor = (m: VoteManifest) => {
-    const key = `${m.chainId}:${m.contract}:${m.configRevision ?? "legacy"}:${
+    const key = `${m.kind}:${m.chainId}:${m.contract}:${m.configRevision ?? "legacy"}:${
       m.configAnchor?.hash ?? ""
     }`;
     let memo = stateMemos.get(key);
@@ -88,22 +93,11 @@ export async function createServer(siteOptions?: SiteOptions) {
   };
   const stateSourceFor = (m: VoteManifest) =>
     createStateSource(m, voteRpcUrl(m), undefined, memoFor(m));
-  const deps: Deps = {
-    db,
-    chain,
-    config,
-    fetch,
-    now,
-    funding: createFunding({ db, chain, now, log }),
-    ai: createAi(config, fetch),
-    admins: createAdmins(db, config, now),
-    maintenance: createMaintenance(db, now),
-    ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
-    pinata: createPinata(config, fetch),
-    log,
-    // Off until an admin sets a round (Admin → Vote, by its contract address).
-    voteRound: createActiveVote({
-      read: () => db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY),
+  await migrateVoteSettings(db);
+  const activeVote = (environment: "production" | "test") =>
+    createActiveVote({
+      environment,
+      read: () => db.meta.get<VoteRoundSetting>(voteSettingKey(environment)),
       refresh: async (m) => {
         const next = await refreshVoteManifest(m, voteRpcUrl(m), {
           finalAnchors: memoFor(m).pins,
@@ -116,7 +110,7 @@ export async function createServer(siteOptions?: SiteOptions) {
           next.configRevision !== m.configRevision ||
           next.configAnchor?.hash !== m.configAnchor?.hash
         ) {
-          await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
+          await db.meta.update<VoteRoundSetting>(voteSettingKey(environment), (cur) => {
             const set = cur?.round ?? cur?.test;
             if (
               !set || set.manifest.chainId !== m.chainId ||
@@ -145,7 +139,24 @@ export async function createServer(siteOptions?: SiteOptions) {
         // Past blocks need an archive node: the round's RPC (RPC_URL / SEPOLIA_RPC_URL) must be one.
         source: stateSourceFor(m),
       }),
-    }),
+    });
+  const deps: Deps = {
+    db,
+    chain,
+    config,
+    fetch,
+    now,
+    funding: createFunding({ db, chain, now, log }),
+    ai: createAi(config, fetch),
+    admins: createAdmins(db, config, now),
+    maintenance: createMaintenance(db, now),
+    ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
+    pinata: createPinata(config, fetch),
+    log,
+    // Off until an admin sets a round (Admin → Vote, by its contract address).
+    voteEnvironment: "production",
+    voteRound: activeVote("production"),
+    testVoteRound: activeVote("test"),
   };
   // Load the image decoder before the first upload asks for it.
   if (deps.pinata.enabled) warmImageWorker();

@@ -12,11 +12,13 @@ export default [
   // Each ballot has two pages: the one that counts (its path), and the editor (/edit).
   // One route each, so going between them keeps the page (and an example's send).
   route("vote/ballot/edit?", "routes/vote.ballot.tsx"),
-  route("vote/mock/:id/edit?", "routes/vote.mock.tsx"),
+  route("vote-test/ballot/edit?", "routes/vote.ballot.tsx", { id: "test-ballot" }),
+  route("vote-test", "routes/vote.tsx", { id: "test-vote" }),
+  route("vote-test/mock/:id/edit?", "routes/vote.mock.tsx"),
   // Examples of the vote results at three moments of the vote.
-  route("vote/results/:id", "routes/vote.results.tsx"),
+  route("vote-test/results/:id", "routes/vote.results.tsx"),
   // Every animation of the vote on one page, each played by a button.
-  route("vote/effects", "routes/vote.effects.tsx"),
+  route("vote-test/effects", "routes/vote.effects.tsx"),
   route("vote", "routes/vote.tsx"),
   route("donation-terms", "routes/terms.tsx"),
   route("donation-terms/v/:id", "routes/terms.version.tsx"),
@@ -26,5 +28,6 @@ export default [
     route("leads", "routes/admin.leads.tsx"),
     route("maintenance", "routes/admin.maintenance.tsx"),
     route("vote", "routes/admin.vote.tsx"),
+    route("vote-test", "routes/admin.vote.tsx", { id: "admin-test-vote" }),
   ]),
 ] satisfies RouteConfig;

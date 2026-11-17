@@ -100,16 +100,6 @@ export const NO_ROUND: VoteManifest = {
   independentTiers: 1,
 };
 
-/** The round the site runs: none until the page learns the one an admin set
- * (/api/vote/manifest, `setRound`). A live binding: read it when needed, never copy it at
- * module load. */
-export let ROUND: VoteManifest = NO_ROUND;
-
-/** Runs the site on another round (the one /api/vote/manifest names). */
-export function setRound(m: VoteManifest) {
-  ROUND = checkManifest(m);
-}
-
 /** The ballot rules' view of the round: `asks[i]` is project i's ask, one per project
  * (else it throws); `poolUsd` defaults to the manifest's; `withdrawn` names the projects
  * an admin withdrew, by index (each asks $0 for the size rule). */
@@ -133,12 +123,12 @@ export const rulesRound = (
 };
 
 /** False while the manifest names no contract: no round, nothing to show. */
-export const roundDeployed = (m: VoteManifest = ROUND): boolean => !/^0x0{40}$/i.test(m.contract);
+export const roundDeployed = (m: VoteManifest): boolean => !/^0x0{40}$/i.test(m.contract);
 
 /** The NFT whose owners vote: the voting badge, or the test round's own badges. */
 export const voterNft = (m: VoteManifest): `0x${string}` =>
   m.kind === "real" ? m.badge! : m.contract;
 
 /** The round's chain, for viem clients. */
-export const voteChain = (m: VoteManifest = ROUND): Chain =>
+export const voteChain = (m: VoteManifest): Chain =>
   m.chainId === MAINNET_CHAIN_ID ? mainnet : sepolia;

@@ -109,7 +109,7 @@ it("preserves unchanged date seconds without exposing seconds in date inputs", a
 it("disables settled initiative corrections", async () => {
   const client = mount();
   await screen.findByText("Initiative details");
-  client.setQueryData(["admin", "vote-corrections"], { ...view, settled: [0] });
+  client.setQueryData(["production", "admin", "vote-corrections"], { ...view, settled: [0] });
   fireEvent.click(screen.getByText("Initiative details"));
   await screen.findByText("This initiative has settled and cannot be corrected here.");
   expect(
@@ -135,7 +135,7 @@ it("keeps other correction controls available before any initiative is registere
   const client = mount();
   await screen.findByText("Initiative details");
   await act(() =>
-    Promise.resolve(client.setQueryData(["admin", "vote-corrections"], {
+    Promise.resolve(client.setQueryData(["production", "admin", "vote-corrections"], {
       ...view,
       manifest: { ...view.manifest, configRevision: "8", projects: [], slugs: [], accounts: [] },
     }))

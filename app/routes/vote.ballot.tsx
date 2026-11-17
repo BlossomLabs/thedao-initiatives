@@ -4,8 +4,10 @@ import { roundLoader } from "~/lib/vote-round";
 /** The round the site runs now, before the page shows it. */
 export const clientLoader = roundLoader;
 
-export function meta() {
-  return [{ title: "Your ballot · TheDAO" }, { name: "robots", content: "noindex" }];
+export function meta({ location }: { location: { pathname: string } }) {
+  return [{
+    title: `${location.pathname.startsWith("/vote-test") ? "Test" : "Production"} ballot · TheDAO`,
+  }, { name: "robots", content: "noindex" }];
 }
 
 /** /vote/ballot: the signed-in account's ballot, found by its badge (no code); its editor

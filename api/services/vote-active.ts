@@ -1,9 +1,36 @@
+import { transientVoteKey } from "../db/dataset.ts";
+import { type VoteEnvironment, voteEnvironment } from "../../shared/vote/environment.ts";
+import { roundKey } from "../../shared/vote/keys.ts";
+import type { Db } from "../db/mod.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import type { Deps } from "../middleware/context.ts";
 import type { VoteRound } from "./vote-chain.ts";
 
 /** db.meta key of the admins' round setting. */
 export const VOTE_ROUND_KEY = "vote_round";
+export const voteSettingKey = (env: VoteEnvironment) => `vote_round_${env}`;
+
+/** Copy legacy state once per environment. The original remains available for rollback. */
+export async function migrateVoteSettings(db: Db) {
+  const legacy = await db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY);
+  const set = roundOf(legacy);
+  if (!set) return;
+  const env = voteEnvironment(set.manifest);
+  const key = voteSettingKey(env);
+  await db.meta.update<VoteRoundSetting>(key, (cur) => cur ?? { ...legacy, round: set });
+  const marker = `${key}_records_migrated`;
+  if (await db.meta.get(marker)) return;
+  const old = ["vote", set.manifest.chainId, set.manifest.contract.toLowerCase()];
+  for await (const entry of db.kv.list({ prefix: old })) {
+    if (transientVoteKey(entry.key)) continue;
+    const target = [...roundKey(set.manifest), ...entry.key.slice(old.length)];
+    const current = await db.kv.get(target);
+    if (current.versionstamp === null) {
+      await db.kv.atomic().check(current).set(target, entry.value).commit();
+    }
+  }
+  await db.meta.set(marker, true);
+}
 
 type SetRound = { manifest: VoteManifest; at: number; by: string };
 
@@ -32,6 +59,7 @@ const FRESH_MS = 5_000;
  * setting is re-read at most every few seconds.
  */
 export function createActiveVote(o: {
+  environment?: VoteEnvironment;
   read: () => Promise<VoteRoundSetting | null>;
   build: (m: VoteManifest) => VoteRound;
   refresh?: (m: VoteManifest) => Promise<VoteManifest>;
@@ -63,6 +91,9 @@ export function createActiveVote(o: {
     const s = await setting.value;
     const m = roundOf(s)?.manifest;
     if (!m) return undefined;
+    if (o.environment && voteEnvironment(m) !== o.environment) {
+      throw new Error("Vote environment mismatch");
+    }
     const r = roundFor(m);
     return s?.pool ? { ...r, manifest: { ...r.manifest, pool: s.pool } } : r;
   };
@@ -74,5 +105,10 @@ export function createActiveVote(o: {
 }
 
 /** The vote round now, or undefined when none is deployed. */
-export const currentVote = async (deps: Pick<Deps, "vote" | "voteRound">) =>
-  deps.voteRound ? await deps.voteRound() : deps.vote;
+export const currentVote = async (deps: Pick<Deps, "vote" | "voteRound" | "voteEnvironment">) => {
+  const round = deps.voteRound ? await deps.voteRound() : deps.vote;
+  if (round && deps.voteEnvironment && voteEnvironment(round.manifest) !== deps.voteEnvironment) {
+    return undefined;
+  }
+  return round;
+};

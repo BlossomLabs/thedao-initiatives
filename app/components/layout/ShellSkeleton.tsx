@@ -9,7 +9,7 @@ import PageSkeleton from "~/components/layout/PageSkeleton";
  */
 export const SHELL_SCRIPT = "var p=location.pathname,d=document.documentElement.dataset;" +
   "if(/^\\/admin\\/?$/.test(p))d.shell='dashboard';" +
-  "else if(/^\\/vote(\\/|$)/.test(p))d.shell='vote'";
+  "else if(/^\\/vote(?:-test)?(\\/|$)/.test(p))d.shell='vote'";
 
 /**
  * The prerendered SPA shell's placeholder. One static HTML file serves every

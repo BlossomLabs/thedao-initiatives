@@ -1,10 +1,11 @@
+import { useVoteApi, useVoteEnvironment } from "~/lib/vote-round";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatUnits } from "viem";
 import { Button } from "~/components/ui/Button";
 import Status from "~/components/ui/Status";
 import { useAdminApi } from "~/hooks/use-admin-api";
-import { api, errorMessage } from "~/lib/api";
+import { errorMessage } from "~/lib/api";
 import { dayTime } from "~/lib/format";
 import { addingOpen, type CorrectionView } from "../../../shared/vote/corrections";
 
@@ -29,8 +30,10 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
 );
 
 export default function VoteCorrections() {
+  const env = useVoteEnvironment();
+  const api = useVoteApi();
   const { data, error } = useQuery({
-    queryKey: ["admin", "vote-corrections"],
+    queryKey: [env, "admin", "vote-corrections"],
     queryFn: ({ signal }) => api<CorrectionView>("/api/admin/vote-round/corrections", { signal }),
     refetchInterval: 10_000,
   });
@@ -112,7 +115,7 @@ function Editor({ view: v }: { view: CorrectionView }) {
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = "vote-correction.json";
+    a.download = `${m.kind === "real" ? "production" : "test"}-vote-correction.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

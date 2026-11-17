@@ -400,10 +400,12 @@ Deno.test("the KV cache isolates the same round address on different chains", as
     await cache.set("state:1", { timestamp: 12, asks: ["5"], poolUsd: "7" });
     assertEquals(await cache.get("state:1"), { timestamp: 12, asks: ["5"], poolUsd: "7" });
     const keys = [];
-    for await (const e of kv.list({ prefix: ["vote", 1, CONTRACT.toLowerCase(), "chain"] })) {
+    for await (
+      const e of kv.list({ prefix: ["vote", "test", 1, CONTRACT.toLowerCase(), "chain"] })
+    ) {
       keys.push(e.key);
     }
-    assertEquals(keys, [["vote", 1, CONTRACT.toLowerCase(), "chain", "state:1"]]);
+    assertEquals(keys, [["vote", "test", 1, CONTRACT.toLowerCase(), "chain", "state:1"]]);
     const other = kvStateCache(kv, { ...manifest(), chainId: 11155111 });
     assertEquals(await other.get("state:1"), undefined);
   } finally {

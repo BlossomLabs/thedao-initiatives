@@ -1,3 +1,4 @@
+import { useRound, useVoteBase } from "~/lib/vote-round";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
@@ -28,7 +29,7 @@ import { usd, usdShort } from "~/lib/format";
 import { changeCause, changeEffect, changeMoves } from "~/lib/vote-change";
 import { When } from "./When";
 import type { LastChangeJson } from "../../../shared/vote/replay-round";
-import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
+import { type VoteManifest } from "../../../shared/vote/manifest";
 import { poolEstimated, poolName, poolNoteText } from "~/components/vote/pool";
 import { dollars as dollarsFull } from "~/components/vote/FinalTiers";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
@@ -80,8 +81,8 @@ export const tierBEmpty = (rv: RoundView) => {
 };
 const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it.";
 
-/** The vote results. The real vote's are the front page, a test vote's are on `/vote`
- * (voters only), and examples of them at `/vote/results/<moment>` (`example`: a fictional
+/** The vote results. The real vote's are the front page, a test vote's are on `/vote-test`
+ * (voters only), and examples of them at `/vote-test/results/<moment>` (`example`: a fictional
  * round at one moment, nothing donated from it).
  *
  * While the vote is open: TheDAO's ballot (what the vote would fund if it ended now) beside
@@ -121,6 +122,8 @@ function Covered({ label, titles }: { label: string; titles: string[] }) {
 export default function VoteResults(
   { example }: { example?: { round: VoteManifest; view: RoundView } } = {},
 ) {
+  const ROUND = useRound();
+  const voteBase = useVoteBase();
   const R = example?.round ?? ROUND;
   const REAL = R.kind === "real";
   const POOL_NAME = REAL ? "pool" : "demo pool";
@@ -134,7 +137,7 @@ export default function VoteResults(
   const badges = useMyBadges(session?.address ?? null, !example);
   // A test round's gas top-up for donating goes by the voter's badge.
   const myBadge = badges.data?.[0];
-  const mine = example ? null : badges.data?.length ? "/vote/ballot" : null;
+  const mine = example ? null : badges.data?.length ? `${voteBase}/ballot` : null;
 
   const inRound = useMemo(() => new Set(R.slugs), [R]);
   const cards = useMemo(

@@ -1,8 +1,9 @@
+import { useRound, useVoteApi } from "~/lib/vote-round";
 import { useEffect, useRef, useState } from "react";
 import type { Hex } from "viem";
 import { writeContract } from "wagmi/actions";
 import { useWallet } from "~/context/wallet";
-import { api } from "~/lib/api";
+
 import { donateChips, parseUsd, walletErrorMessage } from "~/lib/donate";
 import { liveConnector } from "~/lib/wallet-store";
 import { cn } from "~/lib/utils";
@@ -13,7 +14,7 @@ import OverCap from "~/components/donate/OverCap";
 import { confettiBurst } from "~/components/donate/Celebration";
 import { useEnsureVoteChain } from "~/hooks/use-vote-chain";
 import { voteClient } from "~/hooks/use-vote-send";
-import { ROUND } from "../../../shared/vote/manifest";
+
 import { TEST_USD_ABI, TEST_USD_MAX_MINT, testDonation } from "../../../shared/vote/test-usd";
 
 const WAIT_MS = 3 * 60_000;
@@ -40,6 +41,8 @@ export default function TestDonate(
     preselect?: boolean;
   },
 ) {
+  const ROUND = useRound();
+  const api = useVoteApi();
   const red = accent === "red";
   const wallet = useWallet();
   const ensureChain = useEnsureVoteChain();
@@ -93,13 +96,13 @@ export default function TestDonate(
       setBusy("Switching to Sepolia…");
       await ensureChain();
       // Gas: a wallet with no Sepolia ETH asks once, with its badge.
-      if (badge !== undefined && (await voteClient().getBalance({ address: me })) === 0n) {
+      if (badge !== undefined && (await voteClient(ROUND).getBalance({ address: me })) === 0n) {
         setBusy("Getting gas…");
         const { hash } = await api<{ hash: Hex | null }>("/api/vote/gas", {
           method: "POST",
           json: { tokenId: String(badge) },
         });
-        if (hash) await voteClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
+        if (hash) await voteClient(ROUND).waitForTransactionReceipt({ hash, timeout: WAIT_MS });
       }
       setBusy("Confirm in your wallet…");
       const hash = await writeContract(wallet.config, {
@@ -112,7 +115,7 @@ export default function TestDonate(
         connector: liveConnector(wallet),
       } as never);
       setBusy("Waiting for Sepolia…");
-      const r = await voteClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
+      const r = await voteClient(ROUND).waitForTransactionReceipt({ hash, timeout: WAIT_MS });
       if (r.status !== "success") throw new Error("The donation failed on-chain. Try again.");
       setStatus({
         kind: "ok",

@@ -2,6 +2,7 @@
 // (shared/vote/replay-round.ts): no site database, no KV, no env, no secrets.
 //
 //   deno task vote:replay --rpc <archive RPC URL>
+//     --environment production|test  (required when reading from the site)
 //     [--site <url>]          (default https://initiatives.thedao.fund: the round it runs)
 //     [--manifest <manifest .json>]   (another round, as /api/vote/manifest serves it)
 //     [--at <unix seconds>]                              (default: now)
@@ -39,14 +40,22 @@ export function dollars(micro: bigint): string {
 
 /** The round to replay: a manifest file, or the one the site runs (its public
  * /api/vote/manifest, read from the round's contract). */
-async function loadManifest(path?: string, site = "https://initiatives.thedao.fund") {
+async function loadManifest(
+  path?: string,
+  site = "https://initiatives.thedao.fund",
+  environment?: string,
+) {
   let m: unknown;
   if (path) {
     const j = JSON.parse(await Deno.readTextFile(path));
     m = j?.manifest ?? j;
   } else {
-    const res = await fetch(`${site.replace(/\/$/, "")}/api/vote/manifest`);
-    if (!res.ok) throw new Error(`${site}: /api/vote/manifest answered ${res.status}`);
+    if (environment !== "test" && environment !== "production") {
+      throw new Error("Choose --environment production or --environment test.");
+    }
+    const base = environment === "test" ? "/api/vote-test" : "/api/vote";
+    const res = await fetch(`${site.replace(/\/$/, "")}${base}/manifest`);
+    if (!res.ok) throw new Error(`${site}: ${base}/manifest answered ${res.status}`);
     m = (await res.json()).manifest;
     if (!m) throw new Error(`${site} runs no vote right now`);
   }
@@ -140,12 +149,15 @@ export function report(m: VoteManifest, st: Round, now: number): string[] {
 export async function main(argv: string[], io: Io = {}): Promise<number> {
   const out = io.out ?? ((s) => console.log(s));
   const err = io.err ?? ((s) => console.error(s));
-  const args = parseArgs(argv, { boolean: ["json"], string: ["rpc", "manifest", "site", "at"] });
+  const args = parseArgs(argv, {
+    boolean: ["json"],
+    string: ["rpc", "manifest", "site", "at", "environment"],
+  });
   try {
     if (!io.source && !args.rpc) throw new Error("--rpc <archive RPC URL> is required");
     const now = args.at === undefined ? Math.floor(Date.now() / 1000) : Number(args.at);
     if (!Number.isInteger(now) || now <= 0) throw new Error("--at is a time in unix seconds");
-    const saved = await loadManifest(args.manifest, args.site);
+    const saved = await loadManifest(args.manifest, args.site, args.environment);
     const m = io.source ? saved : await refreshVoteManifest(saved, args.rpc!, { at: now });
     const src = io.source ??
       createRoundSource(

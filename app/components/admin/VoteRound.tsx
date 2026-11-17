@@ -1,3 +1,4 @@
+import { loadRound, useRound, useVoteApi, useVoteEnvironment } from "~/lib/vote-round";
 import VoteCorrections from "./VoteCorrections";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -5,14 +6,14 @@ import { Switch } from "@base-ui/react/switch";
 import { Button } from "~/components/ui/Button";
 import Status from "~/components/ui/Status";
 import { useAdminApi } from "~/hooks/use-admin-api";
-import { api, errorMessage } from "~/lib/api";
+import { errorMessage } from "~/lib/api";
 import { dayTime, usdShort } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import { PledgeForm } from "~/components/admin/initiative/Pledges";
 import InitiativeCombobox from "~/components/ui/InitiativeCombobox";
 import { useRun } from "~/components/admin/dashboard/run";
 import { useBoard } from "~/hooks/use-board";
-import { ROUND } from "../../../shared/vote/manifest";
+
 import { type Tier, tierName } from "../../../shared/vote/ballot";
 
 type Brief = {
@@ -69,15 +70,19 @@ function RoundLine({ b }: { b: Brief }) {
  * on Sepolia, the real vote on Ethereum), and the pool's ETH while it waits to be sold.
  */
 export default function VoteRound() {
+  const api = useVoteApi();
+  const env = useVoteEnvironment();
   const adminApi = useAdminApi();
   const qc = useQueryClient();
   const ids = useId();
   const { data } = useQuery({
-    queryKey: voteRoundKey,
+    queryKey: [env, ...voteRoundKey],
     queryFn: ({ signal }) => api<VoteRoundJson>("/api/admin/vote-round", { signal }),
   });
   const [contract, setContract] = useState("");
-  const [chain, setChain] = useState<"sepolia" | "ethereum">("sepolia");
+  const [chain, setChain] = useState<"sepolia" | "ethereum">(
+    env === "test" ? "sepolia" : "ethereum",
+  );
   const [eth, setEth] = useState("");
   const [sold, setSold] = useState(false);
   const [busy, setBusy] = useState<"add" | "remove" | "pool" | null>(null);
@@ -110,12 +115,13 @@ export default function VoteRound() {
     setMsg(null);
     try {
       const r = await call();
-      qc.setQueryData(voteRoundKey, r);
+      qc.setQueryData([env, ...voteRoundKey], r);
       void qc.invalidateQueries({
-        queryKey: voteRoundKey,
-        predicate: (q) => q.queryKey.length > voteRoundKey.length,
+        queryKey: [env, ...voteRoundKey],
+        predicate: (q) => q.queryKey.length > voteRoundKey.length + 1,
       });
-      void qc.invalidateQueries({ queryKey: ["admin", "vote-relayer"] });
+      void qc.invalidateQueries({ queryKey: [env, "admin", "vote-relayer"] });
+      if (what !== "pool") void loadRound(env);
       done(r);
     } catch (e) {
       setMsg({ ok: false, text: errorMessage(e, "Not saved. Try again.") });
@@ -130,7 +136,7 @@ export default function VoteRound() {
         json: { contract: contract.trim(), chain },
       }), (r) => {
       setWarnings(r.warnings ?? []);
-      setRoundMsg({ ok: true, text: "The site runs this round within a few seconds." });
+      setRoundMsg({ ok: true, text: "This vote uses the round within a few seconds." });
     }, setRoundMsg);
   const remove = () =>
     run(
@@ -139,7 +145,7 @@ export default function VoteRound() {
       () => {
         setWarnings([]);
         setContract("");
-        setRoundMsg({ ok: true, text: "No vote on the site now." });
+        setRoundMsg({ ok: true, text: "This vote is now unavailable." });
       },
       setRoundMsg,
     );
@@ -166,13 +172,14 @@ export default function VoteRound() {
           if (canAdd) void add();
         }}
       >
-        <b className={TITLE}>The round the site runs</b>
+        <b className={TITLE}>The round for this vote</b>
         {data && (set
           ? <RoundLine b={set} />
-          : <small className={HINT}>None: the site shows no vote.</small>)}
+          : <small className={HINT}>No round configured for this vote.</small>)}
 
         <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Network">
           {([["sepolia", "Sepolia (test vote)"], ["ethereum", "Ethereum (the real vote)"]] as const)
+            .filter(([k]) => k === (env === "test" ? "sepolia" : "ethereum"))
             .map(([k, label]) => (
               <Button
                 key={k}
@@ -331,10 +338,12 @@ const dollars = (n: number, cents = n % 1 !== 0) =>
  * down until S-Tier's first tally, only up after that, and not at all once voting closes.
  */
 function PoolOnChain({ eth }: { eth: number | null }) {
+  const api = useVoteApi();
+  const env = useVoteEnvironment();
   const adminApi = useAdminApi();
   const id = useId();
   const { data } = useQuery({
-    queryKey: ["admin", "vote-round", "pool-usd"],
+    queryKey: [env, "admin", "vote-round", "pool-usd"],
     queryFn: ({ signal }) => api<PoolUsdJson>("/api/admin/vote-round/pool-usd", { signal }),
     refetchInterval: 15_000,
   });
@@ -358,7 +367,7 @@ function PoolOnChain({ eth }: { eth: number | null }) {
         const batch = await adminApi<unknown>("/api/admin/vote-round/pool-usd", {
           json: { usd: typed },
         });
-        downloadBatch(batch, `pool-${typed}.json`);
+        downloadBatch(batch, `${env}-vote-pool-${typed}.json`);
       },
       `Batch saved for ${
         dollars(typed)
@@ -608,6 +617,8 @@ function TestVoters() {
  * and never reaches the site's pledges.
  */
 function TestPledge() {
+  const env = useVoteEnvironment();
+  const ROUND = useRound();
   const id = useId();
   const board = useBoard();
   const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
@@ -619,7 +630,7 @@ function TestPledge() {
     return ROUND.slugs
       .map((slug) => ({ id: slug, title: titles.get(slug) ?? slug }))
       .sort((a, b) => a.title.localeCompare(b.title));
-  }, [board.data]);
+  }, [board.data, ROUND]);
   return (
     <section className={CARD} aria-labelledby={`${id}-h`}>
       <b id={`${id}-h`} className={TITLE}>Test pledge</b>
@@ -645,7 +656,9 @@ function TestPledge() {
         <div className="mt-3">
           <PledgeForm
             key={picked.id}
-            base={`/api/admin/vote-round/test-pledges/${encodeURIComponent(picked.id)}`}
+            base={`/api/admin/${env === "test" ? "vote-test-round" : "vote-round"}/test-pledges/${
+              encodeURIComponent(picked.id)
+            }`}
             run={(fn, ok) => run(fn, typeof ok === "string" ? `${ok} (${picked.title})` : ok)}
             editing={null}
             onDone={() => {}}
@@ -667,11 +680,13 @@ const withdrawalsKey = ["admin", "vote-round", "initiatives"] as const;
  * Once an initiative is settled in a tier it can't be withdrawn.
  */
 function Withdrawals({ round }: { round: Brief }) {
+  const api = useVoteApi();
+  const env = useVoteEnvironment();
   const adminApi = useAdminApi();
   const id = useId();
   const board = useBoard();
   const { data } = useQuery({
-    queryKey: [...withdrawalsKey, round.chainId, round.contract.toLowerCase()],
+    queryKey: [env, ...withdrawalsKey, round.chainId, round.contract.toLowerCase()],
     queryFn: ({ signal }) =>
       api<{ initiatives: Withdrawal[]; final?: boolean; canWithdraw?: boolean }>(
         "/api/admin/vote-round/initiatives",
@@ -696,7 +711,10 @@ function Withdrawals({ round }: { round: Brief }) {
       const batch = await adminApi<unknown>("/api/admin/vote-round/withdraw", {
         json: { slug: x.slug, withdrawn: !x.withdrawn },
       });
-      downloadBatch(batch, `${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`);
+      downloadBatch(
+        batch,
+        `${env}-vote-${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`,
+      );
     }, `Batch saved for ${title}: execute it with the round's admin account.`);
   return (
     <section className={CARD} aria-labelledby={`${id}-h`}>

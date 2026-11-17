@@ -1,18 +1,23 @@
-import { Navigate } from "react-router";
+import { useRound } from "~/lib/vote-round";
+
 import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
 import VoteResults from "~/components/vote/VoteResults";
 import { useSession } from "~/context/session";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useMyBadges } from "~/hooks/use-vote";
-import { ROUND, roundDeployed } from "../../shared/vote/manifest";
+import { roundDeployed } from "../../shared/vote/manifest";
 import { roundLoader } from "~/lib/vote-round";
 
 /** The round the site runs now, before the page shows it. */
 export const clientLoader = roundLoader;
 
-export function meta() {
-  return [{ title: "Vote · TheDAO" }, { name: "robots", content: "noindex" }];
+export function meta({ location }: { location: { pathname: string } }) {
+  return [{
+    title: `${
+      location.pathname.startsWith("/vote-test") ? "Test vote" : "Production vote"
+    } · TheDAO`,
+  }, { name: "robots", content: "noindex" }];
 }
 
 function Note({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -28,16 +33,17 @@ function Note({ title, children }: { title: string; children?: React.ReactNode }
   );
 }
 
-/** /vote: a test vote's results, for its voters and admins only. The real vote's
- * results are the front page, so it goes there. */
+/** Each environment has its own results. Test results require a voter or admin. */
 export default function VoteRoute() {
+  const ROUND = useRound();
+
   const { session } = useSession();
   const { openWalletPicker } = useWalletPicker();
-  const test = roundDeployed() && ROUND.kind === "test";
+  const test = roundDeployed(ROUND) && ROUND.kind === "test";
   const badges = useMyBadges(session?.address ?? null, test);
 
-  if (!roundDeployed()) return <Note title="There's no vote right now." />;
-  if (ROUND.kind === "real") return <Navigate to="/" replace />;
+  if (!roundDeployed(ROUND)) return <Note title="There's no vote right now." />;
+  if (ROUND.kind === "real") return <VoteResults />;
   if (session?.isAdmin || badges.data?.length) return <VoteResults />;
   if (!session) {
     return (

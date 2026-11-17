@@ -8,6 +8,10 @@ import { glowBadge } from "~/lib/badge-glow";
 
 const ME = "0x1111111111111111111111111111111111111111";
 const round = vi.hoisted(() => ({ contract: "0x1000000000000000000000000000000000000001" }));
+vi.mock("~/lib/vote-round", async (original) => ({
+  ...await original<typeof import("~/lib/vote-round")>(),
+  useRoundLoaded: () => true,
+}));
 const navigate = vi.fn();
 const me = vi.hoisted(() => ({ isBadgeHolder: false }));
 

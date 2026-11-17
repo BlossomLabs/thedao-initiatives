@@ -1,3 +1,4 @@
+import { useRound, useVoteBase } from "~/lib/vote-round";
 import { useEffect, useMemo, useRef, useState } from "react";
 import BallotArrows, { type ArrowFrom } from "~/components/vote/BallotArrows";
 import { hexToBytes } from "viem";
@@ -13,7 +14,7 @@ import { useVoteBallots } from "~/hooks/use-vote";
 import { askOf, servedAsks } from "~/lib/vote-results";
 import { errorMessage } from "~/lib/api";
 import { decodeBallot, encodeBallot, type Tier, TIERS } from "../../../shared/vote/ballot";
-import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
+import { type VoteManifest } from "../../../shared/vote/manifest";
 
 function Header(
   { kicker, title = "Voting has closed", children }: {
@@ -38,16 +39,19 @@ function Header(
 }
 
 /** "TheDAO vote · Badge #12" or "Test vote · Badge #12". */
-export const badgeKicker = (n: number, round: VoteManifest = ROUND) =>
-  `${round.kind === "real" ? "TheDAO vote" : "Test vote"} · Badge #${n}`;
+export const badgeKicker = (n: number, round: VoteManifest) =>
+  `${round.kind === "real" ? "Production vote" : "Test vote"} · Badge #${n}`;
 
 const NOTHING: Partial<Record<string, Tier>> = {};
 
-const SeeResult = () => (
-  <div className="flex justify-center">
-    <LinkButton variant="primary" to="/vote">See the result</LinkButton>
-  </div>
-);
+const SeeResult = () => {
+  const voteBase = useVoteBase();
+  return (
+    <div className="flex justify-center">
+      <LinkButton variant="primary" to={voteBase}>See the result</LinkButton>
+    </div>
+  );
+};
 
 /** After the close, in place of the welcome page and the ballot: says the vote is
  * over and, for the badge's owner, shows the ballot they sent (read from the chain,
@@ -62,7 +66,7 @@ export default function VoteClosed(
     closeText,
     saved = NOTHING,
     settled,
-    round = ROUND,
+    round: providedRound,
     sent: sentHere,
     items,
     paid,
@@ -117,6 +121,9 @@ export default function VoteClosed(
     };
   },
 ) {
+  const activeRound = useRound();
+  const round = providedRound ?? activeRound;
+  const voteBase = useVoteBase();
   // Read recorded ballots when no accepted ballot was supplied; always display decoded ranks.
   const ballots = useVoteBallots(false, !sentHere);
   const sent = useMemo(() => {
@@ -261,7 +268,7 @@ export default function VoteClosed(
 
 
           <Link
-            to="/vote"
+            to={voteBase}
             className={cn(SMALL_BUTTON, "flex-none no-underline hover:no-underline")}
           >
             See them on the board →

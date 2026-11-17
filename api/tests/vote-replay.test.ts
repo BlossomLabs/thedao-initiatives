@@ -1,3 +1,4 @@
+import { voteRequestPath } from "./vote-path.ts";
 // scripts/vote-replay.ts against the site: the same fake chain must give the same round.
 // (Here, not in scripts/: `deno task test:api` runs api/ only.)
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
@@ -125,7 +126,7 @@ Deno.test("the script and the API agree on the same fake chain", async () => {
     source,
   };
   h.clock.now = NOW;
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(res.status, 200);
   const api = await j(res) as Record<string, unknown> & { live: Record<string, unknown> };
   await h.settle();
@@ -175,7 +176,7 @@ Deno.test("the script and API agree despite an incorrect stored settlement", asy
   };
   const key = ["vote", manifest.contract.toLowerCase()];
   h.clock.now = at;
-  assertEquals((await h.req("/api/vote/round")).status, 200);
+  assertEquals((await h.req(voteRequestPath(h.deps, "/api/vote/round"))).status, 200);
   assertEquals((await h.deps.db.kv.get([...key, "settled-w1", "S"])).value, null);
   await h.deps.db.kv.set([...key, "settled-w1", "S"], {
     tier: "S",
@@ -189,7 +190,7 @@ Deno.test("the script and API agree despite an incorrect stored settlement", asy
   // A minute on, the API recomputes despite an incorrect saved record.
   await h.deps.db.kv.delete([...key, "round"]);
   h.clock.now = at + 60;
-  const res = await h.req("/api/vote/round");
+  const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
   assertEquals(res.status, 200);
   assertEquals(replays, 2, "the second request replayed");
   const api = await j(res) as Record<string, unknown> & { live: Record<string, unknown> };
@@ -263,7 +264,7 @@ Deno.test("wallet and goal corrections reproduce settled awards in the API, cach
     await Deno.writeTextFile(path, JSON.stringify(m));
     for (const now of [at, at + 60]) {
       h.clock.now = now;
-      const res = await h.req("/api/vote/round");
+      const res = await h.req(voteRequestPath(h.deps, "/api/vote/round"));
       assertEquals(res.status, 200);
       const result = await j(res) as Record<string, unknown> & { live: Record<string, unknown> };
       const { next: _n, lead: _l, give: _g, ...live } = result.live;

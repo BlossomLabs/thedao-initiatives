@@ -40,7 +40,7 @@ function Header(
 
 /** "TheDAO vote · Badge #12" or "Test vote · Badge #12". */
 export const badgeKicker = (n: number, round: VoteManifest) =>
-  `${round.kind === "real" ? "Production vote" : "Test vote"} · Badge #${n}`;
+  `${round.kind === "real" ? "Vote" : "Test vote"} · Badge #${n}`;
 
 const NOTHING: Partial<Record<string, Tier>> = {};
 

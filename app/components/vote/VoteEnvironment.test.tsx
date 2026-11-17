@@ -26,10 +26,10 @@ it("switching environments changes the label and starts a separate draft", () =>
     </MemoryRouter>,
   );
   expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Test vote · Sepolia");
-  expect(screen.getByText(/Does not affect production allocations/)).toBeInTheDocument();
+  expect(screen.getByText(/Does not affect the vote.s allocations/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("test draft"), { target: { value: "test selections" } });
-  fireEvent.click(screen.getByRole("link", { name: "Open production vote" }));
-  expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Production vote · Ethereum");
+  fireEvent.click(screen.getByRole("link", { name: "Open the vote" }));
+  expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Vote · Ethereum");
   expect(screen.getByLabelText("production draft")).toHaveValue("");
 });
 it("example results are visibly marked as a demonstration", () => {

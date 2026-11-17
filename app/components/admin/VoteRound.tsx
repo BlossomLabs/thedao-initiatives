@@ -15,6 +15,7 @@ import { useRun } from "~/components/admin/dashboard/run";
 import { useBoard } from "~/hooks/use-board";
 
 import { type Tier, tierName } from "../../../shared/vote/ballot";
+import { voteFilePrefix } from "../../../shared/vote/environment";
 
 type Brief = {
   kind: "test" | "real";
@@ -367,7 +368,7 @@ function PoolOnChain({ eth }: { eth: number | null }) {
         const batch = await adminApi<unknown>("/api/admin/vote-round/pool-usd", {
           json: { usd: typed },
         });
-        downloadBatch(batch, `${env}-vote-pool-${typed}.json`);
+        downloadBatch(batch, `${voteFilePrefix(env)}vote-pool-${typed}.json`);
       },
       `Batch saved for ${
         dollars(typed)
@@ -713,7 +714,7 @@ function Withdrawals({ round }: { round: Brief }) {
       });
       downloadBatch(
         batch,
-        `${env}-vote-${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`,
+        `${voteFilePrefix(env)}vote-${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`,
       );
     }, `Batch saved for ${title}: execute it with the round's admin account.`);
   return (

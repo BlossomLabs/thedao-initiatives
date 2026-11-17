@@ -115,7 +115,7 @@ function Editor({ view: v }: { view: CorrectionView }) {
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${m.kind === "real" ? "production" : "test"}-vote-correction.json`;
+    a.download = `${m.kind === "real" ? "" : "test-"}vote-correction.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

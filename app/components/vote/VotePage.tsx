@@ -811,8 +811,10 @@ export default function VotePage(
           : upToDateNow
           ? "Counted"
           : countedHex
-          ? `Resubmit ${R.kind === "real" ? "production" : "test"} ballot`
-          : `Submit ${R.kind === "real" ? "production" : "test"} ballot`,
+          ? R.kind === "real" ? "Resubmit ballot" : "Resubmit test ballot"
+          : R.kind === "real"
+          ? "Submit ballot"
+          : "Submit test ballot",
         ready: canSend || sheetNews,
         summary,
       },
@@ -965,8 +967,10 @@ export default function VotePage(
                 // Not ready, it stays as it is, disabled: the ballot box's line says what
                 // the ballot still needs. With a ballot that counts already, it's a resend.
                 sendLabel={countedHex
-                  ? `Resubmit ${R.kind === "real" ? "production" : "test"} ballot`
-                  : `Submit ${R.kind === "real" ? "production" : "test"} ballot`}
+                  ? R.kind === "real" ? "Resubmit ballot" : "Resubmit test ballot"
+                  : R.kind === "real"
+                  ? "Submit ballot"
+                  : "Submit test ballot"}
                 resultsHref={voteBase}
                 onSend={() => {
                   if (broken) return;

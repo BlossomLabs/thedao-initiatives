@@ -106,7 +106,7 @@ it("withdrawing downloads the Safe batch for the initiative", async () => {
     })
   );
   await waitFor(() =>
-    expect(clicks).toEqual([{ name: "production-vote-withdraw-alpha.json", href: "blob:batch" }])
+    expect(clicks).toEqual([{ name: "vote-withdraw-alpha.json", href: "blob:batch" }])
   );
 });
 
@@ -120,7 +120,7 @@ it("a withdrawn initiative offers the undo", async () => {
       json: { slug: "beta", withdrawn: false },
     })
   );
-  await waitFor(() => expect(clicks[0].name).toBe("production-vote-undo-withdraw-beta.json"));
+  await waitFor(() => expect(clicks[0].name).toBe("vote-undo-withdraw-beta.json"));
 });
 
 it("a settled initiative's button is off, with the reason", async () => {
@@ -217,7 +217,7 @@ it("setting the pool downloads the setPoolUsd batch for the round's admin", asyn
     })
   );
   await waitFor(() =>
-    expect(clicks).toEqual([{ name: "production-vote-pool-725400.json", href: "blob:batch" }])
+    expect(clicks).toEqual([{ name: "vote-pool-725400.json", href: "blob:batch" }])
   );
 });
 

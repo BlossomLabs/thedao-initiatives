@@ -13,7 +13,7 @@ export const clientLoader = roundLoader;
 
 export function meta({ location }: { location: { pathname: string } }) {
   return generateMeta({
-    title: location.pathname.endsWith("vote-test") ? "Test vote" : "Production vote",
+    title: location.pathname.endsWith("vote-test") ? "Test vote" : "Vote",
     url: location.pathname,
     noIndex: true,
   });
@@ -27,7 +27,7 @@ export default function VotePage() {
     <PageMain detail className="max-w-[860px]">
       <Crumbs items={[{ label: "Initiatives", to: "/" }, { label: "Admin", to: "/admin" }]} />
       <h1 className="m-0 font-inter-tight text-[clamp(26px,4vw,40px)] font-medium tracking-[-.02em]">
-        {env === "test" ? "Test vote" : "Production vote"}
+        {env === "test" ? "Test vote" : "Vote"}
       </h1>
       <p className="small dim mt-2.5">
         When an initiative can go to TheDAO's vote, whether the site shows it, and the round it

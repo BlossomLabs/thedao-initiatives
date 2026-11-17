@@ -14,9 +14,7 @@ export const clientLoader = roundLoader;
 
 export function meta({ location }: { location: { pathname: string } }) {
   return [{
-    title: `${
-      location.pathname.startsWith("/vote-test") ? "Test vote" : "Production vote"
-    } · TheDAO`,
+    title: `${location.pathname.startsWith("/vote-test") ? "Test vote" : "Vote"} · TheDAO`,
   }, { name: "robots", content: "noindex" }];
 }
 

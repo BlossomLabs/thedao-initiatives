@@ -32,8 +32,8 @@ export function VoteEnvironmentBanner() {
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2">
         <div>
           <strong>{demo ? "Demonstration" : voteLabel(env)}</strong> · {env === "test"
-            ? "Sepolia · Does not affect production allocations."
-            : "Ethereum · Votes determine production allocations."}
+            ? "Sepolia · Does not affect the vote's allocations."
+            : "Ethereum · Votes decide the allocations."}
           {!demo && roundDeployed(round) && (
             <span className="mt-1 block break-all font-mono text-xs opacity-75">
               Round {round.contract}
@@ -44,7 +44,7 @@ export function VoteEnvironmentBanner() {
           to={`${admin ? "/admin" : ""}${env === "test" ? "/vote" : "/vote-test"}`}
           className="underline"
         >
-          Open {env === "test" ? "production" : "test"} vote
+          Open {env === "test" ? "the vote" : "test vote"}
         </Link>
       </div>
     </aside>

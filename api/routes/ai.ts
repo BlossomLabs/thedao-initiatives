@@ -31,7 +31,7 @@ export function aiRoutes(deps: Deps) {
     }));
     const key = JSON.stringify([
       query,
-      deps.config.jevEnabled ? ["jev", deps.config.jevModel] : [
+      deps.config.typesafeEnabled ? ["jev", deps.config.typesafeModel] : [
         "llm",
         deps.config.aiSearchBaseUrl,
         deps.config.aiSearchModel,

@@ -156,8 +156,9 @@ export interface Config {
   pinataGateway: string;
   /** Where the support widget's messages are forwarded; empty = widget disabled (503). */
   supportUrl: string;
-  jevEnabled: boolean;
-  jevModel: string;
+  typesafeEnabled: boolean;
+  typesafeApiKey: string;
+  typesafeModel: string;
   aiPickThreshold: number;
   aiSearchApiKey: string;
   aiSearchBaseUrl: string;
@@ -261,8 +262,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
     supportUrl: (env.SUPPORT_URL ?? "").trim(),
-    jevEnabled: !(env.JEV_ENABLED ?? "").trim() || flag(env.JEV_ENABLED),
-    jevModel: (env.JEV_MODEL ?? "").trim() || "jev",
+    typesafeEnabled: !(env.TYPESAFE_ENABLED ?? "").trim() || flag(env.TYPESAFE_ENABLED),
+    typesafeApiKey: (env.TYPESAFE_API_KEY ?? "").trim(),
+    typesafeModel: (env.TYPESAFE_MODEL ?? "").trim() || "jev-1.13.0",
     aiPickThreshold,
     aiSearchApiKey: (env.AI_SEARCH_API_KEY ?? "").trim(),
     aiSearchBaseUrl: ((env.AI_SEARCH_BASE_URL ?? "").trim() || "https://api.deepseek.com")

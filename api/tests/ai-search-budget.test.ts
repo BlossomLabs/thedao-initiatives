@@ -19,7 +19,7 @@ Deno.test("AI search budget: every Jev batch counts; cache hits and empty boards
   let fail = false;
   let calls = 0;
   const h = await harness({
-    env: { AI_SEARCH_API_KEY: "test" },
+    env: { TYPESAFE_API_KEY: "test" },
     fetch: (_url, init) => {
       calls++;
       if (fail) return new Response("unavailable", { status: 503 });
@@ -65,7 +65,7 @@ Deno.test("AI search budget: LLM fallback attempts each need a reservation", asy
   for (const remaining of [1, 2]) {
     let calls = 0;
     const h = await harness({
-      env: { JEV_ENABLED: "false", AI_SEARCH_API_KEY: "test" },
+      env: { TYPESAFE_ENABLED: "false", AI_SEARCH_API_KEY: "test" },
       fetch: (_url, init) => {
         calls++;
         const body = JSON.parse(String(init?.body));

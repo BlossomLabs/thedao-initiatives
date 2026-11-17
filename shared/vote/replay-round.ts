@@ -13,6 +13,7 @@ import {
   type StateCache,
   type StateSource,
 } from "./chain-states.ts";
+import { type LastChange, lastChange, type LastChangeMemo } from "./last-change.ts";
 import { liveInputsJson } from "./live-inputs.ts";
 import type { VoteManifest } from "./manifest.ts";
 import {
@@ -84,6 +85,9 @@ export type Round = RoundState & {
   transcript: { block: bigint; records: number; hash: Hex; legacy: boolean };
   head: { block: number; timestamp: number };
   finalized: { block: number; timestamp: number; hash?: `0x${string}` } | null;
+  /** What caused the last change to TheDAO's ballot while the round is open (#118); null
+   * when none was found in the last few inputs, absent once closed. */
+  lastChange?: LastChange | null;
 };
 
 /** An error for a log or a terminal, with URLs cut out: viem's messages name the RPC's
@@ -103,6 +107,9 @@ export async function replayRound(
     cache?: StateCache;
     states?: (receiptBlocks: number[]) => Promise<ChainState[]>;
     log?: (msg: string) => void;
+    /** Kept by the caller across replays: the last change is found again only after a
+     * new input. */
+    lastChangeMemo?: LastChangeMemo;
   },
 ): Promise<Round> {
   const { now } = opts;
@@ -182,13 +189,10 @@ export async function replayRound(
     { block: head.block, timestamp: head.timestamp },
     early,
   );
-  const st = replay({
-    schedule: m.schedule,
-    m: m.slugs.length,
-    states,
-    receipts,
-  }, at);
+  const input = { schedule: m.schedule, m: m.slugs.length, states, receipts };
+  const st = replay(input, at);
   return Object.assign(st, {
+    ...(st.closed ? {} : { lastChange: lastChange(input, at, st, undefined, opts.lastChangeMemo) }),
     finalized,
     ...(head.valuation ? { valuation: head.valuation } : {}),
     settlementValuations: Object.fromEntries(st.tiers.flatMap((t) => {
@@ -291,8 +295,30 @@ export function roundJson(st: Round, slugs: string[]) {
       covered: named(st.live.covered),
       /** Withdrawn now: in no tier, and not covered. */
       withdrawn: named(st.live.withdrawn),
+      ...(st.lastChange !== undefined
+        ? { lastChange: st.lastChange && lastChangeJson(st.lastChange, slugs) }
+        : {}),
       // The live tally's inputs, so a donation's preview re-runs it in the browser.
       ...(st.liveInputs ? { inputs: liveInputsJson(st.liveInputs, st.firstOpen) } : {}),
     },
   };
 }
+
+/** The last change as JSON: slugs for projects, decimal strings for micro-USD. */
+export function lastChangeJson(c: LastChange, slugs: string[]) {
+  return {
+    at: c.at,
+    causes: c.causes.map((x) =>
+      x.kind === "ask"
+        ? { kind: x.kind, slug: slugs[x.project], from: x.from.toString(), to: x.to.toString() }
+        : x.kind === "pool"
+        ? { kind: x.kind, from: x.from.toString(), to: x.to.toString() }
+        : x.kind === "withdrawn"
+        ? { kind: x.kind, slug: slugs[x.project], withdrawn: x.withdrawn }
+        : x
+    ),
+    moved: c.moved.map((x) => ({ slug: slugs[x.project], from: x.from, to: x.to })),
+    amounts: c.amounts.map((x) => slugs[x]),
+  };
+}
+export type LastChangeJson = ReturnType<typeof lastChangeJson>;

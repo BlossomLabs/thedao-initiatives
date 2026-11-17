@@ -1044,9 +1044,21 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     "waiting",
     "waiting",
   ]);
-  const { next: _next, inputs, ...live } = body.live as { next?: unknown; inputs?: unknown };
+  const { next: _next, inputs, lastChange, ...live } = body.live as {
+    next?: unknown;
+    inputs?: unknown;
+    lastChange?: unknown;
+  };
   // The tally's inputs come along (a donation's preview re-runs it): its first open tier.
   assertEquals((inputs as { first: number }).first, 0);
+  // What last changed TheDAO's ballot (#118): badge 1's first ballot brought A in; badge
+  // 2's then only split what A gets.
+  assertEquals(lastChange, {
+    at: NOW - 100,
+    causes: [{ kind: "ballot", tokenId: "1", first: true }],
+    moved: [{ slug: "a", from: null, to: "S" }],
+    amounts: [],
+  });
   // Both badges rank only A: each would pay half of it, if S-Tier settled now.
   assertEquals(live, {
     funded: ["a"],

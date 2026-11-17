@@ -1369,6 +1369,37 @@ it("while open, a withdrawn project is listed as Withdrawn, apart, with no donat
   expect(list().getByRole("button", { name: /Alpha fuzzing/ })).toBeInTheDocument();
 });
 
+it("TheDAO's ballot says what caused its last change, and each move on hover (#118)", async () => {
+  const view = openWith({ beta: give() });
+  const at = Date.UTC(2026, 10, 17, 6, 29) / 1000;
+  await showOpen({
+    ...view,
+    live: {
+      ...view.live,
+      lastChange: {
+        at,
+        causes: [{ kind: "ballot", tokenId: "7", first: false }],
+        moved: [{ slug: "alpha", from: "S", to: null }, { slug: "beta", from: "A", to: "S" }],
+        amounts: [],
+      },
+    },
+  });
+  const note = screen.getByTestId("last-change");
+  expect(note).toHaveTextContent(
+    /^Last change, Nov 17, \d\d:\d\d: a voter changed their ballot, which moved 2 initiatives\.$/,
+  );
+  expect(note).toHaveAttribute(
+    "title",
+    "Alpha fuzzing: S-Tier → not funded\nBeta audits: A-Tier → S-Tier",
+  );
+});
+
+it("no last change, no note", async () => {
+  await showOpen(openWith({ beta: give() }));
+  await list().findByRole("button", { name: /Beta audits/ });
+  expect(screen.queryByTestId("last-change")).toBeNull();
+});
+
 it("once closed, a withdrawn project is apart from the tiers and not funded", async () => {
   await showClosed({
     tiers: [

@@ -22,6 +22,7 @@ import {
 import { type Threats, threatsAsync } from "../../shared/vote/threat.ts";
 import type { ChainInputs } from "../../shared/vote/chain.ts";
 import { type ChainState, refusal, type RoundState } from "../../shared/vote/quiet-ending.ts";
+import type { LastChangeMemo } from "../../shared/vote/last-change.ts";
 import {
   errorText,
   ReplayError,
@@ -347,8 +348,14 @@ export function voteRoutes(deps: Deps) {
   };
   /** Every settlement is derived again from canonical chain inputs. Stored result
    * snapshots never select a settlement time, award or accepted ballot. */
+  /** The last change to TheDAO's ballot, found again only after a new input (#118). */
+  let lastChangeMemo: { contract: string; memo: LastChangeMemo } | null = null;
   const roundState = async (d: VoteRound): Promise<Round> => {
     const now = deps.now();
+    if (lastChangeMemo?.contract !== configurationKey(d)) {
+      lastChangeMemo = { contract: configurationKey(d), memo: {} };
+    }
+    const memo = lastChangeMemo.memo;
     // Ballots through the VoteChain, states through the bounded, shared read below.
     const { ballots, committed, rulesHistory } = d.chain;
     const src: RoundSource = {
@@ -363,6 +370,7 @@ export function voteRoutes(deps: Deps) {
         now,
         states: (receiptBlocks) => statesFor(d, now, receiptBlocks),
         log: deps.log,
+        lastChangeMemo: memo,
       });
     } catch (e) {
       if (!(e instanceof ReplayError)) throw asksUnavailable();

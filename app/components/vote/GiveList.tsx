@@ -492,7 +492,7 @@ export default function GiveList(
                     aria-expanded={isOpen}
                     aria-controls={`give-${i.slug}`}
                     onClick={() => onOpen(isOpen ? undefined : i.slug)}
-                    className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-dao-red"
+                    className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                   >
                     {cat ? <CategoryDot slug={cat} className="flex-none" /> : (
                       <span

@@ -35,8 +35,9 @@ const LINKS: NavItem[] = [
 ];
 
 /** The vote's own links (#124), for the vote the page is on (the vote, or the test vote on
- * /vote-test): Vote, to a badge holder's ballot editor, and Results. None while that vote
- * has no round deployed. */
+ * /vote-test): Vote, to the results, and for a badge holder My ballot, to the ballot that
+ * counts (which moves on to the editor while there is none). None while that vote has no
+ * round deployed. */
 function useVoteLinks(): NavItem[] {
   const base = useVoteBase();
   useRoundLoaded();
@@ -47,14 +48,14 @@ function useVoteLinks(): NavItem[] {
   if (!deployed) return [];
   const ballot = `${base}/ballot`;
   return [
+    { to: base, label: "Vote", end: true },
     ...(badges.data?.length
       ? [{
-        to: `${ballot}/edit`,
-        label: "Vote",
+        to: ballot,
+        label: "My ballot",
         active: (path: string) => path === ballot || path.startsWith(`${ballot}/`),
       }]
       : []),
-    { to: base, label: "Results", end: true },
   ];
 }
 

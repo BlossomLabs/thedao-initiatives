@@ -1,8 +1,7 @@
 import { useRound, useVoteBase } from "~/lib/vote-round";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Vote } from "lucide-react";
 import RoundBox from "./RoundBox";
 import ValuationNotes from "./ValuationNotes";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
@@ -59,10 +58,11 @@ function LastChangeNote(
   );
 }
 
-/** A change to the result while the page is open, said for a few seconds (#126): what
- * caused it (or "The result changed" while the server can't tell), then what moved ("A donation to Foo: Foo is now included in A-Tier and Bar was
- * pushed out."). Your own donation and anyone else's ballot or donation alike. */
-function ChangeToast(
+/** A change to the result while the page is open, written to the console (#126; it was a
+ * toast): what caused it (or "The result changed" while the server can't tell), then what
+ * moved ("A donation to Foo: Foo is now included in A-Tier and Bar was pushed out."). Your
+ * own donation and anyone else's ballot or donation alike. Renders nothing. */
+function ChangeLog(
   { ready, change, tiers, titleOf }: {
     /** The round's figures have come: what they show is the starting point. */
     ready: boolean;
@@ -72,14 +72,12 @@ function ChangeToast(
     titleOf: (slug: string) => string;
   },
 ) {
-  const [shown, setShown] = useState<{ n: number; text: string }>();
-  /** The change already on screen when the figures first came: never a toast. */
+  /** The change already there when the figures first came: never logged. */
   const seen = useRef<number | null>(null);
   /** The ballot at the last poll: what moved since, when the server can't say why. Before
    * S-Tier's first tally it has no history to tell (ballots carry the head's time), so the
    * page compares one poll with the next. */
   const before = useRef<Partial<Record<string, Tier>> | null>(null);
-  const count = useRef(0);
   const at = change?.at ?? 0;
   const key = JSON.stringify(Object.entries(tiers).sort());
   useEffect(() => {
@@ -90,7 +88,7 @@ function ChangeToast(
     before.current = tiers;
     if (wasAt === null || !was) return;
     const say = (cause: string, head: string) =>
-      setShown({ n: ++count.current, text: `${cause[0].toUpperCase()}${cause.slice(1)}: ${head}` });
+      console.log(`[vote] ${cause[0].toUpperCase()}${cause.slice(1)}: ${head}`);
     // The server's word first: what caused it, and what it moved.
     if (change && wasAt !== at) {
       const head = changeHeadline(change, titleOf);
@@ -104,43 +102,8 @@ function ChangeToast(
     // Only a new change or a new ballot matters; titleOf is a new closure on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, at, key]);
-  useEffect(() => {
-    if (!shown) return;
-    const t = setTimeout(() => setShown(undefined), TOAST_MS);
-    return () => clearTimeout(t);
-  }, [shown]);
-  if (typeof document === "undefined") return null;
-  // On the body, so nothing the page wraps it in can clip it or move its fixed place.
-  return createPortal(
-    <div
-      role="status"
-      aria-live="polite"
-      data-change-toast-region=""
-      className="pointer-events-none fixed inset-x-0 bottom-5 z-[150] flex justify-center px-4"
-    >
-      {shown && (
-        <div
-          key={shown.n}
-          data-testid="change-toast"
-          className="pointer-events-auto flex max-w-[560px] items-start gap-3 rounded-[14px] border border-edge2 bg-panel px-4 py-3 font-inter-tight text-[14px] leading-snug text-white shadow-menu motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3"
-        >
-          <p className="m-0 flex-1">{shown.text}</p>
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={() => setShown(undefined)}
-            className="-my-0.5 -mr-1 cursor-pointer rounded-md p-0.5 text-white/55 hover:bg-white/10 hover:text-white"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
-        </div>
-      )}
-    </div>,
-    document.body,
-  );
+  return null;
 }
-/** How long a change's toast stays, ms. */
-const TOAST_MS = 9_000;
 
 /** How long typing pauses before a typed amount's number is worked out, ms. */
 const TYPED_PAUSE_MS = 400;
@@ -683,7 +646,10 @@ export default function VoteResults(
       {mine && (
         // A badge holder's way in, right under what the ballots fund (#123): the editor.
         <div className="mt-5 flex justify-center">
-          <LinkButton variant="primary" to={`${mine}/edit`}>Vote</LinkButton>
+          <LinkButton variant="primary" to={`${mine}/edit`} className="min-w-[180px] px-10">
+            <Vote className="size-[18px]" aria-hidden="true" />
+            Vote
+          </LinkButton>
         </div>
       )}
       {R.schedule && (
@@ -702,7 +668,7 @@ export default function VoteResults(
         <PledgeBand compact />
       </div>
       {!example && (
-        <ChangeToast
+        <ChangeLog
           ready={Boolean(rv)}
           change={rv?.live.lastChange ?? undefined}
           tiers={result.tiers}

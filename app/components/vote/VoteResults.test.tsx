@@ -1418,7 +1418,9 @@ it("TheDAO's ballot says what caused its last change, and each move on hover (#1
   );
 });
 
-it("a new change while the page is open shows a toast saying what moved (#126)", async () => {
+it("a new change while the page is open is logged to the console, saying what moved (#126)", async () => {
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  const logged = () => log.mock.calls.filter(([m]) => String(m).startsWith("[vote]"));
   const qc = new QueryClient();
   const base = openWith({ beta: give() });
   const withChange = (at: number, moved: unknown[]) => ({
@@ -1442,8 +1444,8 @@ it("a new change while the page is open shows a toast saying what moved (#126)",
     </QueryClientProvider>,
   );
   await screen.findByText(/Test vote/i);
-  // The change already there when the page opened: no toast.
-  expect(screen.queryByTestId("change-toast")).toBeNull();
+  // The change already there when the page opened: not logged.
+  expect(logged()).toEqual([]);
   vi.mocked(api).mockResolvedValue(
     withChange(200, [{ slug: "beta", from: null, to: "A" }, {
       slug: "alpha",
@@ -1452,14 +1454,17 @@ it("a new change while the page is open shows a toast saying what moved (#126)",
     }]),
   );
   await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
-  expect(await screen.findByTestId("change-toast")).toHaveTextContent(
-    "A donation to Beta audits: Beta audits is now included in A-Tier and Alpha fuzzing was pushed out.",
+  await waitFor(() =>
+    expect(logged()).toEqual([[
+      "[vote] A donation to Beta audits: Beta audits is now included in A-Tier and Alpha fuzzing was pushed out.",
+    ]])
   );
-  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-  expect(screen.queryByTestId("change-toast")).toBeNull();
+  log.mockRestore();
 });
 
-it("before the server can say what changed, the toast says what moved between two polls", async () => {
+it("before the server can say what changed, the console says what moved between two polls", async () => {
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  const logged = () => log.mock.calls.filter(([m]) => String(m).startsWith("[vote]"));
   const qc = new QueryClient();
   vi.mocked(api).mockResolvedValue(openWith({ beta: give() }, { alpha: [50_000, "S"] }));
   render(
@@ -1470,17 +1475,20 @@ it("before the server can say what changed, the toast says what moved between tw
     </QueryClientProvider>,
   );
   await screen.findByText(/Test vote/i);
-  expect(screen.queryByTestId("change-toast")).toBeNull();
+  expect(logged()).toEqual([]);
   // The same figures again: nothing to say.
   await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
-  expect(screen.queryByTestId("change-toast")).toBeNull();
+  expect(logged()).toEqual([]);
   vi.mocked(api).mockResolvedValue(
     openWith({ beta: give() }, { alpha: [50_000, "A"], beta: [30_000, "S"] }),
   );
   await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
-  expect(await screen.findByTestId("change-toast")).toHaveTextContent(
-    "The result changed: Alpha fuzzing moved to A-Tier and Beta audits is now included in S-Tier.",
+  await waitFor(() =>
+    expect(logged()).toEqual([[
+      "[vote] The result changed: Alpha fuzzing moved to A-Tier and Beta audits is now included in S-Tier.",
+    ]])
   );
+  log.mockRestore();
 });
 
 it("no last change, no note", async () => {

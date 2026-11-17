@@ -34,32 +34,48 @@ const mount = (path: string, env: "production" | "test" = "production") =>
   );
 const desktop = () => within(screen.getAllByRole("navigation", { name: "Site" })[0]);
 
-it("links a badge holder to the vote and its results (#124)", () => {
+it("links to the vote's results and a badge holder's ballot (#124)", () => {
   mount("/vote/ballot");
-  expect(desktop().getByRole("link", { name: "Vote" })).toHaveAttribute(
+  expect(desktop().getByRole("link", { name: "My ballot" })).toHaveAttribute(
     "href",
-    "/vote/ballot/edit",
+    "/vote/ballot",
   );
-  // On the ballot's pages Vote is the current one, Results isn't.
-  expect(desktop().getByRole("link", { name: "Vote" })).toHaveAttribute("aria-current", "page");
-  expect(desktop().getByRole("link", { name: "Results" })).toHaveAttribute("href", "/vote");
-  expect(desktop().getByRole("link", { name: "Results" })).not.toHaveAttribute("aria-current");
+  // On the ballot's pages My ballot is the current one, Vote isn't.
+  expect(desktop().getByRole("link", { name: "My ballot" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  expect(desktop().getByRole("link", { name: "Vote" })).toHaveAttribute("href", "/vote");
+  expect(desktop().getByRole("link", { name: "Vote" })).not.toHaveAttribute("aria-current");
+  // Vote comes first.
+  expect(desktop().getAllByRole("link").map((l) => l.textContent).slice(-2)).toEqual([
+    "Vote",
+    "My ballot",
+  ]);
+});
+
+it("the ballot's editor is My ballot too", () => {
+  mount("/vote/ballot/edit");
+  expect(desktop().getByRole("link", { name: "My ballot" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 });
 
 it("on the test vote the links go to the test vote", () => {
   mount("/vote-test", "test");
-  expect(desktop().getByRole("link", { name: "Vote" })).toHaveAttribute(
+  expect(desktop().getByRole("link", { name: "My ballot" })).toHaveAttribute(
     "href",
-    "/vote-test/ballot/edit",
+    "/vote-test/ballot",
   );
-  expect(desktop().getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
+  expect(desktop().getByRole("link", { name: "Vote" })).toHaveAttribute("aria-current", "page");
 });
 
-it("without a badge only Results; without a round, neither", () => {
+it("without a badge only Vote; without a round, neither", () => {
   state.badges = [];
   mount("/");
-  expect(desktop().queryByRole("link", { name: "Vote" })).toBeNull();
-  expect(desktop().getByRole("link", { name: "Results" })).toBeInTheDocument();
+  expect(desktop().queryByRole("link", { name: "My ballot" })).toBeNull();
+  expect(desktop().getByRole("link", { name: "Vote" })).toHaveAttribute("href", "/vote");
   state.deployed = false;
   mount("/");
   expect(screen.getAllByRole("navigation", { name: "Site" }).at(-1)!.querySelectorAll("a"))

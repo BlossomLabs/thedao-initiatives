@@ -135,8 +135,10 @@ export function matches(c: Card, v: BoardView, skip?: Facet, watched?: string[])
   if (skip !== "status" && v.status === "open" && c.funded) return false;
   if (skip !== "status" && v.status === "funded" && !c.funded) return false;
   // Qualified for the vote: past the vote floor (on the ballot counts). The cards carry it
-  // only while the display is on.
-  if (skip !== "status" && v.status === "qualified" && c.vote === "below") return false;
+  // only while the display is on. Past the deadline to qualify ("closed") only the ballot is.
+  if (
+    skip !== "status" && v.status === "qualified" && (c.vote === "below" || c.vote === "closed")
+  ) return false;
   if (skip !== "status" && v.status === "ballot" && c.vote !== "ballot") return false;
   if (
     skip !== "cats" && v.cats.length && !c.initiative.categories.some((s) => v.cats.includes(s))
@@ -294,7 +296,7 @@ export function groupByFunding(
       ? "funded"
       : c.vote === "ballot"
       ? "ballot"
-      : c.vote && c.vote !== "below"
+      : c.vote === "eligible"
       ? "qualified"
       : "open";
   const order: FundingSection[] = ["funded", "ballot", "qualified", "open"];

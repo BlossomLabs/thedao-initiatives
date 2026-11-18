@@ -1,4 +1,4 @@
-import { type VoteSettings, voteState } from "@shared/vote";
+import { ballotClosed, type VoteSettings, voteState } from "@shared/vote";
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { usdShortUp } from "~/lib/format";
@@ -8,8 +8,19 @@ import { cn } from "~/lib/utils";
 /** How close counts as "almost there": the tag shows within this many points of the floor. */
 export const NEAR_POINTS = 5;
 
+/** The vote settings as they apply to one initiative: none (the display is off, or the
+ * deadline to qualify has passed and it isn't on the ballot: Open for funding only). `now`
+ * in unix seconds. */
+export const voteFor = (
+  vote: VoteSettings | undefined,
+  onBallot: boolean,
+  now = Date.now() / 1000,
+): VoteSettings | undefined =>
+  vote?.show && (onBallot || !ballotClosed(vote, now)) ? vote : undefined;
+
 /** What the tick's callout says: past the floor, or what is missing when within
- * NEAR_POINTS of it; null (no callout) further away or while the display is off. */
+ * NEAR_POINTS of it; null (no callout) further away, while the display is off, or past the
+ * deadline to qualify for one not on the ballot. */
 export type CalloutState =
   | { kind: "eligible" }
   | { kind: "near"; missing: number }
@@ -19,25 +30,30 @@ export function voteCallout(
   goal: number,
   vote?: VoteSettings,
   onBallot = false,
+  now = Date.now() / 1000,
 ): CalloutState | null {
-  if (!vote?.show) return null;
+  const v = voteFor(vote, onBallot, now);
+  if (!v) return null;
   if (onBallot) return { kind: "ballot" };
   if (!goal) return null;
-  const s = voteState(raised, goal, vote);
+  const s = voteState(raised, goal, v);
   if (s.kind !== "below") return { kind: "eligible" };
   return (100 * s.toFloorUsd) / goal <= NEAR_POINTS
     ? { kind: "near", missing: s.toFloorUsd }
     : null;
 }
 
-/** The callout for any initiative (list rows, on a click): past the floor, or what is missing. */
+/** The callout for any initiative (list rows, on a click): past the floor, or what is
+ * missing; null past the deadline to qualify for one not on the ballot. */
 export function voteStanding(
   raised: number,
   goal: number,
   vote: VoteSettings,
   onBallot = false,
-): CalloutState {
+  now = Date.now() / 1000,
+): CalloutState | null {
   if (onBallot) return { kind: "ballot" };
+  if (ballotClosed(vote, now)) return null;
   const s = voteState(raised, goal, vote);
   return s.kind === "below" ? { kind: "near", missing: s.toFloorUsd } : { kind: "eligible" };
 }

@@ -369,6 +369,23 @@ describe("On the ballot filter", () => {
   });
 });
 
+describe("after the deadline to qualify", () => {
+  const closed = { ...card("Closed"), vote: "closed" as const };
+  const ballot = { ...card("Ballot"), vote: "ballot" as const };
+  it("one not on the ballot is Open for funding: neither Qualified nor On the ballot", () => {
+    const q = { ...DEFAULT_VIEW, status: "qualified" as const };
+    expect(applyView([closed, ballot], q).map((c) => c.initiative.title)).toEqual(["Ballot"]);
+    const b = { ...DEFAULT_VIEW, status: "ballot" as const };
+    expect(applyView([closed, ballot], b).map((c) => c.initiative.title)).toEqual(["Ballot"]);
+    const open = { ...DEFAULT_VIEW, status: "open" as const };
+    expect(applyView([closed], open)).toHaveLength(1);
+    expect(groupByFunding([closed, ballot]).map((g) => [g.key, g.cards])).toEqual([
+      ["ballot", [ballot]],
+      ["open", [closed]],
+    ]);
+  });
+});
+
 describe("admin ratings", () => {
   const [a, b, c] = [card("Alpha"), card("Bravo"), card("Charlie")];
   const cards = [a, b, c];

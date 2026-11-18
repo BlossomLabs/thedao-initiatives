@@ -231,7 +231,7 @@ it("the top edge: AI pick or New, then the Featured pin; AI pick over New", () =
 });
 
 describe("vote eligibility", () => {
-  const vote = { show: true, floorPct: 25, capUsd: 200_000 };
+  const vote = { show: true, floorPct: 25, capUsd: 200_000, qualifyBy: null };
   const raised = (total: number) =>
     card({ summary: { ...card({}).summary, total }, pct: total / 10 });
 
@@ -256,6 +256,28 @@ describe("vote eligibility", () => {
       "10.0% funded. $150 to qualify for TheDAO's vote",
     );
     expect(screen.queryByText(/Qualified for the vote|to qualify$/)).toBeNull();
+  });
+
+  it("a card the server closed has the plain bar, even when this clock is behind", () => {
+    const later = { ...vote, qualifyBy: Math.floor(Date.now() / 1000) + 3600 };
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard card={{ ...raised(900), vote: "closed" }} tokensOk vote={later} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("[data-vote-tick]")).toBeNull();
+    expect(screen.queryByText(/qualif/i)).toBeNull();
+  });
+
+  it("after the deadline to qualify: one not on the ballot has the plain bar, no qualify words", () => {
+    const closed = { ...vote, qualifyBy: Math.floor(Date.now() / 1000) - 60 };
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard card={{ ...raised(900), vote: "closed" }} tokensOk vote={closed} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("[data-vote-tick]")).toBeNull();
+    expect(screen.queryByText(/qualif/i)).toBeNull();
   });
 });
 

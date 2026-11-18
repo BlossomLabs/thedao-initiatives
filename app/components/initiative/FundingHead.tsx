@@ -1,14 +1,20 @@
 import { Trophy } from "lucide-react";
 import Bar from "~/components/ui/Bar";
 import { Check } from "lucide-react";
-import { calloutLabel, calloutText, OnBallotMark, voteStanding } from "~/components/board/VoteMark";
+import {
+  calloutLabel,
+  calloutText,
+  OnBallotMark,
+  voteFor,
+  voteStanding,
+} from "~/components/board/VoteMark";
 import { voteFloorPct, voteFloorUsd, type VoteSettings } from "@shared/vote";
 import Money from "~/components/ui/Money";
 import type { Summary } from "~/lib/api-types";
 import { pctText, usd } from "~/lib/format";
 
 export default function FundingHead(
-  { summary, goal, pct, funded, vote, onBallot = false }: {
+  { summary, goal, pct, funded, vote: voteSettings, onBallot = false }: {
     summary: Summary;
     goal: number;
     pct: number;
@@ -19,7 +25,9 @@ export default function FundingHead(
     onBallot?: boolean;
   },
 ) {
-  const standing = vote?.show ? voteStanding(summary.total, goal, vote, onBallot) : null;
+  // Past the deadline to qualify, one not on the ballot is Open for funding: no vote words.
+  const vote = voteFor(voteSettings, onBallot);
+  const standing = vote ? voteStanding(summary.total, goal, vote, onBallot) : null;
   const split = (
     <div className="mt-2.5 flex flex-wrap gap-[26px] text-[13px] text-muted">
       {funded && (

@@ -666,7 +666,14 @@ export default function VoteResults(
         // settling now (a third); stacked on a phone.
         <div className="mx-auto mt-6 grid max-w-[1052px] grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2 [&>section]:h-full">
-            <RoundBox schedule={R.schedule} rv={rv} large />
+            <RoundBox
+              schedule={R.schedule}
+              rv={rv}
+              large
+              // The deadline to qualify for the real ballot (the vote settings); an example
+              // has none.
+              qualifyBy={!example && REAL ? board.data?.flags.vote.qualifyBy ?? null : null}
+            />
           </div>
           <ClosestBox tier={tier} rows={rows} onPick={pick} />
         </div>

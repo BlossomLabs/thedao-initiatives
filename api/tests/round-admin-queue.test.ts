@@ -546,3 +546,31 @@ Deno.test("queue: production's fractional clock still signs a pledge", async () 
   assertEquals(sent.status, 202, await sent.clone().text());
   s.h.close();
 });
+
+for (const kind of ["real", "test"] as const) {
+  Deno.test(`ballot deadline (${kind}): after it ${kind === "real" ? "nothing is ready and a claim is refused" : "the rehearsal goes on"}`, async () => {
+    const s = await setup(kind);
+    await s.h.deps.db.meta.set("vote_settings", {
+      show: true,
+      floorPct: 25,
+      capUsd: 200_000,
+      qualifyBy: NOW + 60,
+    });
+    assertEquals((await s.queue()).ready.map((r) => r.id), [s.ready.id]);
+    s.h.clock.now = NOW + 60;
+    const claim = await claimReq(s, s.ready.id, s.token);
+    if (kind === "real") {
+      assertEquals((await s.queue()).ready, []);
+      assertEquals(claim.status, 409);
+      assertEquals(await j(claim), {
+        error: "No more initiatives can be added to the ballot.",
+        code: "ballot_closed",
+        message: "No more initiatives can be added to the ballot.",
+      });
+    } else {
+      assertEquals((await s.queue()).ready.map((r) => r.id), [s.ready.id]);
+      assertEquals(claim.status, 200, await claim.clone().text());
+    }
+    s.h.close();
+  });
+}

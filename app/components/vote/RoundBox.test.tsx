@@ -267,3 +267,68 @@ it("an unfunded round before opening still shows when voting opens", () => {
   expect(box).toHaveTextContent("Voting opens");
   expect(box).not.toHaveTextContent("Voting stays open");
 });
+
+describe("RoundBox, the deadline to qualify for the ballot", () => {
+  // Voting is open: S-Tier starts settling in a day.
+  const open = {
+    ...schedule,
+    firstTallyAt: [now + 24 * H, now + 48 * H, now + 72 * H] as [number, number, number],
+  };
+  const rv = view([
+    waiting("S", now + 24 * H),
+    waiting("A", now + 48 * H),
+    waiting("B", now + 72 * H),
+  ]);
+  // Midnight, the reader's time, three days on: a day alone says it.
+  const midnight = new Date(Date.now() + 3 * 24 * H * 1000);
+  midnight.setHours(0, 0, 0, 0);
+  const day = Math.floor(midnight.getTime() / 1000);
+  const dayText = midnight.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const lines = (box: HTMLElement) =>
+    [...box.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "");
+
+  for (const bare of [false, true]) {
+    const layout = bare ? "bare" : "default";
+    it(`${layout}: before it, initiatives need to qualify by then; S-Tier's line stays`, () => {
+      render(
+        <RoundBox schedule={open} rv={rv} qualifyBy={day} bare={bare} />,
+      );
+      const box = screen.getByRole("region", { name: "Where the round is" });
+      expect(within(box).getByRole("heading", { name: "Voting is open" })).toBeInTheDocument();
+      const ls = lines(box);
+      const i = ls.indexOf(`Initiatives need to qualify for the ballot before ${dayText}.`);
+      expect(i).toBeGreaterThanOrEqual(0);
+      if (!bare) expect(ls[i + 1]).toMatch(/^S-Tier starts settling /);
+      expect(box).not.toHaveTextContent("No more initiatives");
+    });
+
+    it(`${layout}: after it, no more initiatives can be added`, () => {
+      render(<RoundBox schedule={open} rv={rv} qualifyBy={now - 60} bare={bare} />);
+      const box = screen.getByRole("region", { name: "Where the round is" });
+      expect(lines(box)).toContain("No more initiatives can be added to the ballot.");
+      expect(box).not.toHaveTextContent("need to qualify");
+      if (!bare) expect(box).toHaveTextContent(/S-Tier starts settling /);
+    });
+  }
+
+  it("a deadline that isn't midnight gives its time too", () => {
+    render(<RoundBox schedule={open} rv={rv} qualifyBy={day + 14 * H} />);
+    const box = screen.getByRole("region", { name: "Where the round is" });
+    expect(box).toHaveTextContent(
+      `Initiatives need to qualify for the ballot before ${dayText}, 14:00.`,
+    );
+  });
+
+  it("no deadline, or a later phase: no line", () => {
+    render(<RoundBox schedule={open} rv={rv} qualifyBy={null} />);
+    const box = screen.getByRole("region", { name: "Where the round is" });
+    expect(box).not.toHaveTextContent(/qualify|No more initiatives/);
+    cleanup();
+    render(
+      <RoundBox schedule={schedule} rv={view([settlingS(true), ...later])} qualifyBy={now - 60} />,
+    );
+    expect(screen.getByRole("region", { name: "Where the round is" })).not.toHaveTextContent(
+      "No more initiatives",
+    );
+  });
+});

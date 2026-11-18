@@ -9,7 +9,7 @@ import {
   voteStanding,
 } from "./VoteMark";
 
-const vote = { show: true, floorPct: 25, capUsd: 200_000 };
+const vote = { show: true, floorPct: 25, capUsd: 200_000, qualifyBy: null };
 
 it("the callout: past the floor, or what is missing within 5 points of it", () => {
   // goal $240k, floor 25% = $60k
@@ -78,4 +78,16 @@ it("the whole row shows the callout: a mouse on it, a tap on it, or the keyboard
   expect(shown()).toBe(false);
   fireEvent.focus(screen.getByText("Title"));
   expect(shown()).toBe(true);
+});
+
+it("after the deadline to qualify, only one on the ballot keeps its callout", () => {
+  const closed = { ...vote, qualifyBy: 1000 };
+  // Before it: as ever.
+  expect(voteCallout(60_000, 240_000, closed, false, 999)).toEqual({ kind: "eligible" });
+  expect(voteStanding(10, 240_000, closed, false, 999)).toEqual({ kind: "near", missing: 59_990 });
+  expect(voteCallout(60_000, 240_000, closed, false, 1000)).toBeNull();
+  expect(voteCallout(59_000, 240_000, closed, false, 1000)).toBeNull();
+  expect(voteStanding(60_000, 240_000, closed, false, 1000)).toBeNull();
+  expect(voteCallout(10, 100, closed, true, 1000)).toEqual({ kind: "ballot" });
+  expect(voteStanding(10, 100, closed, true, 1000)).toEqual({ kind: "ballot" });
 });

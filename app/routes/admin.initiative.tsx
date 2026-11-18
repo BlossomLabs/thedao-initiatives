@@ -39,6 +39,8 @@ import PutOnBallotCard, { OnBallotChip } from "~/components/admin/vote/PutOnBall
 import { PledgesToSign } from "~/components/admin/vote/RoundAdminQueue";
 import { useBallotRuns, useRoundAdminQueue } from "~/components/admin/vote/round-admin-actions";
 import { onBallotSlugs, roundDeployed } from "../../shared/vote/manifest";
+import { ballotClosed, voteState } from "../../shared/vote";
+import { useSiteSettings } from "~/hooks/use-site-settings";
 
 /** The round the site runs now, before the page shows it. */
 export const clientLoader = roundLoader;
@@ -90,6 +92,8 @@ export default function ManageInitiative() {
     Boolean(session?.isAdmin) && realOpen && data?.initiative.status === "approved",
   );
   const runs = useBallotRuns("production");
+  // The vote settings: past the deadline to qualify, the queue lists nothing ready.
+  const site = useSiteSettings();
   const runAt = (at: string): Run => async (fn, ok) => {
     setMsg(null);
     try {
@@ -140,6 +144,12 @@ export default function ManageInitiative() {
   const ballotCard = ballotRun?.ready ??
     (r.status === "approved" && !onBallot && realOpen ? ready : undefined);
   const toSign = onBallot ? queue.data?.toSign.filter((x) => x.rfpId === r.id) ?? [] : [];
+  // Qualified, not on the ballot, and the deadline to qualify has passed: where the Put on the
+  // ballot card would be, a line says so (the real round only).
+  const vote = site.data?.vote;
+  const ballotShut = !ballotCard && r.status === "approved" && !onBallot && realOpen &&
+    Boolean(vote) && ballotClosed(vote!, Date.now() / 1000) &&
+    voteState(data.summary.total, r.goalUsd, vote!).kind === "eligible";
   const run = runAt("status");
   const approve = (action: "approve" | "unarchive", ok: string) =>
     run(async () => {
@@ -299,6 +309,11 @@ export default function ManageInitiative() {
           </div>
 
           {ballotCard && <PutOnBallotCard ready={ballotCard} />}
+          {ballotShut && (
+            <div className="panel">
+              <p className="small dim m-0">No more initiatives can be added to the ballot.</p>
+            </div>
+          )}
 
           <CategoriesPanel r={r} run={runAt("categories")} />
           {said("categories")}

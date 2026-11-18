@@ -175,6 +175,10 @@ export default function VotePage(
   const ROUND = useRound();
   const voteBase = useVoteBase();
   const R = mockData?.round ?? ROUND;
+  // The deadline to qualify for the real ballot (the vote settings); an example has none.
+  const qualifyBy = !mockKind && R.kind === "real"
+    ? board.data?.flags.vote.qualifyBy ?? null
+    : null;
   const found = info.data === "none" ? undefined : info.data;
   const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : found;
   const n = data ? data.n : null;
@@ -709,6 +713,7 @@ export default function VotePage(
     const roundProps = R.schedule && {
       schedule: R.schedule,
       rv,
+      qualifyBy,
       badge: badgeLine({
         phase: roundSteps({
           schedule: R.schedule,
@@ -877,7 +882,7 @@ export default function VotePage(
             this round. The vote goes on without it.
           </p>
         </header>
-        {R.schedule && <RoundBox schedule={R.schedule} rv={rv} />}
+        {R.schedule && <RoundBox schedule={R.schedule} rv={rv} qualifyBy={qualifyBy} />}
         <div className="flex justify-center">
           <LinkButton variant="primary" to={voteBase}>
             Follow the results live

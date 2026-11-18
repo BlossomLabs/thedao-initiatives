@@ -10,10 +10,18 @@ export interface VoteSettings {
   show: boolean;
   floorPct: number;
   capUsd: number;
+  /** The deadline to qualify (unix seconds): from then on no initiative joins the ballot,
+   * and only those on it stay in the vote. null: none. */
+  qualifyBy: number | null;
 }
 
 /** Locked on the 23 Sep Curator call: 25% floor, $200,000 cap. Off until the copy is final. */
-export const DEFAULT_VOTE: VoteSettings = { show: false, floorPct: 25, capUsd: 200_000 };
+export const DEFAULT_VOTE: VoteSettings = {
+  show: false,
+  floorPct: 25,
+  capUsd: 200_000,
+  qualifyBy: null,
+};
 
 export function readVoteSettings(raw: unknown): [VoteSettings, null] | [null, string] {
   const r = (raw ?? {}) as Record<string, unknown>;
@@ -26,8 +34,20 @@ export function readVoteSettings(raw: unknown): [VoteSettings, null] | [null, st
   if (!Number.isFinite(capUsd) || capUsd < 0) {
     return [null, "The cap is a USD amount of 0 or more."];
   }
-  return [{ show: r.show, floorPct, capUsd: Math.round(capUsd) }, null];
+  // Settings saved before the deadline existed have none.
+  const qualifyBy = (r.qualifyBy ?? null) as number | null;
+  // Seconds, not milliseconds: 1e11 seconds is the year 5138, so a larger one is ms by mistake.
+  if (
+    qualifyBy !== null && !(Number.isSafeInteger(qualifyBy) && qualifyBy > 0 && qualifyBy < 1e11)
+  ) {
+    return [null, "The deadline to qualify is a moment in unix seconds, or none."];
+  }
+  return [{ show: r.show, floorPct, capUsd: Math.round(capUsd), qualifyBy }, null];
 }
+
+/** Past the deadline to qualify (`now` in unix seconds): no initiative joins the ballot. */
+export const ballotClosed = (s: VoteSettings, now: number): boolean =>
+  s.qualifyBy !== null && now >= s.qualifyBy;
 
 /** What an initiative raises to qualify: the floor share of its goal, or the goal less the cap when that is more. */
 export const voteFloorUsd = (goalUsd: number, s: VoteSettings): number =>

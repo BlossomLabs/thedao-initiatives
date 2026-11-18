@@ -13,7 +13,7 @@ import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import { ledgerStatus, refreshLedgers, safeApiPausedUntil } from "../services/ledger.ts";
 import { sharedChainState } from "../services/chain-state.ts";
 import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
-import { DEFAULT_VOTE, type VoteSettings, voteState } from "../../shared/vote.ts";
+import { ballotClosed, DEFAULT_VOTE, type VoteSettings, voteState } from "../../shared/vote.ts";
 import { buildBriefs } from "../services/vote-briefs.ts";
 import type { VoteBrief } from "../../shared/vote/brief.ts";
 
@@ -36,8 +36,9 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
-  /** Where it stands for TheDAO's vote; only while the vote display is on. */
-  vote?: ReturnType<typeof voteState>["kind"] | "ballot";
+  /** Where it stands for TheDAO's vote; only while the vote display is on. "closed": past
+   * the deadline to qualify and not on the ballot, so Open for funding only. */
+  vote?: ReturnType<typeof voteState>["kind"] | "ballot" | "closed";
 }
 
 export const pctOf = (total: number, goal: number): number =>
@@ -208,6 +209,9 @@ async function buildBoard(deps: Deps, refresh: boolean) {
     safeApiPausedUntil(deps),
   ]);
   const ballot = onBallotSlugs(round?.manifest);
+  // Past the deadline to qualify, only those on the real round's ballot are still in the
+  // vote. A round that couldn't be read closes nothing: its ballot is unknown.
+  const closed = round?.manifest.kind === "real" && ballotClosed(vote, deps.now());
   const cards = orderCards(
     await Promise.all(
       initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk, pausedUntil)),
@@ -218,6 +222,8 @@ async function buildBoard(deps: Deps, refresh: boolean) {
         ...c,
         vote: ballot.has(c.initiative.slug)
           ? "ballot"
+          : closed
+          ? "closed"
           : voteState(c.summary.total, c.initiative.goalUsd, vote).kind,
       }
       : c

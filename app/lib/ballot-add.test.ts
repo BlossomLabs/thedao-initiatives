@@ -10,6 +10,7 @@ import {
 } from "./ballot-add";
 import type { ReadyJson } from "./api-types";
 import { dayTime } from "./format";
+import { ApiError } from "./api";
 
 const HASH = ("0x" + "ab".repeat(32)) as Hex;
 
@@ -205,6 +206,21 @@ describe("putOnBallot: one admin at a time", () => {
     expect(plan).not.toHaveBeenCalled();
     expect(d.send).not.toHaveBeenCalled();
     expect(d.signPledge).not.toHaveBeenCalled();
+  });
+
+  it("putOnBallot: past the deadline to qualify the server's refusal is said as it is", async () => {
+    const plan = vi.fn(() => []);
+    const closed = new ApiError(409, "No more initiatives can be added to the ballot.", {
+      code: "ballot_closed",
+    });
+    const d = deps({ claim: vi.fn(() => Promise.reject(closed)), plan });
+    const end = await putOnBallot(d, ready, () => {});
+    expect(end).toEqual({
+      kind: "failed",
+      reason: "No more initiatives can be added to the ballot.",
+      added: false,
+    });
+    expect(plan).not.toHaveBeenCalled();
   });
 
   it("putOnBallot: a renewal another admin took over stops the run before the next send", async () => {

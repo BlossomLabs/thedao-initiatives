@@ -137,10 +137,14 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     if (!initiative) throw new HttpError(404, "not found");
     return initiative;
   };
-  /** Vote-eligibility display settings (flag, floor, cap): no deploy needed to change them. */
+  /** Vote-eligibility settings (flag, floor, cap, deadline to qualify): no deploy needed to
+   * change them. */
   r.get("/vote-settings", async (c) => c.json(await voteSettings(deps)));
   r.post("/vote-settings", async (c) => {
-    const [v, err] = readVoteSettings(await jsonBody(c, ["show", "floorPct", "capUsd"]));
+    const body = await jsonBody(c, ["show", "floorPct", "capUsd", "qualifyBy"]);
+    // A body without the deadline (a page from before it) keeps the stored one; null clears it.
+    if (!("qualifyBy" in body)) body.qualifyBy = (await voteSettings(deps)).qualifyBy;
+    const [v, err] = readVoteSettings(body);
     if (err) throw new HttpError(400, err);
     await db.meta.set("vote_settings", v);
     return c.json(v);

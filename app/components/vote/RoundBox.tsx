@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@base-ui/react/tooltip";
 import type { RoundView } from "~/hooks/use-vote";
-import { clock, dayTime, usd, usdShort } from "~/lib/format";
+import { clock, dayTime, shortDay, usd, usdShort } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import { type Tier, tierName } from "../../../shared/vote/ballot";
 import type { Schedule } from "../../../shared/vote/quiet-ending";
 import { chainNow, dueAt, type Phase, roundSteps, type Step, type Win } from "./round-steps";
-import { Countdown, useNow, When } from "./When";
+import { Countdown, useNow, utcTime, When } from "./When";
 
 /** Where the round is: a stepper (Voting → S-Tier → A-Tier → B-Tier → Result), the
  * current step in detail (a settling tier's windows in a bar, each with its own popup),
@@ -442,8 +442,23 @@ function WaitingLine({ phase }: { phase: Phase }) {
   );
 }
 
+/** The deadline to qualify for the ballot, while voting hasn't opened or is open: until it,
+ * by when (a day alone at local midnight, else its time too); after it, that the ballot is
+ * closed. `now` in unix seconds. */
+function QualifyLine({ at, now }: { at: number; now: number }) {
+  if (now >= at) return <>No more initiatives can be added to the ballot.</>;
+  return (
+    <>
+      Initiatives need to qualify for the ballot before{" "}
+      <time dateTime={new Date(at * 1000).toISOString()} title={utcTime(at)}>
+        {clock(at) === "00:00" ? shortDay(at) : dayTime(at)}
+      </time>.
+    </>
+  );
+}
+
 export default function RoundBox(
-  { schedule, rv, badge, mine, large, stepsOnly, bare }: {
+  { schedule, rv, badge, mine, large, stepsOnly, bare, qualifyBy = null }: {
     schedule: Schedule;
     rv?: RoundView;
     /** On the ballot: what this badge can still do. */
@@ -458,6 +473,9 @@ export default function RoundBox(
     /** On the ballot editor: a light green box, apart from the cards around it. A heading,
      * the stepper, what the current step means, then this badge. */
     bare?: boolean;
+    /** The deadline to qualify for the ballot (unix seconds; the vote settings'), said while
+     * voting hasn't opened or is open. */
+    qualifyBy?: number | null;
   },
 ) {
   const clock = Math.floor(useNow(5_000) / 1000);
@@ -574,6 +592,11 @@ export default function RoundBox(
       break;
   }
   if (waiting) status = <WaitingLine phase={phase} />;
+  const qualify = qualifyBy !== null && (phase.kind === "before" || phase.kind === "open") && (
+    <p className="m-0 text-[13.5px] text-white/75 tnum">
+      <QualifyLine at={qualifyBy} now={clock} />
+    </p>
+  );
   const tone = badge && TONE[badge.tone];
   const BOX = "overflow-visible rounded-xl border border-white/15 bg-white/[.04] text-left";
   const stepper = (
@@ -625,6 +648,7 @@ export default function RoundBox(
   const nowBox = () => (
     <div className="space-y-2 border-t border-white/10 px-4 pb-4 pt-3.5">
       {titleRow}
+      {qualify}
       {when && <p className="m-0 text-[13.5px] text-white/75 tnum">{when}</p>}
       {phase.kind === "settling" && <WindowBar phase={phase} />}
       {status && <p className="m-0 text-[13.5px] leading-snug text-white/65">{status}</p>}
@@ -663,6 +687,7 @@ export default function RoundBox(
         }
         {(phase.kind === "before" || status || phase.kind === "settling") && (
           <div className="space-y-2">
+            {qualify}
             {phase.kind === "before" && (
               <p className="m-0 text-[13.5px] text-white/75 tnum">{when}</p>
             )}

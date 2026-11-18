@@ -158,7 +158,9 @@ it("desktop: the Backers column shows the pledgers' logos, and +N for the backer
 });
 
 it("the last row's vote callout hangs below the list, so nothing around it clips", () => {
-  const { container } = mount({ vote: { show: true, floorPct: 25, capUsd: 200_000 } });
+  const { container } = mount({
+    vote: { show: true, floorPct: 25, capUsd: 200_000, qualifyBy: null },
+  });
   const last = [...container.querySelectorAll("li")].at(-1)!;
   fireEvent.click(last);
   const callout = last.querySelector("[data-vote-callout]")!;
@@ -166,6 +168,18 @@ it("the last row's vote callout hangs below the list, so nothing around it clips
   for (let el = callout.parentElement; el && el !== container; el = el.parentElement) {
     expect(el.className).not.toMatch(/\boverflow-(hidden|clip|auto|scroll)\b/);
   }
+});
+
+it("a row the server closed (past the deadline to qualify) has no vote mark, whatever this clock says", () => {
+  const later = Math.floor(Date.now() / 1000) + 3600;
+  const { container } = mount({
+    cards: cards.map((c) => ({ ...c, vote: "closed" as const })),
+    vote: { show: true, floorPct: 25, capUsd: 200_000, qualifyBy: later },
+  });
+  for (const li of container.querySelectorAll("li")) fireEvent.click(li);
+  expect(container.querySelector("[data-vote-tick]")).toBeNull();
+  expect(container.querySelector("[data-vote-callout]")).toBeNull();
+  expect(screen.queryByText(/qualif/i)).toBeNull();
 });
 
 it("draws the vote's share as a second segment after the raised part", () => {

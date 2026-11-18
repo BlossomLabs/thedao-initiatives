@@ -152,7 +152,8 @@ function Row(
 ) {
   const { initiative: r, summary, pct, backers, logos } = card;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
-  const standing = vote?.show
+  // Past the deadline to qualify (the server's "closed", or this clock), no vote mark.
+  const standing = vote?.show && card.vote !== "closed"
     ? voteStanding(summary.total, r.goalUsd, vote, card.vote === "ballot")
     : null;
   // The Backers column: every logo when they are all the backers, else three and "+N" for the rest.

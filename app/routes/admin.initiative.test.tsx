@@ -12,12 +12,14 @@ vi.mock("~/context/session", () => ({
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendTransaction, waitForTransactionReceipt } from "wagmi/actions";
 import { structuredRow } from "../../test/fixtures";
 import type { AdminInitiativePage } from "~/lib/api-types";
 import { api } from "~/lib/api";
 import ManageInitiative from "./admin.initiative";
+import { primeRound } from "~/lib/vote-round";
+import { NO_ROUND } from "../../shared/vote/manifest";
 
 const wallet = vi.hoisted(() => ({ connected: true }));
 const ADMIN = "0x1111111111111111111111111111111111111111";
@@ -489,4 +491,88 @@ it("the admin list is not fetched when no edit is waiting", async () => {
   renderPage();
   await screen.findByRole("heading", { level: 1 });
   expect(calls()).not.toContain("/api/admin/admins");
+});
+
+describe("past the deadline to qualify for the ballot", () => {
+  const now = Math.floor(Date.now() / 1000);
+  // The production round can't be unset (NO_ROUND is a test round): "no open real round" is
+  // one that has closed.
+  const realRound = (closesAt = now + 86_400) =>
+    primeRound({
+      ...NO_ROUND,
+      kind: "real",
+      chainId: 1,
+      contract: "0x1000000000000000000000000000000000000001",
+      badge: "0x2000000000000000000000000000000000000002",
+      opensAt: now - 7200,
+      closesAt,
+      slugs: ["acme"],
+      projects: [{ goalUsd: "1000000000", rfp: false, groups: [] }],
+      accounts: ["0x3000000000000000000000000000000000000003"],
+      currencies: [
+        {
+          symbol: "USD",
+          asset: "0x0000000000000000000000000000000000000000",
+          usdFeed: "0x0000000000000000000000000000000000000000",
+        },
+        {
+          symbol: "ETH",
+          asset: "0x0000000000000000000000000000000000000000",
+          usdFeed: "0x4000000000000000000000000000000000000004",
+        },
+      ],
+    });
+  const settings = (qualifyBy: number | null) => {
+    const fallback = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((path, options) => {
+      const p = String(path);
+      if (p === "/api/board/settings") {
+        return Promise.resolve({
+          uploads: false,
+          support: false,
+          vote: { show: true, floorPct: 25, capUsd: 200_000, qualifyBy },
+        });
+      }
+      if (p.endsWith("/vote-round/queue")) {
+        return Promise.resolve({ kind: "real", ready: [], toSign: [] });
+      }
+      return fallback(path, options);
+    });
+  };
+  const qualified = () =>
+    page({
+      status: "approved",
+      approvedAt: 1,
+      safeAddress: SAFE,
+      categories: ["opsec"],
+    });
+  afterEach(() => realRound(now - 3600));
+
+  it("a qualified initiative not on the ballot says no more can be added", async () => {
+    realRound();
+    settings(now - 60);
+    current = { ...qualified(), summary: { ...current.summary, total: 100_000 } };
+    renderPage();
+    expect(await screen.findByText("No more initiatives can be added to the ballot."))
+      .toBeInTheDocument();
+  });
+
+  it("before the deadline, under the floor, or once the round has closed: no such line", async () => {
+    for (
+      const [round, by, total] of [
+        [true, now + 3600, 100_000],
+        [true, now - 60, 1_000],
+        [false, now - 60, 100_000],
+      ] as const
+    ) {
+      realRound(round ? undefined : now - 3600);
+      settings(by);
+      current = { ...qualified(), summary: { ...current.summary, total } };
+      const v = renderPage();
+      await screen.findByText(current.initiative.title, { selector: "h1" });
+      await waitFor(() => expect(calls()).toContain("/api/board/settings"));
+      expect(screen.queryByText("No more initiatives can be added to the ballot.")).toBeNull();
+      v.unmount();
+    }
+  });
 });

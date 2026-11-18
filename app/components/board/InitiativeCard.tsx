@@ -17,6 +17,7 @@ import {
   useVoteReveal,
   VoteCallout,
   voteCallout,
+  voteFor,
   voteStanding,
 } from "~/components/board/VoteMark";
 import { voteFloorPct, type VoteSettings } from "@shared/vote";
@@ -51,7 +52,7 @@ export default function InitiativeCard({
   style,
   watch,
   rating,
-  vote,
+  vote: voteSettings,
   votePct,
   votePendingPct,
   voteTier,
@@ -94,6 +95,10 @@ export default function InitiativeCard({
   const { initiative: r, summary, pct, backers, logos, funded, donationsEnabled } = card;
   // On TheDAO's ballot (the board's own word for it), so the mark says so.
   const onBallot = card.vote === "ballot";
+  // Past the deadline to qualify, one not on the ballot is Open for funding: no vote mark.
+  // The server's word ("closed") counts too, whatever this browser's clock says.
+  const vote = card.vote === "closed" ? undefined : voteFor(voteSettings, onBallot);
+  const standing = vote ? voteStanding(summary.total, r.goalUsd, vote, onBallot) : null;
   // One panel under the actions at a time: Donate, or (admins) the rating form.
   const [panel, setPanel] = useState<"donate" | "rate" | null>(null);
   const toggle = (p: "donate" | "rate") => setPanel((o) => o === p ? null : p);
@@ -101,9 +106,7 @@ export default function InitiativeCard({
   // A result card shows only its final amount, so that is what reads as nothing raised.
   const zero = final === undefined ? !summary.total : !final;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
-  const pctOn = vote?.show
-    ? voteStanding(summary.total, r.goalUsd, vote, onBallot).kind !== "near"
-    : !zero;
+  const pctOn = standing ? standing.kind !== "near" : !zero;
   // The vote results' what-if: S-Tier's lead, or the gap to the next tier (to B-Tier for
   // one the vote didn't fund). Its tick and callout sit on the bar; the figure stays in
   // the amount row.
@@ -113,8 +116,7 @@ export default function InitiativeCard({
   // Near the floor or past it: always shown. Otherwise the card shows it on hover or tap.
   const callout = voteCallout(summary.total, r.goalUsd, vote, onBallot);
   const reveal = useVoteReveal(Boolean(w) || (Boolean(vote?.show) && !callout));
-  const shown = callout ??
-    (reveal.open && vote ? voteStanding(summary.total, r.goalUsd, vote, onBallot) : null);
+  const shown = callout ?? (reveal.open ? standing : null);
   // The top edge: AI pick or New, then the Featured pin.
   const label = cardLabel({ aiTop, featured, approvedAt: r.approvedAt });
   const canDonate = tokensOk && donationsEnabled;
@@ -165,7 +167,7 @@ export default function InitiativeCard({
             )}
           </Bar>
         )
-        : vote?.show
+        : standing
         ? (
           // Room above the bar for the callout.
           <div className={cn("mt-auto", callout && "pt-9")}>
@@ -174,9 +176,7 @@ export default function InitiativeCard({
               votePct={votePct}
               votePendingPct={votePendingPct}
               tick={tick}
-              label={`${pctText(pct)} funded. ${
-                calloutText(voteStanding(summary.total, r.goalUsd, vote, onBallot))
-              }`}
+              label={`${pctText(pct)} funded. ${calloutText(standing)}`}
             >
               {shown && <VoteCallout state={shown} at={tick} side="top" />}
             </Bar>

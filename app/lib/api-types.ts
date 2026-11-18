@@ -172,8 +172,9 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
-  /** Where it stands for TheDAO's vote; only while the vote display is on. */
-  vote?: VoteState["kind"] | "ballot";
+  /** Where it stands for TheDAO's vote; only while the vote display is on. "closed": past the
+   * deadline to qualify and not on the ballot, so Open for funding only. */
+  vote?: VoteState["kind"] | "ballot" | "closed";
 }
 
 export interface CommentEntry {

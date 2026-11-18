@@ -10,6 +10,7 @@ import { api, errorMessage } from "~/lib/api";
 import { boardKey } from "~/hooks/use-board";
 import { siteSettingsKey } from "~/hooks/use-site-settings";
 import { cn } from "~/lib/utils";
+import { dayTime } from "~/lib/format";
 
 export const voteSettingsKey = ["admin", "vote-settings"] as const;
 
@@ -26,11 +27,26 @@ const HINT = "block text-[12px] text-muted";
 
 const grouped = (n: number) => n.toLocaleString("en-US");
 const parseUsd = (s: string) => Number(s.replace(/[\s,$]/g, ""));
+const two = (n: number) => String(n).padStart(2, "0");
+/** Unix seconds as a date and time input's value, in the admin's own time zone; "" for none. */
+export const localInput = (secs: number | null): string => {
+  if (secs === null) return "";
+  const d = new Date(secs * 1000);
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${
+    two(d.getMinutes())
+  }`;
+};
+/** A date and time input's value (the admin's local time) as unix seconds; null for none. */
+export const fromLocalInput = (v: string): number | null => {
+  if (!v) return null;
+  const ms = new Date(v).getTime();
+  return Number.isFinite(ms) ? Math.round(ms / 1000) : null;
+};
 
 /**
  * The Vote page: whether the site shows what it takes to qualify for the
- * vote (saved at once), that share of the goal on a slider, and the maximum TheDAO
- * distributes per initiative (saved together).
+ * vote (saved at once), that share of the goal on a slider, the maximum TheDAO
+ * distributes per initiative and the last moment to qualify for the ballot (saved together).
  */
 export default function VoteSettings() {
   const adminApi = useAdminApi();
@@ -39,18 +55,23 @@ export default function VoteSettings() {
   const { data } = useVoteSettings();
   const [floorPct, setFloorPct] = useState(DEFAULT_VOTE.floorPct);
   const [max, setMax] = useState(grouped(DEFAULT_VOTE.capUsd));
+  const [deadline, setDeadline] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<"switch" | "numbers" | null>(null);
   useEffect(() => {
     if (data) {
       setFloorPct(data.floorPct);
       setMax(grouped(data.capUsd));
+      setDeadline(localInput(data.qualifyBy ?? null));
     }
   }, [data]);
 
   const maxUsd = parseUsd(max);
   const maxBad = max.trim() === "" || !Number.isFinite(maxUsd) || maxUsd < 0;
-  const dirty = Boolean(data) && (floorPct !== data!.floorPct || maxUsd !== data!.capUsd);
+  const qualifyBy = fromLocalInput(deadline);
+  const dirty = Boolean(data) &&
+    (floorPct !== data!.floorPct || maxUsd !== data!.capUsd ||
+      qualifyBy !== (data!.qualifyBy ?? null));
   const on = Boolean(data?.show);
 
   const save = async (next: Settings, what: "switch" | "numbers") => {
@@ -106,7 +127,7 @@ export default function VoteSettings() {
         onSubmit={(e) => {
           e.preventDefault();
           if (data && dirty && !maxBad) {
-            void save({ ...data, floorPct, capUsd: Math.round(maxUsd) }, "numbers");
+            void save({ ...data, floorPct, capUsd: Math.round(maxUsd), qualifyBy }, "numbers");
           }
         }}
       >
@@ -199,6 +220,31 @@ export default function VoteSettings() {
               onBlur={() => !maxBad && setMax(grouped(Math.round(maxUsd)))}
             />
           </span>
+        </section>
+
+        {/* After it, no initiative joins the ballot and only those on it stay in the vote. */}
+        <section className={cn(CARD, "flex flex-wrap items-center gap-3")}>
+          <div className="min-w-[220px] flex-1">
+            <label htmlFor={`${ids}-deadline`} className={TITLE}>
+              Last moment to qualify for the ballot
+            </label>
+            <small id={`${ids}-deadline-hint`} className={HINT}>
+              <span>
+                {data?.qualifyBy
+                  ? `No more initiatives join the ballot after ${dayTime(data.qualifyBy)}.`
+                  : "No deadline: initiatives can join the ballot until the vote ends."}
+              </span>{" "}
+              <span>In your own time zone; leave it empty for none.</span>
+            </small>
+          </div>
+          <input
+            id={`${ids}-deadline`}
+            type="datetime-local"
+            className="flex-none rounded-lg border border-edge2 bg-white/5 px-2.5 py-1.5 font-inter-tight text-[14px] tnum text-white outline-none [color-scheme:dark] focus:border-[rgba(92,183,90,.6)]"
+            aria-describedby={`${ids}-deadline-hint`}
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+          />
         </section>
 
         <div className="flex min-h-[34px] flex-wrap items-center gap-3">

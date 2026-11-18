@@ -4,7 +4,8 @@
  *
  * - **Ready for the ballot**: approved initiatives Qualified for the vote (the saved vote
  *   settings, as the board reads them) that aren't in the round, each with what would stop
- *   it from being added now (`addBlocker`).
+ *   it from being added now (`addBlocker`). None once the deadline to qualify has passed
+ *   (the real round only: a test round rehearses whenever).
  * - **Pledges to sign**, for the initiatives in the round: every awaiting request
  *   (./pledge-requests.ts; the real round only), every pledge with a change in flight (once,
  *   marked so), and every open pledge row whose on-chain record is missing or has another
@@ -17,7 +18,7 @@ import type { Hex } from "viem";
 import type { Deps } from "../middleware/context.ts";
 import type { Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import { HttpError } from "../lib/errors.ts";
-import { voteState } from "../../shared/vote.ts";
+import { ballotClosed, voteState } from "../../shared/vote.ts";
 import { type AddBlocker, addBlocker } from "../../shared/vote/add-plan.ts";
 import { pledgeChainId } from "../../shared/vote/typed-data.ts";
 import { roundKey } from "../../shared/vote/keys.ts";
@@ -97,6 +98,13 @@ const usdOf = (status: PledgeStatus, amountUsd: number) =>
   Number(onChainAmount(status, amountUsd)) / 1e6;
 
 const closedFail = () => new HttpError(410, "Voting has closed.");
+const BALLOT_CLOSED = "No more initiatives can be added to the ballot.";
+const ballotClosedFail = () =>
+  new HttpError(409, BALLOT_CLOSED, { code: "ballot_closed", message: BALLOT_CLOSED });
+/** Past the deadline to qualify, the real round takes no more initiatives; a test round (a
+ * rehearsal) ignores it. */
+const pastDeadline = async (deps: Deps, d: VoteRound) =>
+  d.manifest.kind === "real" && ballotClosed(await voteSettings(deps), deps.now());
 
 /** The claim on putting `rfpId` on the ballot of round `d`. */
 export const ballotClaimKey = (d: VoteRound, rfpId: string) =>
@@ -113,13 +121,15 @@ export function roundAdminQueue(deps: Deps) {
   const pledges = adminPledges(deps);
   const requests = pledgeRequests(deps);
 
-  /** Approved, Qualified for the vote, not in the round. */
+  /** Approved, Qualified for the vote, not in the round; none past the deadline to qualify
+   * (the real round). */
   async function ready(d: VoteRound): Promise<ReadyJson[]> {
     const m = d.manifest;
     const [cards, settings] = await Promise.all([
       db.initiatives.cards("approved"),
       voteSettings(deps),
     ]);
+    if (m.kind === "real" && ballotClosed(settings, deps.now())) return [];
     const outside = cards.filter((c) => !m.slugs.includes(c.slug));
     const [summaries, claims] = await Promise.all([
       db.cards.summaries(outside.map((c) => c.id)),
@@ -339,10 +349,12 @@ export function roundAdminQueue(deps: Deps) {
     return { ...at, change: RECORD };
   }
 
-  /** The initiative `rfpId` while the round is open: 410 once it has closed, 404 when
-   * there is no such initiative. */
+  /** The initiative `rfpId` while the round is open: 410 once it has closed, 409
+   * `ballot_closed` past the deadline to qualify (the real round), 404 when there is no such
+   * initiative. */
   async function claimable(d: VoteRound, rfpId: string) {
     if (deps.now() >= d.manifest.closesAt) throw closedFail();
+    if (await pastDeadline(deps, d)) throw ballotClosedFail();
     if (!await db.initiatives.get(rfpId)) throw new HttpError(404, "not found");
   }
   const claimedFail = (c: BallotClaim) =>

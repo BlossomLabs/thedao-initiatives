@@ -20,6 +20,13 @@ import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts"
 import { errorText, sendNext, withRelayer } from "../routes/vote.ts";
 import type { VoteRound } from "./vote-chain.ts";
 import { currentVote } from "./vote-active.ts";
+import {
+  effectiveChange,
+  mergeChange,
+  type PledgeRequest,
+  requestKey,
+  sameChange,
+} from "./pledge-requests.ts";
 
 /** How long an admin's pledge signature stays good: short, so an unsent one can't
  * later restore an amount. */
@@ -129,6 +136,9 @@ type PendingRecord = {
   applyingAt?: number;
 };
 
+/** Where a pending change stands: landed, still on its way, or failed (why, in words). */
+type Fate = "landed" | "pending" | { failed: string };
+
 /** How a settled change ended, kept a while after its record is gone. */
 type Outcome = { hash: Hex | null; state: "landed" | "failed" };
 /** Where a change stands, for the form that sent it. */
@@ -213,7 +223,7 @@ export function adminPledges(deps: Deps) {
    * the chain doesn't hold it. A read error throws: the record stays, settled on a later
    * look.
    */
-  async function fate(d: VoteRound, rec: PendingRecord): Promise<"landed" | "failed" | "pending"> {
+  async function fate(d: VoteRound, rec: PendingRecord): Promise<Fate> {
     // Both at one block: if ours used the nonce, the pledge read there shows the change
     // (a load-balanced RPC could otherwise answer the two from different heads).
     const block = await d.chain.blockNumber();
@@ -222,29 +232,51 @@ export function adminPledges(deps: Deps) {
       holds(d, rec, block),
     ]);
     if (held) return "landed";
-    const nonceUsed = nonce > BigInt(rec.nonce);
-    const expired = deps.now() > Number(rec.deadline) + DEADLINE_MARGIN_SECS;
-    if (nonceUsed || expired) return "failed";
+    if (nonce > BigInt(rec.nonce)) return { failed: "another signature used its nonce" };
+    if (deps.now() > Number(rec.deadline) + DEADLINE_MARGIN_SECS) {
+      return { failed: "the signature expired" };
+    }
     // A revert leaves the nonce unused, so the state alone can't tell it from a change
     // still on its way: its receipt can (only a mined receipt says "reverted"; a node
     // that lost the transaction says "unknown", which proves nothing).
     if (rec.hash && (await d.chain.txStatus(rec.hash)) === "reverted") {
       // A reorg can turn a revert into a landing: one more look at the state.
-      return (await holds(d, rec)) ? "landed" : "failed";
+      return (await holds(d, rec)) ? "landed" : { failed: "the transaction failed on-chain" };
     }
     return "pending";
   }
   /** `fate`, with a read error as "not known yet". */
   const fateOrPending = (d: VoteRound, rec: PendingRecord) =>
-    applyingFresh(rec) ? Promise.resolve("pending" as const) : fate(d, rec).catch((e) => {
+    applyingFresh(rec) ? Promise.resolve<Fate>("pending") : fate(d, rec).catch((e): Fate => {
       deps.log(`admin pledge: settling ${rec.pid} (${errorText(e)})`);
-      return "pending" as const;
+      return "pending";
     });
 
   /** Another request is applying this record (claimed less than this long ago); after it, a
    * claimer that died is taken over and the change applied again. */
   const applyingFresh = (rec: PendingRecord) =>
     rec.applyingAt !== undefined && deps.now() - rec.applyingAt < APPLY_LEASE_SECS;
+
+  /**
+   * A signed send for the pledge failed: its awaiting request, when it asks for that very
+   * change, keeps the reason (only if the request is unchanged meanwhile; a later change
+   * replaces the request, and the reason with it).
+   */
+  async function noteFailure(
+    d: VoteRound,
+    rfpId: string,
+    pid: string,
+    change: PledgeChange,
+    why: string,
+  ) {
+    const rKey = requestKey(d, rfpId, pid);
+    for (let tries = 0; tries < 3; tries++) {
+      const req = await kv.get<PledgeRequest>(rKey);
+      if (!req.value || !sameChange(req.value.change, change)) return;
+      const noted = { ...req.value, lastError: why, lastErrorAt: deps.now() };
+      if ((await kv.atomic().check(req).set(rKey, noted).commit()).ok) return;
+    }
+  }
 
   /**
    * Settle a record that has an answer: a failed one is dropped; a landed one is claimed
@@ -255,14 +287,15 @@ export function adminPledges(deps: Deps) {
   async function finish(
     d: VoteRound,
     entry: Deno.KvEntry<PendingRecord>,
-    f: "landed" | "failed",
+    f: Exclude<Fate, "pending">,
   ): Promise<boolean> {
     const rec = entry.value;
-    const outcome: Outcome = { hash: rec.hash, state: f };
+    const outcome: Outcome = { hash: rec.hash, state: f === "landed" ? "landed" : "failed" };
     const oKey = outcomeKey(d, rec.rfpId, rec.pid);
-    if (f === "failed") {
-      await kv.atomic().check(entry).delete(entry.key)
+    if (f !== "landed") {
+      const done = await kv.atomic().check(entry).delete(entry.key)
         .set(oKey, outcome, { expireIn: OUTCOME_MS }).commit();
+      if (done.ok) await noteFailure(d, rec.rfpId, rec.pid, rec.change, f.failed);
       return true;
     }
     const claimed = { ...rec, applyingAt: deps.now() };
@@ -275,9 +308,22 @@ export function adminPledges(deps: Deps) {
       deps.log(`admin pledge: applying ${rec.pid} failed (${errorText(e)})`);
       return false;
     }
-    await kv.atomic().check({ key: entry.key, versionstamp: claim.versionstamp })
-      .delete(entry.key).set(oKey, outcome, { expireIn: OUTCOME_MS }).commit();
-    return true;
+    // Landed: an awaiting request asking for this very change is done with too; one that
+    // asks for anything else (changed after the signature) stays, unless the pledge is
+    // gone (a remove landed): nothing is left for it to change.
+    const rKey = requestKey(d, rec.rfpId, rec.pid);
+    for (let tries = 0; tries < 3; tries++) {
+      const req = await kv.get<PledgeRequest>(rKey);
+      const op = kv.atomic().check({ key: entry.key, versionstamp: claim.versionstamp })
+        .check(req).delete(entry.key).set(oKey, outcome, { expireIn: OUTCOME_MS });
+      if (req.value && (rec.change.kind === "remove" || sameChange(req.value.change, rec.change))) {
+        op.delete(rKey);
+      }
+      if ((await op.commit()).ok) return true;
+      // Our claim lost (taken over after its lease): that request finishes it.
+      if ((await kv.get(entry.key)).versionstamp !== claim.versionstamp) return false;
+    }
+    return false;
   }
 
   /**
@@ -333,25 +379,33 @@ export function adminPledges(deps: Deps) {
     };
   }
 
-  /** One look at each of the initiative's changes in flight: the settled ones are applied or
-   * dropped, the rest listed. For the admin page. */
-  async function settleAll(rfpId: string): Promise<PendingPledgeJson[]> {
-    const d = await currentVote(deps);
-    const out: PendingPledgeJson[] = [];
-    if (!d) return out;
+  /** One look at each of the initiative's changes in flight in round `d`: the settled ones
+   * are applied or dropped, the rest answered (the change, its hash). */
+  async function inFlight(
+    d: VoteRound,
+    rfpId: string,
+  ): Promise<Pick<PendingRecord, "pid" | "change" | "hash">[]> {
+    const out: Pick<PendingRecord, "pid" | "change" | "hash">[] = [];
     for await (const entry of kv.list<PendingRecord>({ prefix: pendingPrefix(d, rfpId) })) {
       const rec = entry.value;
       const f = await fateOrPending(d, rec);
       if (f !== "pending" && await finish(d, entry, f)) continue;
-      out.push({
-        pid: rec.pid,
-        kind: rec.change.kind,
-        company: rec.change.kind === "add" ? rec.change.row.company : null,
-        amountUsd: rec.change.kind === "add" ? rec.change.row.amountUsd : null,
-        hash: rec.hash,
-      });
+      out.push({ pid: rec.pid, change: rec.change, hash: rec.hash });
     }
     return out;
+  }
+
+  /** `inFlight` in the current round, for the admin page. */
+  async function settleAll(rfpId: string): Promise<PendingPledgeJson[]> {
+    const d = await currentVote(deps);
+    if (!d) return [];
+    return (await inFlight(d, rfpId)).map((rec) => ({
+      pid: rec.pid,
+      kind: rec.change.kind,
+      company: rec.change.kind === "add" ? rec.change.row.company : null,
+      amountUsd: rec.change.kind === "add" ? rec.change.row.amountUsd : null,
+      hash: rec.hash,
+    }));
   }
 
   /** The pid of another initiative's pledge, on the site or on-chain, can't be reused here:
@@ -450,6 +504,10 @@ export function adminPledges(deps: Deps) {
     }
     if (held) {
       await apply(rfpId, pid, change);
+      const req = await kv.get<PledgeRequest>(requestKey(d, rfpId, pid));
+      if (req.value && (change.kind === "remove" || sameChange(req.value.change, change))) {
+        await kv.atomic().check(req).delete(req.key).commit();
+      }
       return await saved();
     }
 
@@ -505,6 +563,7 @@ export function adminPledges(deps: Deps) {
       const revert = PLEDGE_REVERTS.find(([re]) => re.test(String(e)));
       if (e instanceof HttpError || revert) {
         await kv.delete(key);
+        await noteFailure(d, rfpId, pid, change, revert ? revert[1] : (e as HttpError).message);
         if (e instanceof HttpError) throw e;
         deps.log(`admin pledge: setPledgeBySig refused (${errorText(e)})`);
         throw notRecorded(revert![1]);
@@ -524,5 +583,73 @@ export function adminPledges(deps: Deps) {
     if (d) await settle(d, rfpId, pid);
   }
 
-  return { onChainFor, settle, settleAll, settleLeftover, settleSent, write };
+  /**
+   * Hold a change as an awaiting request until a round admin signs it, on top of the one
+   * already held for the pledge (merged, or replaced; see `mergeChange`), after the change
+   * in flight settles (409 while it hasn't). The row stays as it is. Committed only if
+   * neither the request nor the pending record changed meanwhile: on a race, merged again
+   * once, then 409. "discarded" when nothing is left to hold (a removed awaiting add).
+   */
+  async function hold(
+    d: VoteRound,
+    rfpId: string,
+    pid: string,
+    change: PledgeChange,
+    by: Hex,
+  ): Promise<"held" | "discarded"> {
+    const rKey = requestKey(d, rfpId, pid);
+    for (let tries = 0; tries < 2; tries++) {
+      await settle(d, rfpId, pid);
+      const entry = await kv.get<PledgeRequest>(rKey);
+      const prev = entry.value;
+      if (change.kind !== "add" && !prev && !(await db.pledges.get(rfpId, pid))) {
+        throw new HttpError(404, "not found");
+      }
+      const merged = mergeChange(prev?.change ?? null, change);
+      const op = kv.atomic().check(entry)
+        .check({ key: pendingKey(d, rfpId, pid), versionstamp: null });
+      if (merged) op.set(rKey, { rfpId, pid, change: merged, by, at: deps.now() });
+      else op.delete(rKey);
+      if ((await op.commit()).ok) return merged ? "held" : "discarded";
+    }
+    const pending = (await kv.get<PendingRecord>(pendingKey(d, rfpId, pid))).value;
+    if (pending) throw pendingFail(pending);
+    throw pledgeFail(
+      409,
+      "pledge_request_changed",
+      "Another admin changed this pledge just now: send it again.",
+    );
+  }
+
+  /**
+   * Once the real round has closed (the initiative's pledges no longer go on-chain), an
+   * awaiting request is saved as it is: its change applied to the site's row like a plain
+   * save, after any change left in flight settles, then the request deleted. Answers the
+   * saved row (null after a removal); 404 without a request, or when its pledge is gone.
+   */
+  async function saveHeld(d: VoteRound, rfpId: string, pid: string): Promise<Pledge | null> {
+    await settle(d, rfpId, pid);
+    const rKey = requestKey(d, rfpId, pid);
+    const entry = await kv.get<PledgeRequest>(rKey);
+    if (!entry.value) throw new HttpError(404, "not found");
+    const row = await db.pledges.get(rfpId, pid);
+    const change = effectiveChange(entry.value.change, row);
+    if (change.kind !== "add" && !row) throw new HttpError(404, "not found");
+    await apply(rfpId, pid, change);
+    // Changed meanwhile (discarded, or saved by another admin): the change stands applied.
+    await kv.atomic().check(entry).delete(rKey).commit();
+    return await db.pledges.get(rfpId, pid);
+  }
+
+  return {
+    hold,
+    inFlight,
+    onChainFor,
+    saveHeld,
+    settle,
+    settleAll,
+    settleLeftover,
+    settleSent,
+    write,
+  };
 }

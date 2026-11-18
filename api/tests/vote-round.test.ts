@@ -155,6 +155,7 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
     nonceOf: (n) => Promise.resolve(state.nonces.get(n) ?? 0n),
     pledgeNonceOf: () => Promise.resolve(0n),
     blockNumber: () => Promise.resolve(100n),
+    hasRole: () => Promise.resolve(false),
     pledgeOf: () =>
       Promise.resolve({ initiativeId: 0n, currencyId: 0n, amount: 0n, exists: false }),
     balance: (a) => Promise.resolve(state.balances.get(a.toLowerCase()) ?? 0n),

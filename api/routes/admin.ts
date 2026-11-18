@@ -82,12 +82,25 @@ import {
   signedPledgeOf,
 } from "../services/admin-pledges.ts";
 
+import { awaitingPledgesJson, pledgeRequests } from "../services/pledge-requests.ts";
+import { PLEDGE_ROLE_ID } from "../../shared/vote/roles.ts";
+import { roundAdminQueue } from "../services/round-admin-queue.ts";
+
 export { pledgeOnChain } from "../services/admin-pledges.ts";
+
+/** A pledge's typed data as JSON, for the wallet to sign: the message's numbers as
+ * decimal strings. */
+const typedDataJson = (typed: ReturnType<typeof pledgeTypedData>) => ({
+  ...typed,
+  message: Object.fromEntries(Object.entries(typed.message).map(([k, v]) => [k, v.toString()])),
+});
 
 export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
   const r = new Hono<Vars>();
   const { db, config, chain, ens } = deps;
   const pledges = adminPledges(deps);
+  const requests = pledgeRequests(deps);
+  const queue = roundAdminQueue(deps);
   r.use("*", requireAdmin);
   r.route("/vote-round/corrections", voteCorrectionRoutes(deps, voteReplay));
 
@@ -583,18 +596,18 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     });
     return c.json({
       pid,
-      typedData: {
-        ...typed,
-        message: Object.fromEntries(
-          Object.entries(typed.message).map(([k, v]) => [k, v.toString()]),
-        ),
-      },
+      typedData: typedDataJson(typed),
     });
   });
-  r.post("/vote-round/test-pledges/:slug/pledges", async (c) => {
-    const { d, initiativeId } = await testPledgeTarget(c.req.param("slug"));
-    const { fields, amount } = await testPledgeBody(c);
-    const signed = signedPledgeOf(fields);
+  /** Relay a test pledge (setPledgeBySig on the test round's contract): 202 with the hash.
+   * Never one of the site's pledge records. */
+  const relayTestPledge = async (
+    c: Context<Vars>,
+    d: VoteRound,
+    initiativeId: number,
+    amount: bigint,
+    signed: ReturnType<typeof signedPledgeOf>,
+  ) => {
     try {
       const hash = await withRelayer(db.kv, d, () =>
         sendNext(db.kv, d, deps.now(), {
@@ -621,6 +634,11 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
         `The test pledge wasn't recorded: ${revert?.[1] ?? "the chain refused it"}.`,
       );
     }
+  };
+  r.post("/vote-round/test-pledges/:slug/pledges", async (c) => {
+    const { d, initiativeId } = await testPledgeTarget(c.req.param("slug"));
+    const { fields, amount } = await testPledgeBody(c);
+    return await relayTestPledge(c, d, initiativeId, amount, signedPledgeOf(fields));
   });
   r.post("/vote-round/test-pledges/:slug/pledges/:pid/settle", async (c) => {
     const { d } = await testPledgeTarget(c.req.param("slug"));
@@ -630,6 +648,68 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     return c.json({
       state: status === "success" ? "saved" : status === "reverted" ? "failed" : "pending",
     });
+  });
+
+  /**
+   * Waiting for a round admin (services/round-admin-queue.ts): initiatives Ready for the
+   * ballot and Pledges to sign, for the round this path serves (/vote-test-round: the test
+   * round's). Signing an item runs the pledge form's steps: `prepare` gives the typed data
+   * for the item's change, the signed send relays it (202 `{ hash, pid }`, or 200 when the
+   * chain already held it), and the form settles it with the usual route: the initiative's
+   * `/pledges/:pid/settle` on the real round, `/vote-round/test-pledges/:slug/pledges/:pid/
+   * settle` on a test round (where nothing touches the site's rows).
+   */
+  r.get("/vote-round/queue", async (c) => c.json(await queue.queue(await roundNow())));
+  /** Put on the ballot, one round admin at a time (services/round-admin-queue.ts): the
+   * browser claims the initiative before its run and releases it after, whatever the
+   * outcome. A claim lapses after five minutes. */
+  r.post("/vote-round/ballot-claims/:rfpId", async (c) => {
+    await jsonBody(c, []);
+    const d = await roundNow();
+    return c.json(await queue.claim(d, c.req.param("rfpId"), c.var.user!.address));
+  });
+  r.delete("/vote-round/ballot-claims/:rfpId", async (c) => {
+    const d = await roundNow();
+    await queue.release(d, c.req.param("rfpId"), c.var.user!.address);
+    return c.json({ ok: true });
+  });
+  r.post("/vote-round/queue/:rfpId/:pid/prepare", async (c) => {
+    await jsonBody(c, []);
+    const d = await roundNow();
+    const pid = c.req.param("pid");
+    const { initiativeId, row, change } = await queue.target(d, c.req.param("rfpId"), pid);
+    const typed = pledgeTypedData(d.manifest, {
+      pledgeId: pledgeChainId(pid),
+      initiativeId: BigInt(initiativeId),
+      currencyId: 0n,
+      amount: amountAfter(change, row),
+      nonce: await d.chain.pledgeNonceOf(c.var.user!.address as Hex),
+      deadline: BigInt(deps.now() + PLEDGE_DEADLINE_SECS),
+    });
+    return c.json({ pid, typedData: typedDataJson(typed) });
+  });
+  r.post("/vote-round/queue/:rfpId/:pid", async (c) => {
+    const body = await jsonBody(c, SIGNED_FIELDS);
+    const d = await roundNow();
+    const pid = c.req.param("pid");
+    const rfpId = c.req.param("rfpId");
+    if (deps.now() >= d.manifest.closesAt) throw new HttpError(410, "Voting has closed.");
+    const signed = signedPledgeOf(body);
+    if (signed.pid !== pid) throw new HttpError(400, "bad pledge id");
+    const { initiativeId, row, change } = await queue.target(d, rfpId, pid, true);
+    if (d.manifest.kind === "test") {
+      return await relayTestPledge(c, d, initiativeId, amountAfter(change, row), signed);
+    }
+    const r = await pledges.write({
+      d,
+      initiativeId,
+      rfpId,
+      admin: c.var.user!.address as Hex,
+      signed,
+      change,
+    });
+    if (r.pending) return c.json(sent(r), 202);
+    return c.json({ ok: true, pledge: r.pledge && pledgeJson(config, r.pledge) });
   });
 
   /**
@@ -844,6 +924,14 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     // Pledge changes that landed on-chain since are applied before the list is read.
     const pendingPledges = await pledges.settleAll(initiative.id);
+    const pledgeRows = await db.pledges.list(initiative.id, true);
+    // Awaiting signature: only the real round holds requests.
+    const vote = await currentVote(deps);
+    const awaitingPledges = vote?.manifest.kind === "real"
+      ? awaitingPledgesJson(await requests.list(vote, initiative.id), pledgeRows)
+      : [];
+    // Once the vote has closed they can't be signed: saved as they are, or discarded.
+    const awaitingClosed = awaitingPledges.length > 0 && !(await pledges.onChainFor(initiative));
     return c.json({
       initiative: adminInitiative(
         initiative,
@@ -851,8 +939,10 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       ),
       revisions: (await db.revisions.list(initiative.id, true, true)).map(revisionMeta),
       summary: await deps.funding.summary(initiative, !(await deps.maintenance.on())),
-      pledges: (await db.pledges.list(initiative.id, true)).map((p) => pledgeJson(config, p)),
+      pledges: pledgeRows.map((p) => pledgeJson(config, p)),
       pendingPledges,
+      awaitingPledges,
+      awaitingClosed,
       donations: (await db.donations.list(initiative.id, false)).map((d) =>
         donationJson(d, decimalsOf)
       ),
@@ -1096,6 +1186,9 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     /** "signed": the pledge goes on-chain, so the signature fields are required (checked
      * before any upload); "prepare": the body of a request for the typed data. */
     mode: "plain" | "signed" | "prepare" = "plain",
+    /** In "signed" mode, whether the admin's wallet may sign the pledge: when it may not
+     * and no signature was sent, the change is held as an awaiting request instead. */
+    canSign?: () => Promise<boolean>,
   ) {
     const ct = c.req.header("content-type") ?? "";
     let fields: Record<string, unknown> = {};
@@ -1135,7 +1228,12 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     if (fields.note !== undefined) {
       patch.note = capped(fields.note, PLEDGE_NOTE_CHARS, "The note");
     }
-    const signed = mode === "signed" ? signedPledgeOf(fields) : null;
+    let signed: ReturnType<typeof signedPledgeOf> | null = null;
+    let awaiting = false;
+    if (mode === "signed") {
+      if (canSign && !hasSignature(fields) && !(await canSign())) awaiting = true;
+      else signed = signedPledgeOf(fields);
+    }
     // Validate fields before uploading anything to the external provider.
     if (logo instanceof File && logo.size) {
       if (logo.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
@@ -1149,7 +1247,43 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     }
     if (logoCid !== undefined) patch.logoCid = logoCid;
     const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
-    return { patch, status, signed, fields };
+    return { patch, status, signed, awaiting, fields };
+  }
+
+  /** Any of a pledge signature's own fields sent (the pid alone isn't one). */
+  const hasSignature = (fields: Record<string, unknown>) =>
+    ["nonce", "deadline", "signature"].some((k) => fields[k] !== undefined && fields[k] !== "");
+
+  /** Does the admin's wallet hold the round's PLEDGE_ROLE? A failed read refuses the
+   * request: never held as awaiting, never asked to sign, on a guess. */
+  const canSignPledges = (
+    c: Context<Vars>,
+    chainAt: NonNullable<Awaited<ReturnType<typeof pledges.onChainFor>>>,
+  ) =>
+  async () => {
+    try {
+      return await chainAt.d.chain.hasRole(PLEDGE_ROLE_ID, c.var.user!.address as Hex);
+    } catch (e) {
+      deps.log(`admin pledge: hasRole read failed (${errorText(e)})`);
+      throw new HttpError(
+        503,
+        "Couldn't check your wallet's role on the vote contract; try again.",
+      );
+    }
+  };
+
+  /** Hold a change as an awaiting request until a round admin signs it
+   * (services/admin-pledges.ts `hold`): 202 `{ awaiting, pid }`, or 200 when nothing is
+   * left to hold. */
+  async function holdPledge(
+    c: Context<Vars>,
+    chainAt: NonNullable<Awaited<ReturnType<typeof pledges.onChainFor>>>,
+    rfpId: string,
+    pid: string,
+    change: PledgeChange,
+  ) {
+    const r = await pledges.hold(chainAt.d, rfpId, pid, change, c.var.user!.address as Hex);
+    return r === "held" ? c.json({ awaiting: true, pid }, 202) : c.json({ ok: true });
   }
 
   /**
@@ -1237,19 +1371,19 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     });
     return c.json({
       pid,
-      typedData: {
-        ...typed,
-        message: Object.fromEntries(
-          Object.entries(typed.message).map(([k, v]) => [k, v.toString()]),
-        ),
-      },
+      typedData: typedDataJson(typed),
     });
   });
 
   r.post("/initiatives/:id/pledges", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
     const chainAt = await pledges.onChainFor(initiative);
-    const { patch, status, signed } = await readPledge(c, initiative, chainAt ? "signed" : "plain");
+    const { patch, status, signed, awaiting } = await readPledge(
+      c,
+      initiative,
+      chainAt ? "signed" : "plain",
+      chainAt ? canSignPledges(c, chainAt) : undefined,
+    );
     if (!patch.company) throw new HttpError(400, "Company name is required.");
     if (patch.amountUsd === undefined) throw new HttpError(400, "Amount is required.");
     const row = {
@@ -1260,6 +1394,9 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       url: patch.url ?? "",
       logoCid: patch.logoCid ?? "",
     };
+    if (chainAt && awaiting) {
+      return await holdPledge(c, chainAt, initiative.id, newId(), { kind: "add", row });
+    }
     if (chainAt && signed) {
       const r = await writeOnChain(c, chainAt, initiative.id, signed, { kind: "add", row });
       if (r.pending) return c.json(sent(r), 202);
@@ -1274,9 +1411,21 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     const initiative = await initiativeOr404(c.req.param("id"), true);
     const pid = c.req.param("pid");
     const chainAt = await pledges.onChainFor(initiative);
-    const { patch, status, signed } = await readPledge(c, initiative, chainAt ? "signed" : "plain");
+    const { patch, status, signed, awaiting } = await readPledge(
+      c,
+      initiative,
+      chainAt ? "signed" : "plain",
+      chainAt ? canSignPledges(c, chainAt) : undefined,
+    );
     if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
       throw new HttpError(400, "bad status");
+    }
+    if (chainAt && awaiting) {
+      return await holdPledge(c, chainAt, initiative.id, pid, {
+        kind: "edit",
+        patch,
+        status: status as PledgeStatus | undefined,
+      });
     }
     if (chainAt && signed) {
       if (signed.pid !== pid) throw new HttpError(400, "bad pledge id");
@@ -1306,6 +1455,13 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     const pid = c.req.param("pid");
     const chainAt = await pledges.onChainFor(initiative);
     if (chainAt) {
+      if (!hasSignature(body)) {
+        // An awaiting add was never on-chain or saved: removing it drops the request.
+        const held = await requests.get(chainAt.d, initiative.id, pid);
+        if (
+          held?.change.kind === "add" || !(await canSignPledges(c, chainAt)())
+        ) return await holdPledge(c, chainAt, initiative.id, pid, { kind: "remove" });
+      }
       const signed = signedPledgeOf(body);
       if (signed.pid !== pid) throw new HttpError(400, "bad pledge id");
       const r = await writeOnChain(c, chainAt, initiative.id, signed, { kind: "remove" });
@@ -1315,6 +1471,36 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     await pledges.settleLeftover(initiative.id, pid);
     await db.pledges.remove(initiative.id, pid);
     return c.json({ ok: true });
+  });
+
+  /** Discard an awaiting pledge request (any site admin). The pledge row is untouched. */
+  r.delete("/initiatives/:id/pledge-requests/:pid", async (c) => {
+    await jsonBody(c, []);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    const d = await currentVote(deps);
+    if (!d || !(await requests.discard(d, initiative.id, c.req.param("pid")))) {
+      throw new HttpError(404, "not found");
+    }
+    return c.json({ ok: true });
+  });
+
+  /**
+   * Save an awaiting pledge request as it is, once the real vote has closed (any site
+   * admin): no signature can put it on-chain any more, so its change is applied like a
+   * plain save and the request goes. 409 while the vote is still open.
+   */
+  r.post("/initiatives/:id/pledge-requests/:pid/save", async (c) => {
+    await jsonBody(c, []);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    const pid = c.req.param("pid");
+    if (!PLEDGE_ID_RE.test(pid)) throw new HttpError(400, "bad pledge id");
+    const d = await currentVote(deps);
+    if (!d || d.manifest.kind !== "real") throw new HttpError(404, "not found");
+    if (await pledges.onChainFor(initiative)) {
+      throw new HttpError(409, "The vote is still open: a round admin signs it.");
+    }
+    const p = await pledges.saveHeld(d, initiative.id, pid);
+    return c.json({ ok: true, pledge: p && pledgeJson(config, p) });
   });
 
   /**

@@ -1,152 +1,14 @@
 /** Admin pledges during the real vote: signed by the admin, relayed with setPledgeBySig,
  * answered with the hash right after the broadcast, saved only once the chain holds it. */
 import { assertEquals } from "@std/assert";
-import { privateKeyToAccount } from "viem/accounts";
-import { type Hex, verifyTypedData } from "viem";
+import type { Hex } from "viem";
 import { ADMIN, harness, j } from "./app-helpers.ts";
-import type { VoteChain } from "../services/vote-chain.ts";
-import type { VoteManifest } from "../../shared/vote/manifest.ts";
-import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts";
+import { pledgeChainId } from "../../shared/vote/typed-data.ts";
+import { ADMIN_KEY, fakeChain, NOW, OTHER, roundOf, signPrepared } from "./pledge-chain.ts";
 import { pledgeOnChain } from "../routes/admin.ts";
-
-// ADMIN's key (app-helpers: wallet("0x11..11")).
-const ADMIN_KEY = privateKeyToAccount(`0x${"11".repeat(32)}`);
-const OTHER = privateKeyToAccount(`0x${"33".repeat(32)}`);
-const NOW = 1_800_000_000;
-const RELAYER = "0x9000000000000000000000000000000000000009" as const;
-
-const roundOf = (slugs: string[], kind: "real" | "test" = "real"): VoteManifest => ({
-  kind,
-  chainId: kind === "real" ? 1 : 11155111,
-  contract: "0x1000000000000000000000000000000000000001",
-  ...(kind === "real" ? { badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C" as const } : {}),
-  deployBlock: 1,
-  opensAt: NOW - 3600,
-  closesAt: NOW + 3600,
-  schedule: {
-    opensAt: NOW - 3600,
-    firstTallyAt: [NOW + 600, NOW + 660, NOW + 720],
-    initialWindow: 60,
-    maxWindows: 1,
-  },
-  poolUsd: "913244000000",
-  slugs,
-  projects: slugs.map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
-  groups: [],
-  independentTiers: 1,
-});
-
-type PledgeCall = {
-  pledgeId: Hex;
-  initiativeId: bigint;
-  currencyId: bigint;
-  amount: bigint;
-  signer: Hex;
-  nonce: bigint;
-  deadline: bigint;
-};
-
-/** A chain that does what setPledgeBySig does: consecutive nonces per signer, the
- * signature checked against the signer, the pledge set (re-homed if it existed). A
- * transaction lands at once unless `receipt` says otherwise; `land` and `revert` settle
- * one later. */
-function fakeChain(m: VoteManifest) {
-  const state = {
-    nonces: new Map<string, bigint>(),
-    sent: [] as PledgeCall[],
-    /** What happens to the next transactions. */
-    receipt: "success" as "success" | "reverted" | "pending",
-    statuses: new Map<Hex, "success" | "reverted" | "pending">(),
-    /** The contract's `pledges(bytes32)`. */
-    pledges: new Map<Hex, { initiativeId: bigint; currencyId: bigint; amount: bigint }>(),
-    byHash: new Map<Hex, PledgeCall>(),
-    /** The node's receipt lookups fail (an RPC error). */
-    txStatusFails: false,
-    /** The send goes out, then the call throws (a failed write after the broadcast). */
-    throwAfterSend: false,
-    /** The block each nonce and pledge read named (undefined: the head). */
-    reads: [] as [string, bigint | undefined][],
-  };
-  const land = (hash: Hex) => {
-    const call = state.byHash.get(hash)!;
-    const next = state.nonces.get(call.signer.toLowerCase()) ?? 0n;
-    if (call.nonce !== next) {
-      state.statuses.set(hash, "reverted");
-      return;
-    }
-    state.nonces.set(call.signer.toLowerCase(), next + 1n);
-    state.pledges.set(call.pledgeId, {
-      initiativeId: call.initiativeId,
-      currencyId: call.currencyId,
-      amount: call.amount,
-    });
-    state.statuses.set(hash, "success");
-  };
-  const revert = (hash: Hex) => state.statuses.set(hash, "reverted");
-  const unused = () => Promise.reject(new Error("not used here"));
-  const chain = {
-    relayerAddress: () => RELAYER,
-    relayerNonce: () => Promise.resolve(state.sent.length),
-    txStatus: (hash: Hex) =>
-      state.txStatusFails
-        ? Promise.reject(new Error("rpc down"))
-        : Promise.resolve(state.statuses.get(hash) ?? "unknown"),
-    codeOf: () => Promise.resolve("0x"),
-    blockNumber: () => Promise.resolve(BigInt(state.sent.length + 1)),
-    pledgeNonceOf: (a: Hex, block?: bigint) => {
-      state.reads.push(["nonce", block]);
-      return Promise.resolve(state.nonces.get(a.toLowerCase()) ?? 0n);
-    },
-    pledgeOf: (id: Hex, block?: bigint) => {
-      state.reads.push(["pledge", block]);
-      const p = state.pledges.get(id);
-      return Promise.resolve(
-        p
-          ? { ...p, exists: true }
-          : { initiativeId: 0n, currencyId: 0n, amount: 0n, exists: false },
-      );
-    },
-    async send(call: Parameters<VoteChain["send"]>[0]) {
-      if (call.fn !== "setPledgeBySig") throw new Error(`unexpected ${call.fn}`);
-      const [pledgeId, initiativeId, currencyId, amount, signer, nonce, deadline, signature] =
-        call.args;
-      // The node's gas estimate runs the call: a revert now is a failed send.
-      const next = state.nonces.get(signer.toLowerCase()) ?? 0n;
-      if (nonce !== next) throw new Error(`InvalidPledgeNonce(${signer}, ${nonce})`);
-      if (BigInt(NOW) > deadline) throw new Error("PledgeExpired()");
-      const ok = await verifyTypedData({
-        address: signer,
-        ...pledgeTypedData(m, { pledgeId, initiativeId, currencyId, amount, nonce, deadline }),
-        signature,
-      });
-      if (!ok) throw new Error("InvalidSignature()");
-      const hash = `0x${(state.sent.length + 1).toString(16).padStart(64, "0")}` as Hex;
-      const sent = { pledgeId, initiativeId, currencyId, amount, signer, nonce, deadline };
-      state.sent.push(sent);
-      state.byHash.set(hash, sent);
-      state.statuses.set(hash, "pending");
-      if (state.receipt === "success") land(hash);
-      if (state.receipt === "reverted") revert(hash);
-      if (state.throwAfterSend) throw new Error("kv write failed");
-      return hash;
-    },
-    ownerOf: unused,
-    balanceOf: unused,
-    badgeOf: unused,
-    idsOf: unused,
-    canMint: unused,
-    nonceOf: unused,
-    balance: unused,
-    estimateRecordFor: unused,
-    ballots: unused,
-    committed: unused,
-    rulesHistory: unused,
-    asks: unused,
-  } as unknown as VoteChain;
-  /** The latest transaction sent. */
-  const last = () => [...state.byHash.keys()].at(-1)!;
-  return { state, chain, land, revert, last };
-}
+import { PLEDGE_ROLE_ID } from "../../shared/vote/roles.ts";
+import { roundKey } from "../../shared/vote/keys.ts";
+import { pledgeRequests } from "../services/pledge-requests.ts";
 
 async function setup(kind: "real" | "test" = "real", inRound = true) {
   const h = await harness();
@@ -163,35 +25,6 @@ async function setup(kind: "real" | "test" = "real", inRound = true) {
   const token = await h.mint(ADMIN, true);
   const base = `/api/admin/initiatives/${r.id}`;
   return { h, r, m, token, base, ...fake };
-}
-
-type Typed = ReturnType<typeof pledgeTypedData>;
-/** The prepare answer's typed data, back to bigints, signed by `who`. */
-async function signPrepared(
-  body: Record<string, unknown>,
-  who = ADMIN_KEY,
-): Promise<{ pid: string; nonce: string; deadline: string; signature: Hex; typed: Typed }> {
-  const typed = body.typedData as {
-    domain: Typed["domain"];
-    message: Record<string, string>;
-  };
-  const message = {
-    pledgeId: typed.message.pledgeId as Hex,
-    initiativeId: BigInt(typed.message.initiativeId),
-    currencyId: BigInt(typed.message.currencyId),
-    amount: BigInt(typed.message.amount),
-    nonce: BigInt(typed.message.nonce),
-    deadline: BigInt(typed.message.deadline),
-  };
-  const full = { ...(body.typedData as Typed), message };
-  const signature = await who.signTypedData(full);
-  return {
-    pid: body.pid as string,
-    nonce: typed.message.nonce,
-    deadline: typed.message.deadline,
-    signature,
-    typed: full,
-  };
 }
 
 async function prepare(
@@ -904,5 +737,484 @@ Deno.test("admin pledges: settling reads the nonce and the pledge at one block",
   const pledge = s.state.reads.find(([k]) => k === "pledge")?.[1];
   assertEquals(typeof nonce, "bigint");
   assertEquals(nonce, pledge);
+  s.h.close();
+});
+
+// Awaiting signature: a site admin whose wallet lacks the round's PLEDGE_ROLE.
+
+/** A second site admin, whose wallet holds no role on the round. */
+async function otherAdmin(s: Awaited<ReturnType<typeof setup>>) {
+  await s.h.deps.admins.add(OTHER.address);
+  return await s.h.mint(OTHER.address, true);
+}
+type Awaiting = {
+  pid: string;
+  kind: string;
+  company: string;
+  amountUsd: number | null;
+  fromUsd: number | null;
+  status: string | null;
+  by: string;
+  at: number;
+  lastError: string | null;
+  lastErrorAt: number | null;
+};
+const awaiting = async (s: Awaited<ReturnType<typeof setup>>) =>
+  ((await j(await s.h.req(s.base, { token: s.token }))) as { awaitingPledges: Awaiting[] })
+    .awaitingPledges;
+const OLD_ROW = {
+  company: "Old",
+  amountUsd: 100,
+  status: "pledged" as const,
+  note: "",
+  url: "",
+  logoCid: "",
+};
+
+Deno.test("admin pledges: a site admin without the pledge role saves a pledge as awaiting", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  assertEquals(res.status, 202, await res.clone().text());
+  const body = await j(res);
+  assertEquals(body.awaiting, true);
+  assertEquals(typeof body.pid, "string");
+  assertEquals(await s.h.db.pledges.list(s.r.id, true), []);
+  assertEquals(s.state.sent, []);
+  const pub = await j(await s.h.req(`/api/initiatives/${s.r.slug}`));
+  assertEquals(pub.pledges, []);
+  assertEquals(await awaiting(s), [{
+    pid: body.pid as string,
+    kind: "add",
+    company: "Acme",
+    amountUsd: 500,
+    fromUsd: null,
+    status: "pledged",
+    by: OTHER.address,
+    at: NOW,
+    lastError: null,
+    lastErrorAt: null,
+  }]);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a second change to an awaiting pledge replaces it", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  const pid = (await j(res)).pid as string;
+  const edit = await s.h.req(`${s.base}/pledges/${pid}`, {
+    method: "PATCH",
+    token,
+    json: { amount: "700" },
+  });
+  assertEquals(edit.status, 202, await edit.clone().text());
+  assertEquals(await j(edit), { awaiting: true, pid });
+  const list = await awaiting(s);
+  assertEquals(list.map((a) => [a.pid, a.kind, a.company, a.amountUsd]), [
+    [pid, "add", "Acme", 700],
+  ]);
+  // Two edits to a saved pledge: one request, the later fields win.
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  for (const json of [{ amount: "200", note: "first" }, { amount: "300" }]) {
+    const r = await s.h.req(`${s.base}/pledges/${p.id}`, { method: "PATCH", token, json });
+    assertEquals(r.status, 202);
+  }
+  const edits = (await awaiting(s)).filter((a) => a.pid === p.id);
+  assertEquals(edits.map((a) => [a.kind, a.amountUsd, a.fromUsd]), [["edit", 300, 100]]);
+  // Removing the awaiting add drops it: nothing was on-chain or saved.
+  const del = await s.h.req(`${s.base}/pledges/${pid}`, { method: "DELETE", token });
+  assertEquals(del.status, 200, await del.clone().text());
+  // Removing the edited one replaces its edit.
+  const del2 = await s.h.req(`${s.base}/pledges/${p.id}`, { method: "DELETE", token });
+  assertEquals(del2.status, 202);
+  assertEquals((await awaiting(s)).map((a) => [a.pid, a.kind]), [[p.id, "remove"]]);
+  assertEquals((await s.h.db.pledges.get(s.r.id, p.id))?.amountUsd, 100);
+  assertEquals(s.state.sent, []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: an awaiting change to an existing pledge leaves the row as it is", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const res = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { amount: "250", status: "received" },
+  });
+  assertEquals(res.status, 202, await res.clone().text());
+  assertEquals(await j(res), { awaiting: true, pid: p.id });
+  const row = await s.h.db.pledges.get(s.r.id, p.id);
+  assertEquals([row?.amountUsd, row?.status], [100, "pledged"]);
+  const [a] = await awaiting(s);
+  // Received: it takes nothing off the ask, so 0 goes on-chain.
+  assertEquals([a.pid, a.kind, a.company, a.amountUsd, a.fromUsd, a.status], [
+    p.id,
+    "edit",
+    "Old",
+    0,
+    100,
+    "received",
+  ]);
+  // A pledge that is neither saved nor awaiting is not found.
+  const missing = await s.h.req(`${s.base}/pledges/nope`, {
+    method: "PATCH",
+    token,
+    json: { amount: "1" },
+  });
+  assertEquals(missing.status, 404);
+  s.h.close();
+});
+
+Deno.test("admin pledges: discarding an awaiting pledge removes the request", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  const pid = (await j(res)).pid as string;
+  // Any site admin can discard it.
+  const del = await s.h.req(`${s.base}/pledge-requests/${pid}`, {
+    method: "DELETE",
+    token: s.token,
+  });
+  assertEquals(del.status, 200, await del.clone().text());
+  assertEquals(await awaiting(s), []);
+  const again = await s.h.req(`${s.base}/pledge-requests/${pid}`, {
+    method: "DELETE",
+    token: s.token,
+  });
+  assertEquals(again.status, 404);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a landed signature clears the awaiting request", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const res = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { amount: "250" },
+  });
+  assertEquals(res.status, 202);
+  assertEquals((await awaiting(s)).length, 1);
+  // A round admin signs the same change.
+  const { typed: _, ...fields } = await prepare(s, { pid: p.id, amount: "250" });
+  const signed = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token: s.token,
+    json: { amount: "250", ...fields },
+  });
+  assertEquals(signed.status, 202, await signed.clone().text());
+  assertEquals((await settle(s, p.id, s.last())).state, "saved");
+  assertEquals((await s.h.db.pledges.get(s.r.id, p.id))?.amountUsd, 250);
+  assertEquals(await awaiting(s), []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a wallet with the pledge role is still asked to sign", async () => {
+  const s = await setup();
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token: s.token, json: ACME });
+  assertEquals(res.status, 428);
+  assertEquals(await awaiting(s), []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a failed role check saves nothing", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  s.state.hasRoleFails = true;
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  assertEquals(res.status, 503, await res.clone().text());
+  assertEquals(
+    (await j(res)).error,
+    "Couldn't check your wallet's role on the vote contract; try again.",
+  );
+  s.state.hasRoleFails = false;
+  assertEquals(await awaiting(s), []);
+  assertEquals(await s.h.db.pledges.list(s.r.id, true), []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: the role check asks about the pledge role", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const asked: Hex[] = [];
+  const chain = s.h.deps.vote!.chain;
+  const orig = chain.hasRole;
+  chain.hasRole = (role, a) => {
+    asked.push(role);
+    return orig(role, a);
+  };
+  await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  assertEquals(asked, [PLEDGE_ROLE_ID]);
+  s.h.close();
+});
+
+Deno.test("admin pledges: an initiative outside the round never holds a pledge", async () => {
+  const s = await setup("real", false);
+  const token = await otherAdmin(s);
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  assertEquals(res.status, 201);
+  assertEquals((await s.h.db.pledges.list(s.r.id)).length, 1);
+  assertEquals(await awaiting(s), []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a test round never holds a pledge", async () => {
+  const s = await setup("test");
+  const token = await otherAdmin(s);
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  assertEquals(res.status, 201);
+  assertEquals(await awaiting(s), []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a signature landing after a newer awaiting change leaves that change", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const ask = (amount: string) =>
+    s.h.req(`${s.base}/pledges/${p.id}`, { method: "PATCH", token, json: { amount } });
+  assertEquals((await ask("250")).status, 202);
+  // A round admin signs the 250 change; before it is sent, the request moves to 300.
+  const { typed: _, ...fields } = await prepare(s, { pid: p.id, amount: "250" });
+  assertEquals((await ask("300")).status, 202);
+  const signed = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token: s.token,
+    json: { amount: "250", ...fields },
+  });
+  assertEquals(signed.status, 202, await signed.clone().text());
+  assertEquals((await settle(s, p.id, s.last())).state, "saved");
+  assertEquals((await s.h.db.pledges.get(s.r.id, p.id))?.amountUsd, 250);
+  assertEquals((await awaiting(s)).map((a) => [a.pid, a.amountUsd, a.fromUsd]), [
+    [p.id, 300, 250],
+  ]);
+  s.h.close();
+});
+
+Deno.test("admin pledges: an awaiting change racing another admin's merges both", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const d = s.h.deps.vote!;
+  const requests = pledgeRequests(s.h.deps);
+  // Another admin's note lands between this request's read and its write.
+  const get = s.h.db.pledges.get;
+  let raced = false;
+  s.h.db.pledges.get = async (...args) => {
+    if (!raced) {
+      raced = true;
+      await requests.put(d, {
+        rfpId: s.r.id,
+        pid: p.id,
+        change: { kind: "edit", patch: { note: "theirs" } },
+        by: ADMIN,
+        at: NOW,
+      });
+    }
+    return await get(...args);
+  };
+  const res = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { amount: "250" },
+  });
+  assertEquals(res.status, 202, await res.clone().text());
+  assertEquals((await requests.get(d, s.r.id, p.id))?.change, {
+    kind: "edit",
+    patch: { note: "theirs", amountUsd: 250 },
+  });
+  s.h.close();
+});
+
+Deno.test("admin pledges: a signed change sent while an awaiting change is saved wins, with 409", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const d = s.h.deps.vote!;
+  // A round admin's signed change is claimed between this request's read and its write.
+  const get = s.h.db.pledges.get;
+  let raced = false;
+  s.h.db.pledges.get = async (...args) => {
+    if (!raced) {
+      raced = true;
+      await s.h.kv.set([...roundKey(d.manifest), "pledge-pending", s.r.id, p.id], {
+        rfpId: s.r.id,
+        pid: p.id,
+        initiativeId: 1,
+        change: { kind: "edit", patch: { amountUsd: 400 } },
+        amount: "400000000",
+        admin: ADMIN,
+        nonce: "0",
+        deadline: String(NOW + 600),
+        hash: null,
+        at: NOW,
+      });
+    }
+    return await get(...args);
+  };
+  const res = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { amount: "250" },
+  });
+  assertEquals(res.status, 409, await res.clone().text());
+  assertEquals((await j(res)).code, "pledge_pending");
+  assertEquals(await pledgeRequests(s.h.deps).get(d, s.r.id, p.id), null);
+  s.h.close();
+});
+
+Deno.test("admin pledges: withdrawing an awaiting pledge discards it", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const res = await s.h.req(`${s.base}/pledges`, { method: "POST", token, json: ACME });
+  const pid = (await j(res)).pid as string;
+  const w = await s.h.req(`${s.base}/pledges/${pid}`, {
+    method: "PATCH",
+    token,
+    json: { status: "withdrawn" },
+  });
+  assertEquals(w.status, 200, await w.clone().text());
+  assertEquals(await awaiting(s), []);
+  assertEquals(await s.h.db.pledges.list(s.r.id, true), []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: an awaiting status change shows the amount that goes on-chain", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, { ...OLD_ROW, amountUsd: 20_000 });
+  const res = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { status: "withdrawn" },
+  });
+  assertEquals(res.status, 202, await res.clone().text());
+  const add = await s.h.req(`${s.base}/pledges`, {
+    method: "POST",
+    token,
+    json: { company: "Paid", amount: "50000", status: "received" },
+  });
+  assertEquals(add.status, 202, await add.clone().text());
+  const list = await awaiting(s);
+  const edit = list.find((a) => a.pid === p.id)!;
+  assertEquals([edit.amountUsd, edit.fromUsd, edit.status], [0, 20_000, "withdrawn"]);
+  const paid = list.find((a) => a.kind === "add")!;
+  assertEquals([paid.company, paid.amountUsd, paid.status], ["Paid", 0, "received"]);
+  s.h.close();
+});
+
+Deno.test("admin pledges: after the vote closes an awaiting pledge is saved as it is", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const add = await s.h.req(`${s.base}/pledges`, {
+    method: "POST",
+    token,
+    json: { company: "Late", amount: "50000" },
+  });
+  assertEquals(add.status, 202);
+  const pid = (await j(add)).pid as string;
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const edit = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { amount: "300", status: "received" },
+  });
+  assertEquals(edit.status, 202);
+  const save = (id: string) =>
+    s.h.req(`${s.base}/pledge-requests/${id}/save`, { method: "POST", token, json: {} });
+  // While the vote is open it can only be signed.
+  assertEquals((await save(pid)).status, 409);
+  assertEquals(await s.h.db.pledges.get(s.r.id, pid), null);
+  const before = await j(await s.h.req(s.base, { token: s.token }));
+  assertEquals(before.awaitingClosed, false);
+
+  s.h.clock.now = s.m.closesAt;
+  const page = await j(await s.h.req(s.base, { token: s.token }));
+  assertEquals(page.awaitingClosed, true);
+  assertEquals((page.awaitingPledges as unknown[]).length, 2);
+  const res = await save(pid);
+  assertEquals(res.status, 200, await res.clone().text());
+  assertEquals(((await j(res)).pledge as { id: string }).id, pid);
+  const saved = await s.h.db.pledges.get(s.r.id, pid);
+  assertEquals([saved?.company, saved?.amountUsd, saved?.status], ["Late", 50_000, "pledged"]);
+  assertEquals((await save(p.id)).status, 200);
+  const row = await s.h.db.pledges.get(s.r.id, p.id);
+  assertEquals([row?.amountUsd, row?.status], [300, "received"]);
+  assertEquals(await awaiting(s), []);
+  assertEquals((await save(pid)).status, 404);
+  assertEquals(s.state.sent, []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a landed signed remove drops the awaiting request for that pledge", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const held = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { amount: "250" },
+  });
+  assertEquals(held.status, 202);
+  // A round admin removes the pledge from the form, signed.
+  const { typed: _, ...fields } = await prepare(s, { pid: p.id, remove: true });
+  const del = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "DELETE",
+    token: s.token,
+    json: fields,
+  });
+  assertEquals(del.status, 202, await del.clone().text());
+  assertEquals((await settle(s, p.id, s.last())).state, "saved");
+  assertEquals(await s.h.db.pledges.get(s.r.id, p.id), null);
+  assertEquals(await awaiting(s), []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a failed signed send keeps the request with the reason, a later change clears it", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const hold = (amount: string) =>
+    s.h.req(`${s.base}/pledges/${p.id}`, { method: "PATCH", token, json: { amount } });
+  assertEquals((await hold("250")).status, 202);
+  // Reverted on-chain.
+  s.state.receipt = "reverted";
+  const { typed: _, ...fields } = await prepare(s, { pid: p.id, amount: "250" });
+  const sent = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token: s.token,
+    json: { amount: "250", ...fields },
+  });
+  assertEquals(sent.status, 202, await sent.clone().text());
+  assertEquals((await settle(s, p.id, s.last())).state, "failed");
+  let [a] = await awaiting(s);
+  assertEquals([a.amountUsd, a.lastError, a.lastErrorAt], [
+    250,
+    "the transaction failed on-chain",
+    NOW,
+  ]);
+  // Refused before the broadcast: a stale nonce.
+  s.state.receipt = "success";
+  const again = await prepare(s, { pid: p.id, amount: "250" });
+  s.state.nonces.set(ADMIN_KEY.address.toLowerCase(), 5n);
+  const { typed: __, ...stale } = again;
+  const refused = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token: s.token,
+    json: { amount: "250", ...stale },
+  });
+  assertEquals(refused.status, 502, await refused.clone().text());
+  [a] = await awaiting(s);
+  assertEquals(
+    a.lastError,
+    "the signature was already used, or another pledge of yours went first",
+  );
+  // A later change replaces the request, and the reason with it.
+  assertEquals((await hold("260")).status, 202);
+  [a] = await awaiting(s);
+  assertEquals([a.amountUsd, a.lastError, a.lastErrorAt], [260, null, null]);
   s.h.close();
 });

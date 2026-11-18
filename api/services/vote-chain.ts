@@ -120,6 +120,8 @@ export interface VoteChain {
     pledgeId: Hex,
     block?: bigint,
   ): Promise<{ initiativeId: bigint; currencyId: bigint; amount: bigint; exists: boolean }>;
+  /** Does `account` hold `role` on the round's contract (`hasRole`)? */
+  hasRole(role: Hex, account: Hex): Promise<boolean>;
   /** The head block's number: for reads that must agree with each other. */
   blockNumber(): Promise<bigint>;
   /** Every BallotRecorded and RegistrationRevoked since the deploy block, in chain order,
@@ -300,6 +302,7 @@ export function createVoteChain(
       >("pledges", [id], block);
       return { initiativeId, currencyId, amount, exists };
     },
+    hasRole: (role, a) => read<boolean>("hasRole", [role, a]),
     blockNumber: () => pub.getBlockNumber(),
     balance: (a) => pub.getBalance({ address: a }),
     async txStatus(hash) {

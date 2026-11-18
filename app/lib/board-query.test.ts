@@ -10,13 +10,17 @@ it("reads type:, cat: and funding:, the rest are the keyword words", () => {
   expect(parseBoardQuery('"secure element"').query.words).toEqual(["secure element"]);
 });
 
+it("funding:ballot is On the ballot", () => {
+  expect(parseBoardQuery("funding:ballot").query.status).toBe("ballot");
+});
+
 it("an unknown value is named and ignored; other colons are just words", () => {
   const r = parseBoardQuery("type:loan cat:nope funding:soon 10:30");
   expect(r.query).toEqual({ type: "all", cats: [], status: "all", words: ["10:30"] });
   expect(r.problems).toEqual([
     "Unknown type: loan. Try grant or rfp.",
     "Unknown category: nope.",
-    "Unknown funding: soon. Try open, funded or qualified.",
+    "Unknown funding: soon. Try open, funded, qualified or ballot.",
   ]);
 });
 

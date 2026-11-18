@@ -14,7 +14,8 @@ import { pickText } from "../db/initiatives.ts";
 import { isStructured } from "../../shared/draft/normalise.ts";
 import { usd } from "../../shared/draft/amount.ts";
 
-export const FEED_SCHEMA_VERSION = 1;
+/** 2: `status` gained "ballot". */
+export const FEED_SCHEMA_VERSION = 2;
 
 const iso = (t: number | null) => (t ? new Date(t * 1000).toISOString() : null);
 
@@ -25,7 +26,8 @@ export interface FeedInitiative {
   title: string;
   type: "rfp" | "grant";
   categories: { slug: string; label: string }[];
-  status: "open" | "funded";
+  /** "ballot": on the production round's ballot (a fully funded one stays "funded"). */
+  status: "open" | "ballot" | "funded";
   summary: string;
   goalUsd: number;
   raisedUsd: number;
@@ -87,7 +89,7 @@ export function feedInitiative(
     title: r.title,
     type: r.type,
     categories: categoriesOf(r).map((s) => ({ slug: s, label: categoryOf(s)!.label })),
-    status: card.funded ? "funded" : "open",
+    status: card.funded ? "funded" : card.vote === "ballot" ? "ballot" : "open",
     summary: r.summary,
     goalUsd: r.goalUsd,
     raisedUsd: Math.round(card.summary.total * 100) / 100,
@@ -173,7 +175,13 @@ function factLines(x: FeedInitiative): string[] {
   const lines = [
     `- Type: ${typeName(x.type)}`,
     `- Categories: ${x.categories.map((c) => c.label).join(", ") || "none yet"}`,
-    `- Status: ${x.status === "funded" ? "Fully funded" : "Open for funding"}`,
+    `- Status: ${
+      x.status === "funded"
+        ? "Fully funded"
+        : x.status === "ballot"
+        ? "On the ballot"
+        : "Open for funding"
+    }`,
     `- Goal: ${usd(x.goalUsd)}`,
     `- Raised: ${usd(x.raisedUsd)} (${x.pctFunded}% funded) from ${x.backers} backer${
       x.backers === 1 ? "" : "s"
@@ -262,7 +270,7 @@ export function llmsIndex(feed: Feed, origin: string): string {
     "## Data",
     "",
     `- [All initiatives, full text](${origin}/llms-full.txt): every approved initiative in one Markdown file, pinned first, then by total raised`,
-    `- [initiatives.json](${origin}/api/initiatives.json): the same data as JSON, filterable with ?type=rfp|grant, ?cat=<slug>, ?status=open|funded`,
+    `- [initiatives.json](${origin}/api/initiatives.json): the same data as JSON, filterable with ?type=rfp|grant, ?cat=<slug>, ?status=open|ballot|funded`,
     `- [JSON Schema](${origin}/api/initiatives.schema.json): the schema of initiatives.json`,
     "",
     "## Initiatives",
@@ -297,12 +305,13 @@ export function llmsFull(feed: Feed, origin: string): string {
   ].join("\n");
 }
 
-/** initiatives.json filters: ?type=rfp|grant, ?cat=<slug>[,<slug>] (any), ?status=open|funded. */
+/** initiatives.json filters: ?type=rfp|grant, ?cat=<slug>[,<slug>] (any), ?status=open|ballot|funded
+ * (open matches On the ballot too, like the board's Open filter). */
 export function filterFeed(feed: Feed, q: { type?: string; cat?: string; status?: string }): Feed {
   const cats = (q.cat ?? "").split(",").filter(Boolean);
   const initiatives = feed.initiatives.filter((x) =>
     (!q.type || x.type === q.type) &&
-    (!q.status || x.status === q.status) &&
+    (!q.status || x.status === q.status || (q.status === "open" && x.status === "ballot")) &&
     (!cats.length || x.categories.some((c) => cats.includes(c.slug)))
   );
   return { ...feed, count: initiatives.length, initiatives };

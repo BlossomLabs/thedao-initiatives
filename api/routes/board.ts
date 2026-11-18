@@ -2,7 +2,7 @@ import { datasetGeneration } from "../db/dataset.ts";
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { currentVote } from "../services/vote-active.ts";
-import type { VoteManifest } from "../../shared/vote/manifest.ts";
+import { onBallotSlugs, type VoteManifest } from "../../shared/vote/manifest.ts";
 import { cardInitiative, ipfsUrl } from "../lib/json.ts";
 import type { Donation, Pledge } from "../db/types.ts";
 import type { CardRow } from "../db/initiatives.ts";
@@ -37,7 +37,7 @@ export interface Card {
   funded: boolean;
   donationsEnabled: boolean;
   /** Where it stands for TheDAO's vote; only while the vote display is on. */
-  vote?: ReturnType<typeof voteState>["kind"];
+  vote?: ReturnType<typeof voteState>["kind"] | "ballot";
 }
 
 export const pctOf = (total: number, goal: number): number =>
@@ -207,12 +207,20 @@ async function buildBoard(deps: Deps, refresh: boolean) {
     db.cards.summaries(initiatives.map((x) => x.id)),
     safeApiPausedUntil(deps),
   ]);
+  const ballot = onBallotSlugs(round?.manifest);
   const cards = orderCards(
     await Promise.all(
       initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk, pausedUntil)),
     ),
   ).map((c): Card =>
-    vote.show ? { ...c, vote: voteState(c.summary.total, c.initiative.goalUsd, vote).kind } : c
+    vote.show
+      ? {
+        ...c,
+        vote: ballot.has(c.initiative.slug)
+          ? "ballot"
+          : voteState(c.summary.total, c.initiative.goalUsd, vote).kind,
+      }
+      : c
   );
   return {
     refreshDue: !chainStateFresh(state, deps.now()),

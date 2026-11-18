@@ -10,6 +10,7 @@ const ITEMS: { value: BoardStatus; label: string }[] = [
   { value: "all", label: "Any funding status" },
   { value: "open", label: STATUS_LABELS.open },
   { value: "qualified", label: STATUS_LABELS.qualified },
+  { value: "ballot", label: STATUS_LABELS.ballot },
   { value: "funded", label: STATUS_LABELS.funded },
 ];
 
@@ -17,12 +18,12 @@ const ITEMS: { value: BoardStatus; label: string }[] = [
 export default function StatusSelect(
   { value, vote, onChange }: {
     value: BoardStatus;
-    /** Offer Qualified for the vote (the vote display is on). */
+    /** Offer Qualified for the vote and On the ballot (the vote display is on). */
     vote?: boolean;
     onChange: (s: BoardStatus) => void;
   },
 ) {
-  const items = vote ? ITEMS : ITEMS.filter((s) => s.value !== "qualified");
+  const items = vote ? ITEMS : ITEMS.filter((s) => s.value !== "qualified" && s.value !== "ballot");
   const trigger = useRef<HTMLButtonElement>(null);
   useTakeFocus(STATUS_FOCUS_KEY, trigger);
   return (

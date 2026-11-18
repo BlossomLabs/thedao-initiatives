@@ -341,6 +341,34 @@ describe("Qualified for the vote filter", () => {
   });
 });
 
+describe("On the ballot filter", () => {
+  const below = { ...card("Below"), vote: "below" as const };
+  const past = { ...card("Past"), vote: "eligible" as const };
+  const ballot = { ...card("Ballot"), vote: "ballot" as const };
+  it("ballot keeps only those on the ballot; qualified keeps them too", () => {
+    const only = { ...DEFAULT_VIEW, status: "ballot" as const };
+    expect(applyView([below, past, ballot], only).map((c) => c.initiative.title)).toEqual([
+      "Ballot",
+    ]);
+    const q = { ...DEFAULT_VIEW, status: "qualified" as const };
+    expect(applyView([below, past, ballot], q).map((c) => c.initiative.title)).toEqual([
+      "Past",
+      "Ballot",
+    ]);
+  });
+  it("?status=ballot is read and written", () => {
+    expect(readView(new URLSearchParams("status=ballot")).status).toBe("ballot");
+    expect(writeView({ ...DEFAULT_VIEW, status: "ballot" }).get("status")).toBe("ballot");
+  });
+  it("is a funding section between Fully funded and Qualified for the vote", () => {
+    const funded = { ...card("Funded", { raised: 100_000 }), vote: "ballot" as const };
+    const groups = groupByFunding([below, past, ballot, funded]);
+    expect(groups.map((g) => g.key)).toEqual(["funded", "ballot", "qualified", "open"]);
+    expect(groups[0].cards).toEqual([funded]);
+    expect(groups[1].cards).toEqual([ballot]);
+  });
+});
+
 describe("admin ratings", () => {
   const [a, b, c] = [card("Alpha"), card("Bravo"), card("Charlie")];
   const cards = [a, b, c];

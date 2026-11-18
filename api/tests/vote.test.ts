@@ -1,6 +1,8 @@
 /** Vote eligibility: the settings admins keep (no deploy) and the rule the board and pages share. */
 import { assertEquals } from "@std/assert";
 import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
+import { NO_ROUND, type VoteManifest } from "../../shared/vote/manifest.ts";
+import type { VoteRound } from "../services/vote-chain.ts";
 import { DEFAULT_VOTE, voteFloorPct, voteState } from "../../shared/vote.ts";
 
 Deno.test("vote settings: off by default, admins change them, the board and site settings carry them", async () => {
@@ -53,6 +55,40 @@ Deno.test("the board marks each card's vote state only while the display is on",
     token: admin,
     json: { show: true, floorPct: 25, capUsd: 200_000 },
   });
+  assertEquals(await vote(), "below");
+  h.close();
+});
+
+Deno.test("the board marks an initiative on the real round's ballot; a test round marks none", async () => {
+  const h = await harness({ env: { BOARD_CACHE_SECS: "0" } });
+  const admin = await h.mint(ADMIN, true);
+  const a = await h.db.initiatives.insert({
+    title: "A",
+    summary: "s",
+    status: "approved",
+    goalUsd: 1000,
+  });
+  await h.req("/api/admin/vote-settings", {
+    method: "POST",
+    token: admin,
+    json: { show: true, floorPct: 25, capUsd: 200_000 },
+  });
+  const vote = async () =>
+    ((await j(await h.req("/api/board"))) as { cards: { vote?: string }[] }).cards[0].vote;
+  const manifest = (kind: "real" | "test"): VoteManifest => ({
+    ...NO_ROUND,
+    kind,
+    chainId: kind === "real" ? 1 : 11155111,
+    badge: kind === "real" ? "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C" : undefined,
+    contract: "0x1000000000000000000000000000000000000001",
+    slugs: [a.slug],
+    projects: [{ goalUsd: "1", rfp: false, groups: [] }],
+  });
+  h.deps.vote = { manifest: manifest("test") } as VoteRound;
+  assertEquals(await vote(), "below");
+  h.deps.vote = { manifest: manifest("real") } as VoteRound;
+  assertEquals(await vote(), "ballot");
+  h.deps.vote = { manifest: { ...manifest("real"), slugs: ["other"] } } as VoteRound;
   assertEquals(await vote(), "below");
   h.close();
 });

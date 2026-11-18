@@ -12,7 +12,7 @@ import { REVIEWER } from "~/lib/reviewer";
 import { type Tier, TIERS } from "@shared/vote/ballot";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
-export const STATUSES = ["all", "open", "qualified", "funded"] as const;
+export const STATUSES = ["all", "open", "qualified", "ballot", "funded"] as const;
 export const SORTS = [
   ["recommended", "Featured"],
   ["closest", "Closest to funded"],
@@ -134,8 +134,10 @@ export function matches(c: Card, v: BoardView, skip?: Facet, watched?: string[])
   if (skip !== "type" && v.type !== "all" && c.initiative.type !== v.type) return false;
   if (skip !== "status" && v.status === "open" && c.funded) return false;
   if (skip !== "status" && v.status === "funded" && !c.funded) return false;
-  // Qualified for the vote: past the vote floor. The cards carry it only while the display is on.
+  // Qualified for the vote: past the vote floor (on the ballot counts). The cards carry it
+  // only while the display is on.
   if (skip !== "status" && v.status === "qualified" && c.vote === "below") return false;
+  if (skip !== "status" && v.status === "ballot" && c.vote !== "ballot") return false;
   if (
     skip !== "cats" && v.cats.length && !c.initiative.categories.some((s) => v.cats.includes(s))
   ) {
@@ -275,10 +277,10 @@ export const fullyFunded = (c: Card, votePct = 0): boolean => {
   return goal > 0 && (c.summary.total / goal) * 100 + votePct >= 100 - 1e-6;
 };
 
-export type FundingSection = "funded" | "qualified" | "open";
+export type FundingSection = "funded" | "ballot" | "qualified" | "open";
 
 /** "Closest to funded" in sections, as the Funding filter names them: Fully funded,
- * Qualified for the vote (only while the cards carry the vote state), Open for
+ * On the ballot, Qualified for the vote (only while the cards carry the vote state), Open for
  * funding. On the vote results `votePct` (each one's vote share, % of its goal,
  * by id) counts toward fully funded. Funded results with `voteTiers` are ordered
  * S-Tier, A-Tier, B-Tier, then untiered; the existing order is preserved within each tier and other group. */
@@ -290,10 +292,12 @@ export function groupByFunding(
   const sectionOf = (c: Card): FundingSection =>
     fullyFunded(c, votePct.get(c.initiative.id))
       ? "funded"
+      : c.vote === "ballot"
+      ? "ballot"
       : c.vote && c.vote !== "below"
       ? "qualified"
       : "open";
-  const order: FundingSection[] = ["funded", "qualified", "open"];
+  const order: FundingSection[] = ["funded", "ballot", "qualified", "open"];
   const tierOrder = (c: Card) => {
     const tier = voteTiers?.get(c.initiative.id);
     return tier ? TIERS.indexOf(tier) : TIERS.length;
@@ -353,6 +357,7 @@ export const STATUS_LABELS = {
   open: "Open for funding",
   funded: "Fully funded",
   qualified: "Qualified for the vote",
+  ballot: "On the ballot",
 } as const;
 
 /** What Clear filters resets: every applied filter (type, categories, funding

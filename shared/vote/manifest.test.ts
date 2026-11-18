@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { checkManifest, roundDeployed, rulesRound, type VoteManifest, voterNft } from "./manifest";
+import {
+  checkManifest,
+  onBallotSlugs,
+  roundDeployed,
+  rulesRound,
+  type VoteManifest,
+  voterNft,
+} from "./manifest";
 
 const C = "0x1000000000000000000000000000000000000001";
 const B = "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C";
@@ -20,6 +27,12 @@ const base: VoteManifest = {
 };
 
 describe("round manifest", () => {
+  it("on the ballot: the real round's slugs only; a test round or none is empty", () => {
+    expect([...onBallotSlugs({ ...base, kind: "real", chainId: 1, badge: B, slugs: ["a", "b"] })])
+      .toEqual(["a", "b"]);
+    expect(onBallotSlugs({ ...base, slugs: ["a"] }).size).toBe(0);
+    expect(onBallotSlugs(undefined).size).toBe(0);
+  });
   it("a real round votes with the badge; a test round with its own NFT", () => {
     expect(voterNft({ ...base, kind: "real", chainId: 1, badge: B })).toBe(B);
     expect(voterNft(base)).toBe(C);

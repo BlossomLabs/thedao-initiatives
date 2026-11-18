@@ -1,6 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { useVoteReveal, VoteCallout, voteCallout } from "./VoteMark";
+import {
+  calloutLabel,
+  calloutText,
+  useVoteReveal,
+  VoteCallout,
+  voteCallout,
+  voteStanding,
+} from "./VoteMark";
 
 const vote = { show: true, floorPct: 25, capUsd: 200_000 };
 
@@ -23,6 +30,16 @@ it("the callout says how much is missing, short and rounded up, or Qualified for
   expect(screen.getByText("$2k to qualify")).toBeInTheDocument();
   rerender(<VoteCallout state={{ kind: "eligible" }} at={25} side="top" />);
   expect(screen.getByText("Qualified for the vote")).toBeInTheDocument();
+});
+
+it("on the ballot: the callout shows even below the floor, in its own words", () => {
+  expect(voteCallout(10, 100, vote, true)).toEqual({ kind: "ballot" });
+  expect(voteStanding(10, 100, vote, true)).toEqual({ kind: "ballot" });
+  expect(voteCallout(10, 100, { ...vote, show: false }, true)).toBeNull();
+  expect(calloutLabel({ kind: "ballot" })).toBe("On the ballot");
+  expect(calloutText({ kind: "ballot" })).toBe("On the ballot for TheDAO's vote");
+  render(<VoteCallout state={{ kind: "ballot" }} at={25} side="top" />);
+  expect(screen.getByText("On the ballot")).toBeInTheDocument();
 });
 
 function Row() {

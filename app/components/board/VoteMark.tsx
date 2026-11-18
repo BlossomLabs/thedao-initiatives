@@ -10,13 +10,19 @@ export const NEAR_POINTS = 5;
 
 /** What the tick's callout says: past the floor, or what is missing when within
  * NEAR_POINTS of it; null (no callout) further away or while the display is off. */
-export type CalloutState = { kind: "eligible" } | { kind: "near"; missing: number };
+export type CalloutState =
+  | { kind: "eligible" }
+  | { kind: "near"; missing: number }
+  | { kind: "ballot" };
 export function voteCallout(
   raised: number,
   goal: number,
   vote?: VoteSettings,
+  onBallot = false,
 ): CalloutState | null {
-  if (!vote?.show || !goal) return null;
+  if (!vote?.show) return null;
+  if (onBallot) return { kind: "ballot" };
+  if (!goal) return null;
   const s = voteState(raised, goal, vote);
   if (s.kind !== "below") return { kind: "eligible" };
   return (100 * s.toFloorUsd) / goal <= NEAR_POINTS
@@ -25,18 +31,30 @@ export function voteCallout(
 }
 
 /** The callout for any initiative (list rows, on a click): past the floor, or what is missing. */
-export function voteStanding(raised: number, goal: number, vote: VoteSettings): CalloutState {
+export function voteStanding(
+  raised: number,
+  goal: number,
+  vote: VoteSettings,
+  onBallot = false,
+): CalloutState {
+  if (onBallot) return { kind: "ballot" };
   const s = voteState(raised, goal, vote);
   return s.kind === "below" ? { kind: "near", missing: s.toFloorUsd } : { kind: "eligible" };
 }
 
 /** The callout's words, as it shows them. */
 export const calloutLabel = (state: CalloutState): string =>
-  state.kind === "eligible" ? "Qualified for the vote" : `${usdShortUp(state.missing)} to qualify`;
+  state.kind === "ballot"
+    ? "On the ballot"
+    : state.kind === "eligible"
+    ? "Qualified for the vote"
+    : `${usdShortUp(state.missing)} to qualify`;
 
 /** The callout's words for screen readers. */
 export const calloutText = (state: CalloutState): string =>
-  state.kind === "eligible"
+  state.kind === "ballot"
+    ? "On the ballot for TheDAO's vote"
+    : state.kind === "eligible"
     ? "Qualified for TheDAO's vote"
     : `${usdShortUp(state.missing)} to qualify for TheDAO's vote`;
 
@@ -96,6 +114,23 @@ export function Callout(
   );
 }
 
+/** On the ballot: a ticked ballot box, a filled green rounded square with a dark check. */
+export function OnBallotMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={cn("size-3 flex-none", className)} aria-hidden="true">
+      <rect x="1.5" y="1.5" width="13" height="13" rx="3.5" fill="#5cb75a" />
+      <path
+        d="M4.6 8.3l2.2 2.2 4.4-4.6"
+        fill="none"
+        stroke="#08321c"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /**
  * "$2k to qualify" (or "Qualified for the vote"): the callout over the vote floor's
  * mark, for initiatives close to the floor. The floor sits on the left of the bar, so
@@ -104,14 +139,16 @@ export function Callout(
 export function VoteCallout(
   { state, at, side }: { state: CalloutState; at: number; side: "top" | "bottom" },
 ) {
+  const ballot = state.kind === "ballot";
   const ok = state.kind === "eligible";
   return (
     <Callout
       at={at}
       side={side}
-      edge={ok ? "border-[rgba(92,183,90,.6)]" : "border-white/30"}
-      className="flex items-center gap-1 whitespace-nowrap"
+      edge={ballot || ok ? "border-[rgba(92,183,90,.6)]" : "border-white/30"}
+      className={cn("flex items-center gap-1 whitespace-nowrap", ballot && "text-[#a7e3a5]")}
     >
+      {ballot && <OnBallotMark />}
       {ok && <Check className="size-3 text-dao-green" strokeWidth={3} aria-hidden="true" />}
       {calloutLabel(state)}
     </Callout>

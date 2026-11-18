@@ -12,6 +12,8 @@ import Skeleton from "~/components/ui/Skeleton";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import Markdown from "~/components/Markdown";
 import FundingHead from "~/components/initiative/FundingHead";
+import { useRound } from "~/lib/vote-round";
+import { onBallotSlugs } from "@shared/vote/manifest";
 import Backers from "~/components/initiative/Backers";
 import DonationsTable from "~/components/initiative/DonationsTable";
 import SideCards from "~/components/initiative/SideCards";
@@ -61,6 +63,8 @@ export default function Initiative() {
   const viewing = Number.isInteger(asked) && asked > 0 && asked !== current ? asked : current;
   const older = useRevision(slug, viewing !== current ? viewing : null);
   const { data: site } = useSiteSettings();
+  // The production round (the page is public); empty until TopBar has loaded it.
+  const onBallot = onBallotSlugs(useRound()).has(slug);
   const revisions = page?.revisions ?? [];
   const idx = revisions.findIndex((v) => v.n === viewing);
   const [mode, setMode] = useState<ViewMode>("rendered");
@@ -235,6 +239,7 @@ export default function Initiative() {
             pct={page.pct}
             funded={page.funded}
             vote={r.status === "approved" ? site?.vote : undefined}
+            onBallot={onBallot}
           />
           {!isPlaceholderData && <Backers pledges={page.pledges} />}
           <SectionHeading>Summary</SectionHeading>

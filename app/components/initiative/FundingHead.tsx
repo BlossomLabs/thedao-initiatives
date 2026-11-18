@@ -1,23 +1,25 @@
 import { Trophy } from "lucide-react";
 import Bar from "~/components/ui/Bar";
 import { Check } from "lucide-react";
-import { calloutLabel, calloutText, voteStanding } from "~/components/board/VoteMark";
+import { calloutLabel, calloutText, OnBallotMark, voteStanding } from "~/components/board/VoteMark";
 import { voteFloorPct, voteFloorUsd, type VoteSettings } from "@shared/vote";
 import Money from "~/components/ui/Money";
 import type { Summary } from "~/lib/api-types";
 import { pctText, usd } from "~/lib/format";
 
 export default function FundingHead(
-  { summary, goal, pct, funded, vote }: {
+  { summary, goal, pct, funded, vote, onBallot = false }: {
     summary: Summary;
     goal: number;
     pct: number;
     funded: boolean;
     /** Where it stands for TheDAO's vote, while the display is on (approved initiatives). */
     vote?: VoteSettings;
+    /** It is on the production round's ballot: the page says so instead of how to qualify. */
+    onBallot?: boolean;
   },
 ) {
-  const standing = vote?.show ? voteStanding(summary.total, goal, vote) : null;
+  const standing = vote?.show ? voteStanding(summary.total, goal, vote, onBallot) : null;
   const split = (
     <div className="mt-2.5 flex flex-wrap gap-[26px] text-[13px] text-muted">
       {funded && (
@@ -55,7 +57,12 @@ export default function FundingHead(
           </span>
           {standing && (
             // The board's callout words, beside the % they are about.
-            <span className="inline-flex items-center gap-1 font-semibold text-white">
+            <span
+              className={`inline-flex items-center gap-1 font-semibold ${
+                standing.kind === "ballot" ? "text-[#a7e3a5]" : "text-white"
+              }`}
+            >
+              {standing.kind === "ballot" && <OnBallotMark />}
               {standing.kind === "eligible" && (
                 <Check className="size-3.5 text-dao-green" strokeWidth={3} aria-hidden="true" />
               )}
@@ -91,7 +98,9 @@ export default function FundingHead(
       {standing && (
         // Once, where people read: what it takes to qualify and for what.
         <p className="m-0 mt-2.5 text-[12.5px] text-muted">
-          {goal - vote!.capUsd > (goal * vote!.floorPct) / 100
+          {onBallot
+            ? "On the ballot for TheDAO's vote: voters can place it in a tier."
+            : goal - vote!.capUsd > (goal * vote!.floorPct) / 100
             // A large goal: the floor is the goal less what TheDAO distributes at most.
             ? `This initiative qualifies for TheDAO's vote at ${
               usd(voteFloorUsd(goal, vote!))

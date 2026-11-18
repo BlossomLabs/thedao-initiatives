@@ -6,7 +6,7 @@ export const FEED_JSON_SCHEMA = {
   type: "object",
   required: ["schemaVersion", "generatedAt", "count", "totals", "initiatives"],
   properties: {
-    schemaVersion: { const: 1 },
+    schemaVersion: { const: 2 },
     generatedAt: { type: "string", format: "date-time" },
     count: {
       type: "integer",
@@ -65,7 +65,7 @@ export const FEED_JSON_SCHEMA = {
             properties: { slug: { type: "string" }, label: { type: "string" } },
           },
         },
-        status: { enum: ["open", "funded"] },
+        status: { enum: ["open", "ballot", "funded"] },
         summary: { type: "string" },
         goalUsd: { type: "number" },
         raisedUsd: { type: "number", description: "Pledges plus donations" },

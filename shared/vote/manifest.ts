@@ -52,6 +52,11 @@ export type VoteManifest = {
   ballotRules?: boolean;
 };
 
+/** The initiatives on the ballot: the production (real) round's slugs. A test round, or
+ * no round, puts nothing on it. Derived, never stored. */
+export const onBallotSlugs = (m: VoteManifest | undefined): Set<string> =>
+  new Set(m?.kind === "real" ? m.slugs : []);
+
 export const SEPOLIA_CHAIN_ID = 11155111;
 export const MAINNET_CHAIN_ID = 1;
 

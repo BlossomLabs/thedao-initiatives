@@ -4,7 +4,7 @@ import type { BoardStatus } from "~/lib/board-view";
 /**
  * Funding status as a 14px glyph, in the funding bar's colours: a dashed ring for
  * any status, part-filled for open for funding, a check once it qualifies for
- * the vote, and a party popper once fully funded.
+ * the vote, a ticked ballot box once it is on the ballot, and a party popper once fully funded.
  */
 export default function FundingGlyph({ status }: { status: BoardStatus }) {
   return (
@@ -48,6 +48,20 @@ export default function FundingGlyph({ status }: { status: BoardStatus }) {
             d="M5 8.2l2 2 4-4.2"
             fill="none"
             stroke="#0b2a1a"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
+      {status === "ballot" && (
+        <>
+          {/* On the ballot: a ticked ballot box, a filled rounded square. */}
+          <rect x="1.5" y="1.5" width="13" height="13" rx="3.5" fill="#5cb75a" />
+          <path
+            d="M5 8.2l2 2 4-4.2"
+            fill="none"
+            stroke="#08321c"
             strokeWidth="1.8"
             strokeLinecap="round"
             strokeLinejoin="round"

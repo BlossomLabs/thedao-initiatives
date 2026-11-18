@@ -6,6 +6,8 @@ import { ADMIN, harness, PLAIN, SAFE_ADDR, testConnection } from "./app-helpers.
 import { minimalSubmission, revisionBody } from "./fixtures.ts";
 import { FEED_JSON_SCHEMA } from "../services/feed-schema.ts";
 import { parseInitiativeFile } from "../services/content.ts";
+import { NO_ROUND } from "../../shared/vote/manifest.ts";
+import type { VoteRound } from "../services/vote-chain.ts";
 
 const HOST = "https://initiatives.thedao.fund";
 
@@ -138,7 +140,7 @@ Deno.test("initiatives.json: shape, totals, filters by type, category and status
       initiatives: Record<string, unknown>[];
     };
     const all = await (await t.req("/api/initiatives.json")).json() as J;
-    assertEquals(all.schemaVersion, 1);
+    assertEquals(all.schemaVersion, 2);
     assertEquals(all.count, 2);
     assertEquals(all.totals, { ...all.totals, goalUsd: 150_000, rfps: 1, grants: 1 });
     const one = all.initiatives.find((x) => x.slug === t.live.slug)!;
@@ -160,6 +162,36 @@ Deno.test("initiatives.json: shape, totals, filters by type, category and status
     assertEquals(await q("cat=wallets-signing,opsec"), [t.rfp.slug]);
     assertEquals(await q("status=funded"), []);
     assertEquals((await q("status=open")).length, 2);
+  } finally {
+    await t.close();
+  }
+});
+
+Deno.test("feeds: an initiative on the real round's ballot is On the ballot, unless fully funded", async () => {
+  const t = await setup();
+  try {
+    t.h.deps.vote = {
+      manifest: {
+        ...NO_ROUND,
+        kind: "real",
+        chainId: 1,
+        badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
+        slugs: [t.rfp.slug],
+        projects: [{ goalUsd: "1", rfp: true, groups: [] }],
+      },
+    } as unknown as VoteRound;
+    await t.h.deps.db.meta.set("vote_settings", { show: true, floorPct: 25, capUsd: 200_000 });
+    const res = await t.req("/api/initiatives.json?status=ballot");
+    const got = (await res.json() as { initiatives: { slug: string }[] }).initiatives;
+    assertEquals(got.map((x) => x.slug), [t.rfp.slug]);
+    // Open matches On the ballot too, like the board's Open filter.
+    const open = await (await t.req("/api/initiatives.json?status=open")).json() as {
+      initiatives: { slug: string }[];
+    };
+    assertEquals(open.initiatives.map((x) => x.slug).sort(), [t.live.slug, t.rfp.slug].sort());
+    const md = await (await t.req(`/initiative/${t.rfp.slug}.md`)).text();
+    assertStringIncludes(md, "funding_status: ballot");
+    assertStringIncludes(await (await t.req("/llms-full.txt")).text(), "- Status: On the ballot");
   } finally {
     await t.close();
   }

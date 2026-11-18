@@ -152,11 +152,13 @@ function Row(
 ) {
   const { initiative: r, summary, pct, backers, logos } = card;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
-  const standing = vote?.show ? voteStanding(summary.total, r.goalUsd, vote) : null;
+  const standing = vote?.show
+    ? voteStanding(summary.total, r.goalUsd, vote, card.vote === "ballot")
+    : null;
   // The Backers column: every logo when they are all the backers, else three and "+N" for the rest.
   const shownLogos = backers > logos.length ? logos.slice(0, 3) : logos;
   const more = backers - shownLogos.length;
-  const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
+  const pctOn = standing ? standing.kind !== "near" : pct >= 1;
   const full = fullyFunded(card, votePct);
   const votedFull = (votePct ?? 0) > 0 && full;
   const pctShown = withdrawn

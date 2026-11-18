@@ -2,23 +2,18 @@ import { assertEquals, assertNotEquals, assertThrows } from "@std/assert";
 import { getAddress, keccak256, slice, toBytes } from "viem";
 import { pledgeChainId } from "../shared/vote/typed-data.ts";
 import {
-  addingOpen,
-  addPlan,
   checkAsks,
   checkCodeSize,
   CODE_SIZE_LIMIT,
   currencyMismatch,
   MAINNET_CURRENCIES,
   manifestFor,
-  nextAddingOpen,
   parseMinters,
   parseRealArgs,
   parseRoundAdmins,
   parseTestIncludes,
   parseTestTiming,
   planDonationSetup,
-  planGroups,
-  planInitiatives,
   poolDrift,
   poolUsdFromFeed,
   qualifyingCards,
@@ -31,6 +26,13 @@ import {
   USD_CURRENCY,
   voteSchedule,
 } from "./vote-deploy.ts";
+import {
+  addingOpen,
+  addPlan,
+  nextAddingOpen,
+  planGroups,
+  planInitiatives,
+} from "../shared/vote/add-plan.ts";
 import { CHAINLINK_FEEDS, TOKENS } from "../api/config.ts";
 
 // The plan (vote fact sheet): opens Nov 17, S-Tier Thu Dec 3, A-Tier Mon Dec 7,

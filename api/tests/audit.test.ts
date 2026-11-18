@@ -386,6 +386,10 @@ Deno.test("audit: unexpected failures emit metadata without raw errors and reque
     const text = log.join("\n") + JSON.stringify(events(h)) + await response.text();
     assertFalse(text.includes("SECRET_DATABASE_URL"));
     assertFalse(text.includes("SECRET_CLAIM"));
+    // Where it failed is kept: the error's type and stack frames, without its message.
+    const crash = log.map((l) => JSON.parse(l)).find((e) => e.unhandled);
+    assertEquals([crash?.path, crash?.type], ["/api/test-failure", "Error"]);
+    assert(crash.frames.length > 0);
   } finally {
     h.close();
   }

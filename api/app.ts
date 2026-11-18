@@ -76,6 +76,19 @@ export function createApp(
     if (err instanceof HttpError) {
       return c.json({ error: err.message, ...err.extra }, err.status as 400);
     }
+    // The answer says nothing, so the logs (Honeycomb) keep where it failed: the error's
+    // type and stack frames, never its message (it may carry secrets or request data).
+    try {
+      const frames = (err instanceof Error ? err.stack ?? "" : "").split("\n")
+        .filter((l) => /^\s+at /.test(l)).slice(0, 12).map((l) => l.trim());
+      deps.log(JSON.stringify({
+        unhandled: true,
+        method: c.req.method,
+        path: c.req.path,
+        type: err instanceof Error ? err.name : typeof err,
+        frames,
+      }));
+    } catch { /* a failing logger never changes the answer */ }
     return c.json({ error: "internal error" }, 500);
   });
   app.notFound((c) => c.json({ error: "not found" }, 404));

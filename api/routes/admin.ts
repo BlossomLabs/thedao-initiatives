@@ -592,7 +592,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       currencyId: 0n,
       amount,
       nonce: await d.chain.pledgeNonceOf(c.var.user!.address as Hex),
-      deadline: BigInt(deps.now() + PLEDGE_DEADLINE_SECS),
+      deadline: BigInt(Math.floor(deps.now()) + PLEDGE_DEADLINE_SECS),
     });
     return c.json({
       pid,
@@ -684,7 +684,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       currencyId: 0n,
       amount: amountAfter(change, row),
       nonce: await d.chain.pledgeNonceOf(c.var.user!.address as Hex),
-      deadline: BigInt(deps.now() + PLEDGE_DEADLINE_SECS),
+      deadline: BigInt(Math.floor(deps.now()) + PLEDGE_DEADLINE_SECS),
     });
     return c.json({ pid, typedData: typedDataJson(typed) });
   });
@@ -1367,7 +1367,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       currencyId: 0n,
       amount: amountAfter(change, stored),
       nonce: await chainAt.d.chain.pledgeNonceOf(c.var.user!.address as Hex),
-      deadline: BigInt(deps.now() + PLEDGE_DEADLINE_SECS),
+      deadline: BigInt(Math.floor(deps.now()) + PLEDGE_DEADLINE_SECS),
     });
     return c.json({
       pid,

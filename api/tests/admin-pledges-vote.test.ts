@@ -1218,3 +1218,19 @@ Deno.test("admin pledges: a failed signed send keeps the request with the reason
   assertEquals([a.amountUsd, a.lastError, a.lastErrorAt], [260, null, null]);
   s.h.close();
 });
+
+Deno.test("admin pledges: production's fractional clock still prepares and relays a signed pledge", async () => {
+  const s = await setup();
+  // bootstrap's clock is Date.now() / 1000: seconds with a fraction (#132).
+  s.h.clock.now = NOW + 0.731;
+  const signed = await prepare(s, ACME);
+  assertEquals(signed.typed.message.deadline, BigInt(NOW + 600));
+  const { typed: _, ...fields } = signed;
+  const res = await s.h.req(`${s.base}/pledges`, {
+    method: "POST",
+    token: s.token,
+    json: { ...ACME, ...fields },
+  });
+  assertEquals(res.status, 202, await res.clone().text());
+  s.h.close();
+});

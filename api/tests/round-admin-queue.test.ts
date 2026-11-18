@@ -536,3 +536,13 @@ Deno.test("ballot claim: a claim 1 s short of 5 minutes still holds", async () =
   assertEquals((await claimReq(s, s.ready.id, other)).status, 409);
   s.h.close();
 });
+
+Deno.test("queue: production's fractional clock still signs a pledge", async () => {
+  const s = await setup();
+  // bootstrap's clock is Date.now() / 1000: seconds with a fraction (#132).
+  s.h.clock.now = NOW + 0.731;
+  const row = await s.pledge(s.ballot.id, "Zed", 300);
+  const sent = await s.sign(s.ballot.id, row.id);
+  assertEquals(sent.status, 202, await sent.clone().text());
+  s.h.close();
+});

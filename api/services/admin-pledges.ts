@@ -456,7 +456,8 @@ export function adminPledges(deps: Deps) {
   > {
     const { d, initiativeId, rfpId, admin, signed, change } = args;
     const pid = signed.pid;
-    const now = deps.now();
+    // Whole seconds: the clock is fractional in production, and BigInt refuses fractions.
+    const now = Math.floor(deps.now());
     if (signed.deadline <= BigInt(now)) {
       throw pledgeFail(400, "bad_deadline", "That signature has expired: send the pledge again.");
     }

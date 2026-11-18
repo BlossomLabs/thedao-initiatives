@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, expect, it, vi } from "vitest";
 import { signTypedData } from "wagmi/actions";
 import { api, ApiError } from "~/lib/api";
-import Pledges, { PledgeForm } from "./Pledges";
+import { NO_ROUND } from "../../../../shared/vote/manifest";
+import { primeRound } from "~/lib/vote-round";
+import Pledges, { LOCKED, PledgeForm } from "./Pledges";
+import { dropLock, resetLock, takeLock } from "~/lib/signing-lock";
 import type { AdminInitiativePage } from "~/lib/api-types";
 import type { Run } from "./run";
 
@@ -16,6 +19,14 @@ const waitReceipt = vi.fn();
 
 vi.mock("~/context/wallet", () => ({
   useWallet: () => ({ address: ADMIN, isConnected: true, config: {}, connectors: [] }),
+}));
+const roundAdmin = vi.hoisted(() => ({ value: false, pledgeRole: false, loading: false }));
+vi.mock("~/hooks/use-round-admin", () => ({
+  useRoundAdmin: () => ({
+    isRoundAdmin: roundAdmin.value,
+    canSignPledges: roundAdmin.value || roundAdmin.pledgeRole,
+    loading: roundAdmin.loading,
+  }),
 }));
 vi.mock("~/hooks/use-vote-chain", () => ({ useEnsureVoteChain: () => () => Promise.resolve() }));
 vi.mock("wagmi/actions", () => ({ signTypedData: vi.fn() }));
@@ -97,6 +108,8 @@ const fill = () => {
 };
 
 beforeEach(() => {
+  // A test that leaves a signature unanswered would hold the page's signing lock.
+  resetLock();
   vi.mocked(api).mockReset();
   vi.mocked(signTypedData).mockReset().mockResolvedValue(SIG);
   waitReceipt.mockReset().mockResolvedValue({ status: "success" });
@@ -314,6 +327,7 @@ it("shows pledges still being recorded on-chain in the table", () => {
     logoUrl: "",
   };
   const page = {
+    initiative: { slug: "acme" },
     pledges: [pledge],
     pendingPledges: [
       { pid: "P1", kind: "edit", company: null, amountUsd: null, hash: "0x01" },
@@ -325,4 +339,255 @@ it("shows pledges still being recorded on-chain in the table", () => {
   expect(screen.getByText("Newco")).toBeInTheDocument();
   // An edit in flight can't be edited or deleted again until it lands.
   expect(screen.queryByTitle("Delete pledge")).not.toBeInTheDocument();
+});
+
+const acme = {
+  id: "P1",
+  company: "Acme",
+  amountUsd: 20000,
+  status: "pledged",
+  note: "",
+  url: "",
+  logoUrl: "",
+};
+const awaiting = (over: object) => ({
+  pid: "P9",
+  kind: "add",
+  company: "Newco",
+  amountUsd: 300,
+  fromUsd: null,
+  status: "pledged",
+  by: ADMIN,
+  at: 1800000000,
+  lastError: null,
+  lastErrorAt: null,
+  ...over,
+});
+const pageOf = (awaitingPledges: unknown[], awaitingClosed = false) =>
+  ({
+    initiative: { slug: "acme" },
+    pledges: [acme],
+    pendingPledges: [],
+    awaitingPledges,
+    awaitingClosed,
+  }) as unknown as AdminInitiativePage;
+
+it("Pledges: an awaiting add shows as a row with the Awaiting signature chip and Discard", () => {
+  render(<Pledges page={pageOf([awaiting({})])} base={BASE} run={() => Promise.resolve(true)} />);
+  expect(screen.getByText("Newco")).toBeInTheDocument();
+  const chip = screen.getByText("Awaiting signature");
+  expect(chip.className).toContain("border-white/35");
+  expect(chip.className).not.toMatch(/amber|gold|yellow|vote/);
+  expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
+});
+
+it('Pledges: an awaiting edit shows "$20,000 → $30,000" on its row', () => {
+  const edit = awaiting({
+    pid: "P1",
+    kind: "edit",
+    company: "Acme",
+    amountUsd: 30000,
+    fromUsd: 20000,
+  });
+  render(<Pledges page={pageOf([edit])} base={BASE} run={() => Promise.resolve(true)} />);
+  expect(screen.getByText("$20,000 → $30,000")).toBeInTheDocument();
+  expect(screen.getByText("Awaiting signature")).toBeInTheDocument();
+  expect(screen.queryByTitle("Edit pledge")).not.toBeInTheDocument();
+  expect(screen.queryByTitle("Delete pledge")).not.toBeInTheDocument();
+});
+
+it("Pledges: an awaiting removal shows the chip and Removal on its row", () => {
+  const rm = awaiting({
+    pid: "P1",
+    kind: "remove",
+    company: "Acme",
+    amountUsd: null,
+    fromUsd: 20000,
+  });
+  render(<Pledges page={pageOf([rm])} base={BASE} run={() => Promise.resolve(true)} />);
+  expect(screen.getByText("Awaiting signature")).toBeInTheDocument();
+  expect(screen.getByText("Removal")).toBeInTheDocument();
+  expect(screen.queryByTitle("Delete pledge")).not.toBeInTheDocument();
+});
+
+it("Pledges: Discard calls the discard endpoint", async () => {
+  vi.mocked(api).mockResolvedValue({});
+  const run: Run = async (fn) => {
+    await fn();
+    return true;
+  };
+  render(<Pledges page={pageOf([awaiting({})])} base={BASE} run={run} />);
+  fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+  await waitFor(() =>
+    expect(vi.mocked(api)).toHaveBeenCalledWith(`${BASE}/pledge-requests/P9`, {
+      method: "DELETE",
+    })
+  );
+});
+
+it("an awaiting answer saves nothing now, says so, and clears the form", async () => {
+  vi.mocked(api).mockResolvedValue({ awaiting: true, pid: "P9" });
+  render(<Harness />);
+  fill();
+  await waitFor(() =>
+    expect(screen.getByTestId("msg")).toHaveTextContent(
+      "Saved as Awaiting signature. It counts in the vote once a round admin signs it.",
+    )
+  );
+  expect(vi.mocked(signTypedData)).not.toHaveBeenCalled();
+  expect(screen.getByPlaceholderText("Company *")).toHaveValue("");
+});
+
+it("a pledge_request_changed answer shows its message and keeps the form", async () => {
+  vi.mocked(api).mockRejectedValue(
+    new ApiError(409, "Someone changed this request.", { code: "pledge_request_changed" }),
+  );
+  render(<Harness />);
+  fill();
+  await waitFor(() =>
+    expect(screen.getByTestId("msg")).toHaveTextContent("Someone changed this request.")
+  );
+  expect(screen.getByPlaceholderText("Company *")).toHaveValue("Acme");
+});
+
+const NOTE = "It's on the ballot: a pledge counts in the vote once a round admin signs it.";
+const onBallot = () =>
+  primeRound({
+    ...NO_ROUND,
+    kind: "real",
+    chainId: 1,
+    contract: "0x1000000000000000000000000000000000000001",
+    badge: "0x2000000000000000000000000000000000000002",
+    slugs: ["acme"],
+    projects: [{ goalUsd: "1000000000", rfp: false, groups: [] }],
+    accounts: ["0x3000000000000000000000000000000000000003"],
+    currencies: [
+      {
+        symbol: "USD",
+        asset: "0x0000000000000000000000000000000000000000",
+        usdFeed: "0x0000000000000000000000000000000000000000",
+      },
+      {
+        symbol: "ETH",
+        asset: "0x0000000000000000000000000000000000000000",
+        usdFeed: "0x4000000000000000000000000000000000000004",
+      },
+    ],
+  });
+
+it("the form notes the ballot only while it is on it and the wallet is not a round admin", () => {
+  onBallot();
+  const form = (slug: string) => (
+    <PledgeForm
+      base={BASE}
+      run={() => Promise.resolve(true)}
+      editing={null}
+      onDone={() => {}}
+      slug={slug}
+    />
+  );
+  const { rerender } = render(form("acme"));
+  expect(screen.getByText(NOTE)).toBeInTheDocument();
+  rerender(form("other"));
+  expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  roundAdmin.value = true;
+  rerender(form("acme"));
+  expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  roundAdmin.value = false;
+  primeRound(NO_ROUND);
+});
+
+it("the form's note follows the pledge role alone, and never shows while the roles load", () => {
+  onBallot();
+  // A new element each time: the same one would be skipped on a rerender.
+  const form = () => (
+    <PledgeForm
+      base={BASE}
+      run={() => Promise.resolve(true)}
+      editing={null}
+      onDone={() => {}}
+      slug="acme"
+    />
+  );
+  // The pledge role without the admin role: the API puts the save on-chain, no note.
+  roundAdmin.pledgeRole = true;
+  const { rerender } = render(form());
+  expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  roundAdmin.pledgeRole = false;
+  roundAdmin.loading = true;
+  rerender(form());
+  expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  roundAdmin.loading = false;
+  rerender(form());
+  expect(screen.getByText(NOTE)).toBeInTheDocument();
+  primeRound(NO_ROUND);
+});
+
+it("Pledges: an awaiting withdrawal shows what goes on-chain and the status", () => {
+  const edit = awaiting({
+    pid: "P1",
+    kind: "edit",
+    company: "Acme",
+    amountUsd: 0,
+    fromUsd: 20000,
+    status: "withdrawn",
+  });
+  const add = awaiting({ amountUsd: 0, status: "received" });
+  render(<Pledges page={pageOf([edit, add])} base={BASE} run={() => Promise.resolve(true)} />);
+  expect(screen.getByText("$20,000 → $0")).toBeInTheDocument();
+  expect(screen.getByText("Withdrawn")).toBeInTheDocument();
+  expect(screen.getByText("$0")).toBeInTheDocument();
+  expect(screen.getByText("Received")).toBeInTheDocument();
+});
+
+it("Pledges: an awaiting pledge whose last send failed says why", () => {
+  const rm = awaiting({ lastError: "the signature expired", lastErrorAt: 1800000100 });
+  render(<Pledges page={pageOf([rm])} base={BASE} run={() => Promise.resolve(true)} />);
+  expect(screen.getByText("Last try failed: the signature expired")).toBeInTheDocument();
+});
+
+it("Pledges: once the vote has closed an awaiting pledge can be saved now or discarded", async () => {
+  vi.mocked(api).mockResolvedValue({ ok: true });
+  const run: Run = async (fn) => {
+    await fn();
+    return true;
+  };
+  const { rerender } = render(
+    <Pledges page={pageOf([awaiting({})])} base={BASE} run={run} />,
+  );
+  expect(screen.queryByRole("button", { name: "Save now" })).toBeNull();
+  rerender(<Pledges page={pageOf([awaiting({})], true)} base={BASE} run={run} />);
+  expect(screen.getByText("The vote has closed: save it or discard it.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Save now" }));
+  await waitFor(() =>
+    expect(vi.mocked(api)).toHaveBeenCalledWith(`${BASE}/pledge-requests/P9/save`, { json: {} })
+  );
+});
+
+it("the form's signing waits for the page's signing lock: it never overlaps a Sign all", async () => {
+  vi.mocked(api).mockImplementation((path) =>
+    path === `${BASE}/pledges/prepare`
+      ? Promise.resolve(prepared)
+      : Promise.reject(needsSignature())
+  );
+  expect(takeLock("sign-all")).toBe(true);
+  try {
+    render(<Harness />);
+    fill();
+    await waitFor(() => expect(screen.getByTestId("msg")).toHaveTextContent(LOCKED));
+    expect(vi.mocked(api)).not.toHaveBeenCalledWith(`${BASE}/pledges/prepare`, expect.anything());
+    expect(vi.mocked(signTypedData)).not.toHaveBeenCalled();
+  } finally {
+    dropLock("sign-all");
+  }
+  // Once it is free the form takes it while signing, and gives it back.
+  let signed!: (v: `0x${string}`) => void;
+  vi.mocked(signTypedData).mockImplementation(() => new Promise((r) => (signed = r)));
+  fireEvent.click(screen.getByRole("button", { name: "Add pledge" }));
+  await waitFor(() => expect(vi.mocked(signTypedData)).toHaveBeenCalled());
+  expect(takeLock("sign")).toBe(false);
+  signed(SIG);
+  await waitFor(() => expect(takeLock("sign")).toBe(true));
+  dropLock("sign");
 });

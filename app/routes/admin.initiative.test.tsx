@@ -53,6 +53,7 @@ const page = (over: Partial<AdminInitiativePage["initiative"]>): AdminInitiative
   revisions: [],
   summary: { pledged: 0, received: 0, donated: 0, total: 0, live: false, ledger: 0, paidOut: 0 },
   pledges: [],
+  awaitingPledges: [],
   donations: [],
   safeSync: null,
   signers: { ok: true, detail: "ok", list: SIGNERS, threshold: 3 },

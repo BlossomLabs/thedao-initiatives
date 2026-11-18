@@ -39,6 +39,14 @@ describe("sendPledge", () => {
     expect(d.prepare).not.toHaveBeenCalled();
   });
 
+  it("an awaiting answer ends without asking the wallet", async () => {
+    const d = deps({ plain: vi.fn(() => Promise.resolve("awaiting" as const)) });
+    const r = record();
+    expect(await sendPledge(d, r.set)).toEqual({ kind: "awaiting" });
+    expect(d.prepare).not.toHaveBeenCalled();
+    expect(d.sign).not.toHaveBeenCalled();
+  });
+
   it("signs, relays, waits for the receipt itself, then settles as saved", async () => {
     const d = deps();
     const r = record();

@@ -15,6 +15,17 @@ vi.mock("~/lib/api", async (original) => ({
 }));
 vi.mock("~/hooks/use-site-settings", () => ({ useSiteSettings: () => ({ data: undefined }) }));
 vi.mock("~/components/admin/Admins", () => ({ default: () => <p>Admins box</p> }));
+const round = vi.hoisted(() => ({
+  contract: "0x0000000000000000000000000000000000000000",
+}));
+vi.mock("~/lib/vote-round", async (original) => ({
+  ...await original<typeof import("~/lib/vote-round")>(),
+  roundLoader: () => null,
+  useRound: () => round,
+}));
+vi.mock("~/components/admin/vote/RoundAdminQueue", () => ({
+  default: ({ env, title }: { env: string; title: string }) => <h2>{title} ({env})</h2>,
+}));
 vi.mock("~/context/wallet", () => ({ useWallet: () => ({ isConnected: false }) }));
 vi.mock("~/components/admin/initiative/SafeCard", () => ({
   useSafeDeploy: () => ({ ensureDeployed: vi.fn(), status: null, busy: false }),
@@ -94,12 +105,16 @@ const status = {
 const answer = (list = rows, t = todo) => (path: unknown) => {
   const p = String(path);
   if (p === "/api/admin/todo") return Promise.resolve(t);
+  if (p === "/api/admin/vote-round/queue") {
+    return Promise.resolve({ kind: "real", ready: [{}], toSign: [{}, {}] });
+  }
   if (p === "/api/admin/status") return Promise.resolve(status);
   if (p === "/api/admin/initiatives") return Promise.resolve({ rows: list });
   return Promise.reject(new Error(`unexpected ${p}`));
 };
 
 beforeEach(() => {
+  round.contract = "0x0000000000000000000000000000000000000000";
   vi.mocked(api).mockReset().mockImplementation(answer());
 });
 
@@ -401,4 +416,21 @@ it("with nothing held, the held comments are never fetched", async () => {
   mount();
   await screen.findByText("Submissions to approve");
   expect(vi.mocked(api).mock.calls.map(([p]) => String(p))).not.toContain("/api/admin/held");
+});
+
+it("with a round deployed: the Waiting for a round admin card, and a to-do line linking to it", async () => {
+  round.contract = "0x1000000000000000000000000000000000000001";
+  mount();
+  const line = await screen.findByRole("link", {
+    name: "1 initiative ready for the ballot, 2 pledges to sign",
+  });
+  expect(line).toHaveAttribute("href", "#round-admin");
+  expect(screen.getByText("Waiting for a round admin (production)")).toBeInTheDocument();
+});
+
+it("with no round deployed: neither the card nor the line", async () => {
+  mount();
+  await screen.findByText("4 initiatives");
+  expect(screen.queryByText(/Waiting for a round admin/)).toBeNull();
+  expect(screen.queryByText(/ready for the ballot/)).toBeNull();
 });

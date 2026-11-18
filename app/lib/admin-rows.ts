@@ -1,4 +1,5 @@
 import type { AdminInitiative, Summary } from "~/lib/api-types";
+import { plural } from "~/lib/format";
 import { type AdminQuery, UNTAGGED } from "~/lib/admin-query";
 
 type Row = { initiative: AdminInitiative; summary?: Pick<Summary, "total"> };
@@ -66,4 +67,13 @@ export function approvedCounts(rows: Row[]) {
   const approved = rows.filter((x) => x.initiative.status === "approved");
   const grants = approved.filter((x) => x.initiative.type === "grant").length;
   return { total: approved.length, grants, rfps: approved.length - grants };
+}
+
+/** The dashboard's to-do line for what waits for a round admin; null when nothing does. */
+export function roundAdminTodoLine(ready: number, toSign: number): string | null {
+  const parts = [
+    ready > 0 && `${plural(ready, "initiative")} ready for the ballot`,
+    toSign > 0 && `${plural(toSign, "pledge")} to sign`,
+  ].filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
 }

@@ -12,6 +12,8 @@ export type PledgePhase =
   | { kind: "relaying" }
   | { kind: "waiting"; hash: Hex; earlier?: true }
   | { kind: "saved"; hash?: Hex; earlier?: true }
+  /** Held as an "Awaiting signature" request: a round admin has to sign it. */
+  | { kind: "awaiting" }
   /** Mined, but the API hasn't seen it yet: the site shows it shortly. */
   | { kind: "recorded"; hash: Hex; reason: string; earlier?: true }
   | { kind: "failed"; reason: string; hash?: Hex; earlier?: true };
@@ -25,8 +27,9 @@ export type SettleState = "saved" | "pending" | "failed";
 export interface PledgeFlowDeps<P extends { pid: string }> {
   /** The chain's name, for the words: "Ethereum", "Sepolia". */
   chain: string;
-  /** The write as typed: "saved" (not on-chain), or "sign" (the API's 428). */
-  plain(): Promise<"saved" | "sign">;
+  /** The write as typed: "saved" (not on-chain), "sign" (the API's 428), or "awaiting"
+   * (the API's 202 `{ awaiting: true }`: held for a round admin's signature). */
+  plain(): Promise<"saved" | "sign" | "awaiting">;
   /** The typed data to sign, under the pledge's id. */
   prepare(): Promise<P | Busy>;
   sign(p: P): Promise<Hex>;
@@ -124,7 +127,9 @@ export async function sendPledge<P extends { pid: string }>(
     return p;
   };
   try {
-    if ((await d.plain()) === "saved") return { kind: "saved" };
+    const first = await d.plain();
+    if (first === "saved") return { kind: "saved" };
+    if (first === "awaiting") return end({ kind: "awaiting" });
   } catch (e) {
     return end({ kind: "failed", reason: message(e) });
   }

@@ -3,6 +3,7 @@ import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import VoteSettings from "~/components/admin/VoteSettings";
 import VoteRelayer from "~/components/admin/VoteRelayer";
+import RoundAdminQueue from "~/components/admin/vote/RoundAdminQueue";
 import VoteRound from "~/components/admin/VoteRound";
 import { roundDeployed } from "../../shared/vote/manifest";
 import { generateMeta } from "~/utils/meta";
@@ -36,6 +37,11 @@ export default function VotePage() {
       {env === "production" && <VoteSettings />}
       <VoteRound />
       {roundDeployed(round) && <VoteRelayer />}
+      {env === "test" && roundDeployed(round) && (
+        <div className="mt-6">
+          <RoundAdminQueue env="test" title="Ready for the test ballot" />
+        </div>
+      )}
     </PageMain>
   );
 }

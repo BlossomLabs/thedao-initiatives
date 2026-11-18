@@ -18,7 +18,15 @@ import { useSession } from "~/context/session";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { errorMessage } from "~/lib/api";
 import { plural } from "~/lib/format";
+import { roundAdminTodoLine } from "~/lib/admin-rows";
+import { roundLoader, useRound } from "~/lib/vote-round";
+import { roundDeployed } from "../../shared/vote/manifest";
+import RoundAdminQueue from "~/components/admin/vote/RoundAdminQueue";
+import { useRoundAdminQueue } from "~/components/admin/vote/round-admin-actions";
 import { cn } from "~/lib/utils";
+
+/** The round the site runs now, so the round admin card shows only when one is deployed. */
+export const clientLoader = roundLoader;
 
 /** The tools an admin uses now and then, shown on this page when picked from More. */
 const PANELS = { services: "Services" } as const;
@@ -55,6 +63,9 @@ export default function Dashboard() {
   const [params, setParams] = useSearchParams();
   const panel = (params.get("panel") ?? "") as Panel | "";
   const status = useAdminStatus(true);
+  const deployed = roundDeployed(useRound());
+  // The card's own query (same key): the line always matches the card, and shows once it loads.
+  const queue = useRoundAdminQueue("production", deployed);
   const [menu, setMenu] = useState(false);
   const buttonRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -97,6 +108,9 @@ export default function Dashboard() {
   }
   const maintenance = site?.maintenance;
   const vote = site?.vote;
+  const roundTodo = deployed && queue.data
+    ? roundAdminTodoLine(queue.data.ready.length, queue.data.toSign.length)
+    : null;
   const ok = status.data ? servicesOk(status.data) : null;
   const menuItem =
     "flex w-full cursor-pointer items-center gap-2.5 rounded-lg border-0 bg-transparent px-3.5 py-2.5 text-left font-inter-tight text-[14px] text-white no-underline hover:bg-white/[.08]";
@@ -113,6 +127,9 @@ export default function Dashboard() {
             <span>{plural(data.counts.total, "initiative")}</span>
             <span>{data.counts.approved} approved</span>
             <span>This week: {data.counts.approvedThisWeek} approved</span>
+            {roundTodo && (
+              <a href="#round-admin" className="text-inherit hover:text-white">{roundTodo}</a>
+            )}
             {ok !== null && (
               <button
                 type="button"
@@ -204,6 +221,11 @@ export default function Dashboard() {
           {/* Always in view, first: who can sign in here is a security fact, checked at a glance. */}
           <Admins />
           <QuickPledge index={data.index} />
+          {deployed && (
+            <div id="round-admin" className="scroll-mt-20">
+              <RoundAdminQueue env="production" title="Waiting for a round admin" />
+            </div>
+          )}
         </aside>
       </div>
 

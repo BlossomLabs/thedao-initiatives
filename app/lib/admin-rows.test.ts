@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { adminFacetCounts, approvedCounts, filterAdminRows } from "./admin-rows";
+import {
+  adminFacetCounts,
+  approvedCounts,
+  filterAdminRows,
+  roundAdminTodoLine,
+} from "./admin-rows";
 import { parseAdminQuery } from "./admin-query";
 import type { AdminInitiative } from "~/lib/api-types";
 
@@ -71,4 +76,12 @@ it("pill counts: each facet counted with the other filters applied", () => {
 it("counts approved initiatives by type, and grants plus RFPs is the total", () => {
   expect(approvedCounts(rows)).toEqual({ total: 2, grants: 1, rfps: 1 });
   expect(approvedCounts([])).toEqual({ total: 0, grants: 0, rfps: 0 });
+});
+
+it("roundAdminTodoLine words what waits for a round admin", () => {
+  expect(roundAdminTodoLine(1, 2)).toBe("1 initiative ready for the ballot, 2 pledges to sign");
+  expect(roundAdminTodoLine(2, 1)).toBe("2 initiatives ready for the ballot, 1 pledge to sign");
+  expect(roundAdminTodoLine(1, 0)).toBe("1 initiative ready for the ballot");
+  expect(roundAdminTodoLine(0, 3)).toBe("3 pledges to sign");
+  expect(roundAdminTodoLine(0, 0)).toBeNull();
 });

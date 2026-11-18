@@ -1,5 +1,6 @@
 /** Hand-mirrored shapes of the API's JSON (api/lib/json.ts + routes). */
 import type { VoteManifest } from "../../shared/vote/manifest";
+import type { AddBlocker } from "../../shared/vote/add-plan";
 import type { Finding, Findings, Milestone, SectionKey, Sections } from "@shared/draft/types";
 import type { VoteSettings, VoteState } from "@shared/vote";
 
@@ -172,7 +173,7 @@ export interface Card {
   funded: boolean;
   donationsEnabled: boolean;
   /** Where it stands for TheDAO's vote; only while the vote display is on. */
-  vote?: VoteState["kind"];
+  vote?: VoteState["kind"] | "ballot";
 }
 
 export interface CommentEntry {
@@ -480,6 +481,76 @@ export interface PendingPledge {
   hash: string | null;
 }
 
+/** A pledge change held until a round admin signs it (Awaiting signature). */
+export interface AwaitingPledgeJson {
+  pid: string;
+  kind: "add" | "edit" | "remove";
+  company: string;
+  /** What the pledge counts on-chain after the change (a received or withdrawn one: 0);
+   * null for a remove. */
+  amountUsd: number | null;
+  /** What it counts on-chain now, per its row; null for an add. */
+  fromUsd: number | null;
+  /** Its status after the change; null for a remove. */
+  status: "pledged" | "received" | "withdrawn" | null;
+  /** The asking admin's address. */
+  by: string;
+  /** Unix seconds. */
+  at: number;
+  /** Why its last signed send failed, and when (unix seconds). */
+  lastError: string | null;
+  lastErrorAt: number | null;
+}
+
+/** Waiting for a round admin (api/services/round-admin-queue.ts): an approved initiative
+ * Qualified for the vote and not in the round. */
+export interface ReadyJson {
+  id: string;
+  slug: string;
+  title: string;
+  goalUsd: number;
+  raisedUsd: number;
+  safeAddress: string;
+  type: "rfp" | "grant";
+  affiliations: string[];
+  /** Its open pledges, signed once it is on the ballot. */
+  pledges: { pid: string; company: string; amountUsd: number }[];
+  blocker: AddBlocker | null;
+  /** The round admin putting it on the ballot right now, since when (unix seconds). */
+  claim: { by: string; at: number } | null;
+}
+/** A pledge of an initiative in the round that waits for a round admin's signature. */
+export interface ToSignJson {
+  rfpId: string;
+  slug: string;
+  title: string;
+  pid: string;
+  company: string;
+  kind: "add" | "edit" | "remove" | "record";
+  /** What the pledge counts on-chain after the change (0 for a remove, a received or a
+   * withdrawn pledge). */
+  amountUsd: number;
+  /** What it counts on-chain now, per its row (an add: null); for a "record", the chain's
+   * (null: none there). */
+  fromUsd: number | null;
+  /** Its status after the change; null for a remove. */
+  status: "pledged" | "received" | "withdrawn" | null;
+  /** Who asked, and when (unix seconds): an awaiting request's; null otherwise. */
+  by: string | null;
+  at: number | null;
+  /** Why the request's last signed send failed, and when (unix seconds); null otherwise. */
+  lastError: string | null;
+  lastErrorAt: number | null;
+  /** A change already relayed and not settled yet. */
+  inFlight: { hash: `0x${string}` | null } | null;
+}
+/** GET /api/admin/vote-round/queue (and /vote-test-round/queue). */
+export interface RoundAdminQueueJson {
+  kind: "real" | "test";
+  ready: ReadyJson[];
+  toSign: ToSignJson[];
+}
+
 export interface AdminInitiativePage {
   initiative: AdminInitiative;
   revisions: RevisionMeta[];
@@ -487,6 +558,11 @@ export interface AdminInitiativePage {
   pledges: Pledge[];
   /** During the real vote: pledge changes sent on-chain whose transaction hasn't settled. */
   pendingPledges?: PendingPledge[];
+  /** During the real vote: pledge changes held until a round admin signs them. */
+  awaitingPledges: AwaitingPledgeJson[];
+  /** The real vote has closed: awaiting pledges can't be signed any more, only saved as
+   * they are or discarded. */
+  awaitingClosed?: boolean;
   donations: Donation[];
   safeSync: SafeSyncState | null;
   signers: { ok: boolean; detail: string; list: string[]; threshold: number };

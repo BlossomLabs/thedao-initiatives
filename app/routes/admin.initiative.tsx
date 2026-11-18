@@ -33,7 +33,12 @@ import { walletErrorMessage } from "~/lib/donate";
 import { dt } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
 import { withReauthentication } from "~/lib/reauthenticate";
-import { roundLoader } from "~/lib/vote-round";
+import { roundLoader, useRound } from "~/lib/vote-round";
+import TodoSection from "~/components/admin/dashboard/TodoSection";
+import PutOnBallotCard, { OnBallotChip } from "~/components/admin/vote/PutOnBallot";
+import { PledgesToSign } from "~/components/admin/vote/RoundAdminQueue";
+import { useBallotRuns, useRoundAdminQueue } from "~/components/admin/vote/round-admin-actions";
+import { onBallotSlugs, roundDeployed } from "../../shared/vote/manifest";
 
 /** The round the site runs now, before the page shows it. */
 export const clientLoader = roundLoader;
@@ -76,6 +81,15 @@ export default function ManageInitiative() {
   const [msg, setMsg] = useState<(NonNullable<Msg> & { at: string }) | null>(null);
   const { isConnected } = useWallet();
   const safe = useSafeDeploy(data?.initiative.id ?? "", refresh);
+  // Waiting for a round admin, this initiative's part: only while the real round is open.
+  const ROUND = useRound();
+  const realOpen = ROUND.kind === "real" && roundDeployed(ROUND) &&
+    Date.now() / 1000 < ROUND.closesAt;
+  const queue = useRoundAdminQueue(
+    "production",
+    Boolean(session?.isAdmin) && realOpen && data?.initiative.status === "approved",
+  );
+  const runs = useBallotRuns("production");
   const runAt = (at: string): Run => async (fn, ok) => {
     setMsg(null);
     try {
@@ -118,6 +132,14 @@ export default function ManageInitiative() {
   // Deploy first, approve second: the wallet prompt is the admin's sign-off on the Safe.
   const canApprove = Boolean(r.safeAddress) || isConnected;
   const tagged = r.categories.length > 0;
+  const onBallot = onBallotSlugs(ROUND).has(r.slug);
+  // The queue's entry is the source of truth for Qualified and its blockers; a Put on the
+  // ballot under way keeps its card until the page leaves.
+  const ballotRun = runs.find((x) => x.ready.id === r.id);
+  const ready = queue.data?.ready.find((x) => x.id === r.id && x.blocker?.kind !== "already");
+  const ballotCard = ballotRun?.ready ??
+    (r.status === "approved" && !onBallot && realOpen ? ready : undefined);
+  const toSign = onBallot ? queue.data?.toSign.filter((x) => x.rfpId === r.id) ?? [] : [];
   const run = runAt("status");
   const approve = (action: "approve" | "unarchive", ok: string) =>
     run(async () => {
@@ -138,6 +160,7 @@ export default function ManageInitiative() {
       </h1>
       <p className="m-0 flex flex-wrap items-center gap-3">
         <TypeBadge type={r.type} inline />
+        {onBallot && <OnBallotChip />}
         {/* The status has its own panel below; the categories sit together. */}
         {r.categories.length > 0 && (
           <span className="flex flex-wrap items-center gap-1.5" data-categories="">
@@ -181,6 +204,16 @@ export default function ManageInitiative() {
           <SectionHeading count={data.pledges.length}>Backer pledges</SectionHeading>
           <Pledges page={data} base={base} run={runAt("pledges")} />
           {said("pledges")}
+          {toSign.length > 0 && (
+            <TodoSection
+              title="Pledges to sign"
+              count={toSign.length}
+              empty=""
+              className="mt-3.5"
+            >
+              <PledgesToSign items={toSign} asOf={queue.dataUpdatedAt} oneInitiative />
+            </TodoSection>
+          )}
 
           <SectionHeading count={data.donations.length}>Donations</SectionHeading>
           <Donations page={data} base={base} run={runAt("donations")} />
@@ -264,6 +297,8 @@ export default function ManageInitiative() {
             )}
             {said("status")}
           </div>
+
+          {ballotCard && <PutOnBallotCard ready={ballotCard} />}
 
           <CategoriesPanel r={r} run={runAt("categories")} />
           {said("categories")}

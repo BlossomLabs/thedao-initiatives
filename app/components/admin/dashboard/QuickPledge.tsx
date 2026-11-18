@@ -47,6 +47,7 @@ export default function QuickPledge({ index }: { index: AdminTodo["index"] }) {
       {picked && search === picked.title && (
         <PledgeForm
           key={picked.id}
+          slug={picked.slug}
           base={`/api/admin/initiatives/${picked.id}`}
           run={(fn, ok) => run(fn, typeof ok === "string" ? `${ok} (${picked.title})` : ok)}
           editing={null}

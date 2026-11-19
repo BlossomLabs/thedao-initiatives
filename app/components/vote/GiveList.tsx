@@ -675,9 +675,9 @@ export default function GiveList(
                         )}
                       {isOpen && (
                         // Pledging instead (#128): the pledge form, on this initiative and
-                        // with the amount above. Quiet, on the right, with why one would.
-                        <p className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[12.5px] text-white/60">
-                          <span>Pay only once it's fully funded?</span>
+                        // with the amount above. One centred link under the button, saying
+                        // why one would (#136).
+                        <p className="m-0 text-center text-[12.5px]">
                           <button
                             type="button"
                             aria-haspopup="dialog"
@@ -685,7 +685,7 @@ export default function GiveList(
                               openPledgeRequest(i.id, amount && amount > 0 ? amount : undefined)}
                             className="cursor-pointer text-dao-green/90 underline decoration-dao-green/40 underline-offset-[3px] hover:text-dao-green hover:decoration-dao-green"
                           >
-                            Pledge instead
+                            Pledge instead to pay only once it's fully funded
                           </button>
                         </p>
                       )}

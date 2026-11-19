@@ -4,7 +4,7 @@ import { useWallet } from "~/context/wallet";
 import { useSession } from "~/context/session";
 import Identity from "~/components/wallet/Identity";
 import { Avatar } from "~/components/wallet/Avatar";
-import { QaChip, RoleTags } from "~/components/ui/Badge";
+import { QaChip, RoleTags, YouTag } from "~/components/ui/Badge";
 import Reveal from "~/components/ui/Reveal";
 import { SMALL_BUTTON } from "~/components/ui/Button";
 import WalletMenu from "~/components/wallet/WalletMenu";
@@ -21,7 +21,8 @@ import { FormNote, type Note, SENT_MS, SubmitButton } from "./FormFeedback";
 import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
 import { inputMax, tooLong } from "@shared/draft/caps";
 
-export function IdentityRow({ c }: { c: CommentEntry }) {
+/** `me`: the signed-in address, lower case; its own entries get the "You" chip. */
+export function IdentityRow({ c, me }: { c: CommentEntry; me?: string }) {
   const label = c.roles.includes("ADMIN") ? "TheDAO team" : c.displayName || "Anonymous";
   return (
     <span className="flex flex-wrap items-center gap-2.5">
@@ -33,6 +34,7 @@ export function IdentityRow({ c }: { c: CommentEntry }) {
             <span className="font-inter-tight text-[14.5px] font-normal text-muted">{label}</span>
           </span>
         )}
+      {me && c.address?.toLowerCase() === me && <YouTag />}
       <RoleTags roles={c.roles} />
       {/* When it was posted, as on reviews. */}
       <span className="small dim">{ago(c.createdAt)}</span>
@@ -84,7 +86,8 @@ export default function EntryCard({
   const [name, setName] = useState("");
   const [featureMenu, setFeatureMenu] = useState(false);
   const { address } = useWallet();
-  const { connecting } = useSession();
+  const { connecting, session } = useSession();
+  const myAddress = session?.address.toLowerCase();
   const me = useIdentity(replying ? address : undefined);
   // The wallet is briefly connected before the sign-in signature; keep the
   // connect button mounted until then so it can still show a refusal.
@@ -165,7 +168,7 @@ export default function EntryCard({
             </div>
           )}
           <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-            <IdentityRow c={c} />
+            <IdentityRow c={c} me={myAddress} />
             {c.type === "question" && c.answered && <QaChip tone="ok">answered ✓</QaChip>}
             {c.type === "suggestion" && c.reviewed && <QaChip>reviewed</QaChip>}
           </div>
@@ -176,7 +179,7 @@ export default function EntryCard({
               className="ml-[18px] mt-3.5 rounded-xl border border-white/10 border-l-2 border-l-[rgba(255,180,50,.28)] bg-panel-reply px-4 py-3.5"
             >
               <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-                <IdentityRow c={r} />
+                <IdentityRow c={r} me={myAddress} />
               </div>
               <Body text={r.body} className="mb-2.5 text-[14.5px]" />
             </div>

@@ -35,6 +35,16 @@ const ROLE_TAGS: Record<string, [string, string]> = {
   DONOR: ["Donor", "text-[#c4a6ff] border-[rgba(160,108,255,.4)] bg-[rgba(160,108,255,.14)]"],
 };
 
+/** "You" beside the signed-in account's own comment or review: private voting badgeholders
+ * all share one avatar, so the picture alone can't tell. Filled, unlike the role chips. */
+export function YouTag() {
+  return (
+    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-white bg-white px-2.5 py-1 font-inter-tight text-[10.5px] font-bold uppercase tracking-[.06em] text-[#10202f]">
+      You
+    </span>
+  );
+}
+
 /** Role chips, priority order, at most two shown, after the Badge holder chip
  * (EXPERT), which is always shown. */
 export function RoleTags({ roles }: { roles: string[] }) {

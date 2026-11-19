@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import Identity from "~/components/wallet/Identity";
-import { QaChip } from "~/components/ui/Badge";
+import { QaChip, YouTag } from "~/components/ui/Badge";
 import type { AdminReview } from "~/hooks/use-admin-ratings";
 import { errorMessage } from "~/lib/api";
 import { ago } from "~/lib/format";
@@ -11,7 +11,14 @@ import { REVIEW_LABEL } from "~/lib/reviewer";
 
 /** Public badge-backed review. Superseded reviews remain visible but no longer count. */
 export default function ReviewCard(
-  { r, mine, onDelete }: { r: AdminReview; mine: boolean; onDelete: () => Promise<void> },
+  { r, mine, yours, onDelete }: {
+    r: AdminReview;
+    /** Deletable: by the signed-in account, from a badge it still holds. */
+    mine: boolean;
+    /** Written by the signed-in account: the "You" chip. */
+    yours?: boolean;
+    onDelete: () => Promise<void>;
+  },
 ) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +32,7 @@ export default function ReviewCard(
     >
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
         <Identity address={r.address} size={24} />
+        {yours && <YouTag />}
         <QaChip>{REVIEW_LABEL} #{r.tokenId}</QaChip>
         <StarRow value={r.stars} />
         <span className="small dim">{ago(r.createdAt)}</span>

@@ -1,8 +1,12 @@
 import { render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { IdentityRow } from "./EntryCard";
 import type { CommentEntry } from "~/lib/api-types";
 import { dt } from "~/lib/format";
+
+vi.mock("~/components/wallet/Identity", () => ({
+  default: ({ address }: { address: string }) => <span>{address}</span>,
+}));
 
 const entry = (roles: string[]): CommentEntry => ({
   id: "c1",
@@ -46,4 +50,23 @@ it("shows when the comment was posted, the way reviews do", () => {
   unmount();
   render(<IdentityRow c={{ ...entry([]), createdAt: 1_760_000_000 }} />);
   expect(screen.getByText(dt(1_760_000_000))).toBeInTheDocument();
+});
+
+it("the signed-in account's own comment gets a You chip, whatever the case of the address", () => {
+  const mine = { ...entry([]), address: "0xAbC0000000000000000000000000000000000001" };
+  const { unmount } = render(
+    <IdentityRow c={mine} me="0xabc0000000000000000000000000000000000001" />,
+  );
+  expect(screen.getByText("You")).toBeInTheDocument();
+  unmount();
+  render(<IdentityRow c={mine} me="0xdef0000000000000000000000000000000000002" />);
+  expect(screen.queryByText("You")).toBeNull();
+});
+
+it("no You chip when signed out, nor on a comment without an address", () => {
+  const { unmount } = render(<IdentityRow c={{ ...entry([]), address: "0x1" }} />);
+  expect(screen.queryByText("You")).toBeNull();
+  unmount();
+  render(<IdentityRow c={entry([])} me="" />);
+  expect(screen.queryByText("You")).toBeNull();
 });

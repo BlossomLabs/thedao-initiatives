@@ -225,6 +225,7 @@ export default function CommentsSection({ initiativeId, slug, open }: {
               r={i.r}
               mine={i.r.address.toLowerCase() === me &&
                 Boolean(reviews.tokenIds?.includes(i.r.tokenId))}
+              yours={i.r.address.toLowerCase() === me}
               onDelete={() => reviews.remove(i.r.id)}
             />
           )

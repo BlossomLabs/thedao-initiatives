@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertFalse, assertRejects } from "@std/assert";
 import { createDb } from "../db/mod.ts";
-import { ADMIN_SESSION_IDLE_SECS } from "../config.ts";
+import { ADMIN_SESSION_IDLE_SECS, AI_DAILY_CALL_CAP } from "../config.ts";
 import type { Verification } from "../chain/verify.ts";
 
 let clock = 1_800_000_000;
@@ -350,7 +350,7 @@ Deno.test("rate limit windows, locks, ai budget", async () => {
   assertFalse(await db.meta.lock("l", 30));
   await db.meta.unlock("l");
   assert(await db.meta.lock("l", 30));
-  for (let i = 0; i < 500; i++) assert(await db.meta.aiBudgetOk());
+  for (let i = 0; i < AI_DAILY_CALL_CAP; i++) assert(await db.meta.aiBudgetOk());
   assertFalse(await db.meta.aiBudgetOk());
   kv.close();
 });

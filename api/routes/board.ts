@@ -16,6 +16,7 @@ import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.t
 import { ballotClosed, DEFAULT_VOTE, type VoteSettings, voteState } from "../../shared/vote.ts";
 import { buildBriefs } from "../services/vote-briefs.ts";
 import type { VoteBrief } from "../../shared/vote/brief.ts";
+import { shownLogoCid } from "../../shared/pledge-logo.ts";
 
 /** The vote-eligibility settings, the defaults until an admin saves them. */
 export const voteSettings = async (deps: Pick<Deps, "db">): Promise<VoteSettings> => ({
@@ -89,7 +90,7 @@ export function topSponsors(
       const lead = [...s.pledges].sort((a, b) => b.amountUsd - a.amountUsd)[0];
       return {
         company: lead.company.trim(),
-        logoUrl: ipfsUrl(config, s.pledges.find((p) => p.logoCid)?.logoCid ?? ""),
+        logoUrl: ipfsUrl(config, s.pledges.map(shownLogoCid).find(Boolean) ?? ""),
         url: s.pledges.find((p) => p.url)?.url ?? "",
         totalUsd: s.total,
       };
@@ -135,7 +136,7 @@ export async function buildCard(
     ),
     ledgerStatus(deps, r, safeApiPausedUntil),
   ]);
-  const withLogo = s.pledges.filter((p) => p.logoCid);
+  const withLogo = s.pledges.filter((p) => shownLogoCid(p));
   return {
     initiative: cardInitiative(r),
     summary,
@@ -145,7 +146,11 @@ export async function buildCard(
     donations: s.donations,
     ledger,
     logos: (withLogo.length ? withLogo : s.pledges).slice(0, 4)
-      .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid), url: p.url })),
+      .map((p) => ({
+        company: p.company,
+        logoUrl: ipfsUrl(deps.config, shownLogoCid(p)),
+        url: p.url,
+      })),
     funded: Boolean(r.goalUsd && summary.total >= r.goalUsd),
     donationsEnabled: Boolean(tokensOk && r.safeAddress && r.status === "approved"),
   };

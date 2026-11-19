@@ -9,6 +9,7 @@ import { isStructured } from "../../shared/draft/mod.ts";
 import { type CardRow, pickText } from "../db/initiatives.ts";
 import { categoriesOf } from "../../shared/categories.ts";
 import { donationDetail } from "./donation-detail.ts";
+import { shownLogoCid } from "../../shared/pledge-logo.ts";
 
 export function ipfsUrl(config: Config, cid: string): string {
   return cid ? `https://${config.pinataGateway}/ipfs/${cid}` : "";
@@ -132,6 +133,7 @@ export function adminInitiative(r: Initiative, privateFields: boolean) {
  * private fields they wrote themselves. */
 export const proposerInitiative = (r: Initiative) => adminInitiative(r, true);
 
+/** The public pledge: the logo only from PLEDGE_LOGO_MIN_USD up (shownLogoCid). */
 export function pledgeJson(config: Config, p: Pledge) {
   return {
     id: p.id,
@@ -140,10 +142,16 @@ export function pledgeJson(config: Config, p: Pledge) {
     status: p.status,
     note: p.note,
     url: p.url,
-    logoUrl: ipfsUrl(config, p.logoCid),
+    logoUrl: ipfsUrl(config, shownLogoCid(p)),
     createdAt: p.createdAt,
   };
 }
+
+/** For the admins: the saved logo whatever the amount, so they can see and replace it. */
+export const adminPledgeJson = (config: Config, p: Pledge) => ({
+  ...pledgeJson(config, p),
+  logoUrl: ipfsUrl(config, p.logoCid),
+});
 
 /** Token quantity from the raw on-chain amount. */
 export function tokenQty(

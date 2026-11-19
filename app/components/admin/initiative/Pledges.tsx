@@ -435,7 +435,9 @@ export function PledgeForm(
           <img src={editing.logoUrl} alt="" className="h-6 rounded bg-white p-0.5" />
         )}
         {phase.kind === "idle" && !stacked && (
-          <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>
+          <span className="small dim">
+            PNG, JPG or WEBP; shown on the public page from $10,000.
+          </span>
         )}
       </div>
       {showBallotNote && (

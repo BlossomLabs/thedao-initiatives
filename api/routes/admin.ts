@@ -22,10 +22,10 @@ import {
   adminCardInitiative,
   adminCommentJson,
   adminInitiative,
+  adminPledgeJson,
   cardInitiative,
   donationJson,
   ipfsUrl,
-  pledgeJson,
   revisionMeta,
 } from "../lib/json.ts";
 import { capped, DOMAIN_RE, parseGoal, TX_HASH_RE, validateHttpsLink } from "../lib/validate.ts";
@@ -714,7 +714,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       change,
     });
     if (r.pending) return c.json(sent(r), 202);
-    return c.json({ ok: true, pledge: r.pledge && pledgeJson(config, r.pledge) });
+    return c.json({ ok: true, pledge: r.pledge && adminPledgeJson(config, r.pledge) });
   });
 
   /**
@@ -944,7 +944,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       ),
       revisions: (await db.revisions.list(initiative.id, true, true)).map(revisionMeta),
       summary: await deps.funding.summary(initiative, !(await deps.maintenance.on())),
-      pledges: pledgeRows.map((p) => pledgeJson(config, p)),
+      pledges: pledgeRows.map((p) => adminPledgeJson(config, p)),
       pendingPledges,
       awaitingPledges,
       awaitingClosed,
@@ -1412,10 +1412,10 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     if (chainAt && signed) {
       const r = await writeOnChain(c, chainAt, initiative.id, signed, { kind: "add", row });
       if (r.pending) return c.json(sent(r), 202);
-      return c.json({ pledge: pledgeJson(config, r.pledge!) }, 201);
+      return c.json({ pledge: adminPledgeJson(config, r.pledge!) }, 201);
     }
     const p = await db.pledges.add(initiative.id, row);
-    return c.json({ pledge: pledgeJson(config, p) }, 201);
+    return c.json({ pledge: adminPledgeJson(config, p) }, 201);
   });
 
   /** Edit a pledge: any of company, amount, url, note, logo (same body as adding), and status.
@@ -1448,7 +1448,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
           "This pledge changed just now: send it again.",
         );
       }
-      return c.json({ ok: true, pledge: pledgeJson(config, next) });
+      return c.json({ ok: true, pledge: adminPledgeJson(config, next) });
     }
     if (chainAt && awaiting) {
       return await holdPledge(c, chainAt, initiative.id, pid, {
@@ -1466,7 +1466,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       });
       if (r.pending) return c.json(sent(r), 202);
       if (!r.pledge) throw new HttpError(404, "not found");
-      return c.json({ ok: true, pledge: pledgeJson(config, r.pledge) });
+      return c.json({ ok: true, pledge: adminPledgeJson(config, r.pledge) });
     }
     await pledges.settleLeftover(initiative.id, pid);
     let next = await db.pledges.get(initiative.id, pid);
@@ -1476,7 +1476,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       await db.pledges.setStatus(initiative.id, pid, status as PledgeStatus);
       next = await db.pledges.get(initiative.id, pid);
     }
-    return c.json({ ok: true, pledge: pledgeJson(config, next!) });
+    return c.json({ ok: true, pledge: adminPledgeJson(config, next!) });
   });
 
   r.delete("/initiatives/:id/pledges/:pid", async (c) => {
@@ -1530,7 +1530,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       throw new HttpError(409, "The vote is still open: a round admin signs it.");
     }
     const p = await pledges.saveHeld(d, initiative.id, pid);
-    return c.json({ ok: true, pledge: p && pledgeJson(config, p) });
+    return c.json({ ok: true, pledge: p && adminPledgeJson(config, p) });
   });
 
   /**
@@ -1548,7 +1548,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       throw new HttpError(400, "malformed tx hash");
     }
     const r = await pledges.settleSent(initiative.id, pid, hash as Hex | null);
-    return c.json({ state: r.state, pledge: r.pledge && pledgeJson(config, r.pledge) });
+    return c.json({ state: r.state, pledge: r.pledge && adminPledgeJson(config, r.pledge) });
   });
 
   /** An initiative's vote card bullets (#96) as stored, and whether they stand for its

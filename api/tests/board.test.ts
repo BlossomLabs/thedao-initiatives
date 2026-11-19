@@ -34,10 +34,12 @@ const pl = (company: string, amountUsd: number, extra: Partial<Pledge> = {}) =>
 
 Deno.test("sponsors: one row per company across initiatives, biggest total first", () => {
   const s = topSponsors(cfg, [
-    { pledges: [pl("EF", 10000), pl("Acme", 6000)] },
-    { pledges: [pl(" ef ", 5000, { logoCid: "cid1", url: "https://ef" }), pl("Acme", 6000)] },
+    { pledges: [pl("EF", 10000, { logoCid: "cid1" }), pl("Acme", 6000, { logoCid: "small" })] },
+    { pledges: [pl(" ef ", 5000, { url: "https://ef" }), pl("Acme", 6000)] },
   ]);
   assertEquals(s.map((x) => [x.company, x.totalUsd]), [["EF", 15000], ["Acme", 12000]]);
+  // A logo shows only on a pledge of $10,000 or more: Acme's $6,000 one stays a silhouette.
+  assertEquals(s[1].logoUrl, "");
   assertEquals(s[0].logoUrl, "https://gw.example/ipfs/cid1");
   assertEquals(s[0].url, "https://ef");
 });

@@ -745,7 +745,23 @@ Deno.test("admin: settings, status, pledges with logo, safe deploy params + conf
       body: form,
     }),
   ) as { pledge: { id: string; logoUrl: string } };
+  // The admins see the saved logo whatever the amount.
   assertStringIncludes(p2.pledge.logoUrl, "/ipfs/bafylogo");
+  // Under $10,000 the logo stays saved, but the public sees a silhouette.
+  const small = ((await j(await h.req("/api/board"))).cards as { logos: unknown[] }[])[0];
+  assertEquals(small.logos, [
+    { company: "Acme", logoUrl: "", url: "https://acme.example/" },
+    { company: "Logo Co", logoUrl: "", url: "https://logo.example/" },
+  ]);
+  const page = await j(await h.req("/api/initiatives/" + sub.slug)) as {
+    pledges: { company: string; logoUrl: string }[];
+  };
+  assertEquals(page.pledges.find((p) => p.company === "Logo Co")?.logoUrl, "");
+  await h.req("/api/admin/initiatives/" + id + "/pledges/" + p2.pledge.id, {
+    method: "PATCH",
+    token: admin,
+    json: { amount: "10000" },
+  });
   const card = ((await j(await h.req("/api/board"))).cards as {
     logos: unknown[];
     backers: number;

@@ -10,7 +10,7 @@ import { DOMAIN_RE, NICK_RE, PRESET_RE } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
 import { pfpUrl } from "../lib/json.ts";
 import { badgeHolders } from "../services/roles.ts";
-import { assertAvatarEditable, displayProfile } from "../services/profile.ts";
+import { assertAvatarEditable, assertNameEditable, displayProfile } from "../services/profile.ts";
 
 export const PFP_MAX_BYTES = 512 * 1024;
 
@@ -73,6 +73,7 @@ export function profileRoutes(deps: Deps) {
     if (!(await db.rateLimit("nick:" + addr.toLowerCase(), 10, 60))) {
       throw new HttpError(429, "Too many tries, slow down a moment.");
     }
+    await assertNameEditable(deps, addr);
     // Anything ending in .eth must be this wallet's ENS name, spaces or not.
     await assertEthNameOwned(ens, raw, addr);
     if (DOMAIN_RE.test(raw.toLowerCase())) {

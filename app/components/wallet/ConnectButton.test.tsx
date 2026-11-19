@@ -45,8 +45,9 @@ vi.mock("~/context/profile-dialog", () => ({
 vi.mock("~/context/wallet-picker", () => ({
   useWalletPicker: () => ({ openWalletPicker: vi.fn(), walletPickerOpen: false }),
 }));
+const who = vi.hoisted(() => ({ avatarFromBadge: false }));
 vi.mock("~/hooks/use-identity", () => ({
-  useIdentity: () => ({ name: "me", avatar: null, hasName: false }),
+  useIdentity: () => ({ name: "me", avatar: null, hasName: false, ...who }),
 }));
 vi.mock("~/lib/api", async (original) => ({
   ...await original<typeof import("~/lib/api")>(),
@@ -71,6 +72,7 @@ beforeEach(() => {
   vi.mocked(api).mockReset();
   navigate.mockReset();
   me.isBadgeHolder = false;
+  who.avatarFromBadge = false;
 });
 afterEach(cleanup);
 
@@ -87,6 +89,17 @@ it("an account without a badge in the round gets no Vote", async () => {
   await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalledWith("/api/vote/mine"));
   expect(await screen.findByText("My initiatives")).toBeInTheDocument();
   expect(screen.queryByText("Vote")).toBeNull();
+});
+
+it("a voter can't change their name or picture: no menu item for it (#140)", async () => {
+  vi.mocked(api).mockResolvedValue({ ids: [] });
+  show();
+  expect(await screen.findByText("Set a display name")).toBeInTheDocument();
+  cleanup();
+  who.avatarFromBadge = true;
+  show();
+  expect(await screen.findByText("Manage sessions")).toBeInTheDocument();
+  expect(screen.queryByText("Set a display name")).toBeNull();
 });
 
 it("with no round deployed: no Vote, and nobody asks", async () => {

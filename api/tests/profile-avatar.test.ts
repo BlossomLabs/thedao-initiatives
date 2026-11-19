@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import {
   PRIVATE_BADGE_AVATAR,
   PRIVATE_BADGE_AVATAR_RULE,
+  PRIVATE_BADGE_NAME_RULE,
   PRIVATE_BADGE_PFP,
 } from "../../shared/profile.ts";
 import { createBadgeChecker } from "../chain/badge.ts";
@@ -14,7 +15,7 @@ function picture() {
   return form;
 }
 
-Deno.test("private voting badge avatars override old pictures in public profiles and signed-in accounts", async () => {
+Deno.test("private voting badge avatars override old pictures, and neither the avatar nor the name can be changed", async () => {
   const h = await harness({ env: { PINATA_JWT: "test" } });
   try {
     h.script.votingBadgeHolders.add(PLAIN.toLowerCase());
@@ -52,8 +53,10 @@ Deno.test("private voting badge avatars override old pictures in public profiles
       token,
       json: { nickname: "New name" },
     });
-    assertEquals(rename.status, 200);
-    assertEquals((await j(await h.req("/api/nickname/" + PLAIN))).pfp, PRIVATE_BADGE_PFP);
+    // Nor the name they were given (#140).
+    assertEquals(rename.status, 403);
+    assertEquals((await j(rename)).error, PRIVATE_BADGE_NAME_RULE);
+    assertEquals((await j(await h.req("/api/nickname/" + PLAIN))).nickname, "Voter");
   } finally {
     h.close();
   }

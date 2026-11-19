@@ -90,13 +90,15 @@ export default function ConnectButton() {
     if (!promptPending || identity.loading) return;
     if (!session || !address || session.address.toLowerCase() !== address.toLowerCase()) return;
     setPromptPending(false);
-    if (identity.hasName && identity.hasAvatar) return;
+    // Voters' name and picture are set for them (#140): nothing to complete.
+    if (identity.avatarFromBadge || (identity.hasName && identity.hasAvatar)) return;
     openProfile(true);
   }, [
     promptPending,
     identity.loading,
     identity.hasName,
     identity.hasAvatar,
+    identity.avatarFromBadge,
     session,
     address,
     openProfile,
@@ -158,16 +160,17 @@ export default function ConnectButton() {
         onClick: () => void navigate(`${voteBase}/ballot`),
       }]
       : []),
-    {
+    // Voters can't change their name or picture (#140): no item for them.
+    ...(identity.avatarFromBadge ? [] : [{
       key: "name",
       label: identity.nameFromEns && identity.avatarLocked
         ? "Your name and picture"
         : identity.hasName
         ? (identity.avatarLocked ? "Change display name" : "Change name or picture")
         : "Set a display name",
-      lucide: "edit",
+      lucide: "edit" as const,
       onClick: () => openProfile(false),
-    },
+    }]),
     {
       key: "sessions",
       label: "Manage sessions",

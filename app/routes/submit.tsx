@@ -48,7 +48,8 @@ function useSubmitter() {
   const signedIn = Boolean(
     session && address && session.address.toLowerCase() === address.toLowerCase(),
   );
-  const complete = identity.hasName && identity.hasAvatar;
+  // A voter's name and picture are set for them (#140): nothing to complete.
+  const complete = identity.avatarFromBadge || (identity.hasName && identity.hasAvatar);
   return {
     isConnected,
     address,

@@ -1,6 +1,7 @@
 import {
   PRIVATE_BADGE_AVATAR,
   PRIVATE_BADGE_AVATAR_RULE,
+  PRIVATE_BADGE_NAME_RULE,
   PRIVATE_BADGE_PFP,
 } from "../../shared/profile.ts";
 import { HttpError } from "../lib/errors.ts";
@@ -32,5 +33,12 @@ export async function displayProfile(deps: Deps, address: string) {
 export async function assertAvatarEditable(deps: Deps, address: string) {
   if (await hasPrivateBadge(deps, address, true)) {
     throw new HttpError(403, PRIVATE_BADGE_AVATAR_RULE);
+  }
+}
+
+/** The same fresh check before a display name is changed: voters keep theirs (#140). */
+export async function assertNameEditable(deps: Deps, address: string) {
+  if (await hasPrivateBadge(deps, address, true)) {
+    throw new HttpError(403, PRIVATE_BADGE_NAME_RULE);
   }
 }

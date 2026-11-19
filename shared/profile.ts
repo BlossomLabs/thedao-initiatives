@@ -8,3 +8,6 @@ export const PRIVATE_BADGE_PFP = "private-badge";
 export const PRIVATE_BADGE_AVATAR = "/avatars/daotoshi-avatar-flat-cartoon.webp";
 export const PRIVATE_BADGE_AVATAR_RULE =
   "Private voting badgeholders use this shared avatar. It cannot be changed.";
+/** Voters' names are set for them too (#140). */
+export const PRIVATE_BADGE_NAME_RULE =
+  "Private voting badgeholders keep the name they were given. It cannot be changed.";

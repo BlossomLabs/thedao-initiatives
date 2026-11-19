@@ -78,6 +78,7 @@ import {
   PLEDGE_REVERTS,
   type PledgeChange,
   pledgeFail,
+  type PledgePatch,
   SIGNED_FIELDS,
   signedPledgeOf,
 } from "../services/admin-pledges.ts";
@@ -1193,6 +1194,9 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     /** In "signed" mode, whether the admin's wallet may sign the pledge: when it may not
      * and no signature was sent, the change is held as an awaiting request instead. */
     canSign?: () => Promise<boolean>,
+    /** In "signed" mode, whether this change needs no signature (an edit of a pledge's
+     * name, link, note or logo): sent unsigned, it is then saved as is (`unsigned`). */
+    needsNoSignature?: (patch: PledgePatch, status: string | undefined) => Promise<boolean>,
   ) {
     const ct = c.req.header("content-type") ?? "";
     let fields: Record<string, unknown> = {};
@@ -1232,10 +1236,15 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     if (fields.note !== undefined) {
       patch.note = capped(fields.note, PLEDGE_NOTE_CHARS, "The note");
     }
+    const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
     let signed: ReturnType<typeof signedPledgeOf> | null = null;
     let awaiting = false;
+    let unsigned = false;
     if (mode === "signed") {
-      if (canSign && !hasSignature(fields) && !(await canSign())) awaiting = true;
+      if (
+        needsNoSignature && !hasSignature(fields) && (await needsNoSignature(patch, status))
+      ) unsigned = true;
+      else if (canSign && !hasSignature(fields) && !(await canSign())) awaiting = true;
       else signed = signedPledgeOf(fields);
     }
     // Validate fields before uploading anything to the external provider.
@@ -1250,8 +1259,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       logoCid = cid;
     }
     if (logoCid !== undefined) patch.logoCid = logoCid;
-    const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
-    return { patch, status, signed, awaiting, fields };
+    return { patch, status, signed, awaiting, unsigned, fields };
   }
 
   /** Any of a pledge signature's own fields sent (the pid alone isn't one). */
@@ -1410,19 +1418,37 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     return c.json({ pledge: pledgeJson(config, p) }, 201);
   });
 
-  /** Edit a pledge: any of company, amount, url, note, logo (same body as adding), and status. */
+  /** Edit a pledge: any of company, amount, url, note, logo (same body as adding), and status.
+   * During the vote an edit that keeps the amount and status goes unsigned (`saveWords`). */
   r.patch("/initiatives/:id/pledges/:pid", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
     const pid = c.req.param("pid");
     const chainAt = await pledges.onChainFor(initiative);
-    const { patch, status, signed, awaiting } = await readPledge(
+    const { patch, status, signed, awaiting, unsigned } = await readPledge(
       c,
       initiative,
       chainAt ? "signed" : "plain",
       chainAt ? canSignPledges(c, chainAt) : undefined,
+      // Its name, link, note or logo change nothing on-chain: any site admin saves them.
+      chainAt
+        ? async (patch, status) =>
+          (await pledges.wordsOnly(chainAt.d, initiative.id, pid, patch, status)) !== null
+        : undefined,
     );
     if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
       throw new HttpError(400, "bad status");
+    }
+    if (chainAt && unsigned) {
+      const next = await pledges.saveWords(chainAt.d, initiative.id, pid, patch, status);
+      // Its amount or status changed since the check: the form sends it again.
+      if (!next) {
+        throw pledgeFail(
+          409,
+          "pledge_request_changed",
+          "This pledge changed just now: send it again.",
+        );
+      }
+      return c.json({ ok: true, pledge: pledgeJson(config, next) });
     }
     if (chainAt && awaiting) {
       return await holdPledge(c, chainAt, initiative.id, pid, {

@@ -577,6 +577,53 @@ export function adminPledges(deps: Deps) {
     return { pending: true, hash, pid };
   }
 
+  /** The pledge's row, when this edit leaves its amount and status as they are (after the
+   * change in flight settles: 409 while it hasn't); null otherwise, or when it isn't saved. */
+  async function wordsOnly(
+    d: VoteRound,
+    rfpId: string,
+    pid: string,
+    patch: PledgePatch,
+    status: string | undefined,
+  ): Promise<Pledge | null> {
+    await settle(d, rfpId, pid);
+    const cur = await db.pledges.get(rfpId, pid);
+    if (!cur) return null;
+    if (patch.amountUsd !== undefined && patch.amountUsd !== cur.amountUsd) return null;
+    if (status !== undefined && status !== cur.status) return null;
+    return cur;
+  }
+
+  /**
+   * During the vote, an edit that leaves the pledge's amount and status as they are (its
+   * name, link, note or logo) changes nothing on-chain: any site admin saves it straight to
+   * the row, unsigned. The change in flight settles first (409 while it hasn't); an
+   * awaiting edit takes the new fields too, so signing it later doesn't put the old ones
+   * back. Null when this edit would change what the pledge counts, or the pledge isn't
+   * saved: it goes the signed way.
+   */
+  async function saveWords(
+    d: VoteRound,
+    rfpId: string,
+    pid: string,
+    patch: PledgePatch,
+    status: string | undefined,
+  ): Promise<Pledge | null> {
+    const cur = await wordsOnly(d, rfpId, pid, patch, status);
+    if (!cur) return null;
+    const { amountUsd: _, ...words } = patch;
+    if (!Object.keys(words).length) return cur;
+    const next = await db.pledges.update(rfpId, pid, words);
+    const rKey = requestKey(d, rfpId, pid);
+    for (let tries = 0; tries < 3; tries++) {
+      const req = await kv.get<PledgeRequest>(rKey);
+      if (req.value?.change.kind !== "edit") break;
+      const change = { ...req.value.change, patch: { ...req.value.change.patch, ...words } };
+      if ((await kv.atomic().check(req).set(rKey, { ...req.value, change }).commit()).ok) break;
+    }
+    return next;
+  }
+
   /** Settle a change left in flight from the vote (the round may have closed since), before
    * a write that doesn't go on-chain. */
   async function settleLeftover(rfpId: string, pid: string) {
@@ -647,10 +694,12 @@ export function adminPledges(deps: Deps) {
     inFlight,
     onChainFor,
     saveHeld,
+    saveWords,
     settle,
     settleAll,
     settleLeftover,
     settleSent,
+    wordsOnly,
     write,
   };
 }

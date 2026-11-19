@@ -1234,3 +1234,74 @@ Deno.test("admin pledges: production's fractional clock still prepares and relay
   assertEquals(res.status, 202, await res.clone().text());
   s.h.close();
 });
+
+Deno.test("admin pledges: a site admin without the pledge role saves a pledge's name, link and note at once", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  // The form sends the amount and status too: unchanged, they need no signature.
+  const res = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: {
+      company: "New name",
+      amount: "100",
+      status: "pledged",
+      url: "https://new.example/",
+      note: "hi",
+    },
+  });
+  assertEquals(res.status, 200, await res.clone().text());
+  const row = await s.h.db.pledges.get(s.r.id, p.id);
+  assertEquals([row?.company, row?.url, row?.note, row?.amountUsd], [
+    "New name",
+    "https://new.example/",
+    "hi",
+    100,
+  ]);
+  assertEquals(await awaiting(s), []);
+  assertEquals(s.state.sent, []);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a round admin isn't asked to sign a pledge's new name", async () => {
+  const s = await setup();
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const res = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token: s.token,
+    json: { company: "Renamed", amount: "100" },
+  });
+  assertEquals(res.status, 200, await res.clone().text());
+  assertEquals((await s.h.db.pledges.get(s.r.id, p.id))?.company, "Renamed");
+  assertEquals(s.state.sent, []);
+  // The amount still goes on-chain: signed first.
+  const money = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token: s.token,
+    json: { company: "Renamed", amount: "150" },
+  });
+  assertEquals(money.status, 428);
+  s.h.close();
+});
+
+Deno.test("admin pledges: a new name joins the awaiting change, so signing it keeps the name", async () => {
+  const s = await setup();
+  const token = await otherAdmin(s);
+  const p = await s.h.db.pledges.add(s.r.id, OLD_ROW);
+  const held = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { company: "Old", amount: "250" },
+  });
+  assertEquals(held.status, 202);
+  const words = await s.h.req(`${s.base}/pledges/${p.id}`, {
+    method: "PATCH",
+    token,
+    json: { company: "Newer", amount: "100" },
+  });
+  assertEquals(words.status, 200, await words.clone().text());
+  assertEquals((await s.h.db.pledges.get(s.r.id, p.id))?.company, "Newer");
+  assertEquals((await awaiting(s)).map((a) => [a.company, a.amountUsd]), [["Newer", 250]]);
+  s.h.close();
+});

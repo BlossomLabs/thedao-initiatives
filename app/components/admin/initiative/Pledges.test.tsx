@@ -450,7 +450,8 @@ it("a pledge_request_changed answer shows its message and keeps the form", async
   expect(screen.getByPlaceholderText("Company *")).toHaveValue("Acme");
 });
 
-const NOTE = "It's on the ballot: a pledge counts in the vote once a round admin signs it.";
+const NOTE =
+  "It's on the ballot: a new pledge, an amount or a status counts in the vote once a round admin signs it. A name, link, note or logo saves right away.";
 const onBallot = () =>
   primeRound({
     ...NO_ROUND,

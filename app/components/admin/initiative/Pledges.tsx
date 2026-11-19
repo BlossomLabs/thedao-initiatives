@@ -440,7 +440,8 @@ export function PledgeForm(
       </div>
       {showBallotNote && (
         <p className="small dim m-0 mt-2.5">
-          It's on the ballot: a pledge counts in the vote once a round admin signs it.
+          It's on the ballot: a new pledge, an amount or a status counts in the vote once a round
+          admin signs it. A name, link, note or logo saves right away.
         </p>
       )}
       <div className="mt-2.5 empty:hidden">

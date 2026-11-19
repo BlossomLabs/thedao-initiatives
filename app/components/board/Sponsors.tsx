@@ -269,7 +269,7 @@ function Entry({ s, fit }: { s: Sponsor; fit: Fit }) {
         >
           <span className="whitespace-nowrap">{dollars(s.totalUsd)}</span> {
             /* Stacked, the figure is the headline and "pledged by" its caption, read
-            down into the logo and the name; side by side, "$5,000 pledged". */
+            down into the logo and the name; side by side, "$10,000 pledged". */
           }
           <span className={cn("hidden", side && "min-[1100px]:inline")}>pledged</span>
           <span

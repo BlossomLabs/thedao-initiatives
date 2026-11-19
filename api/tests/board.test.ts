@@ -34,23 +34,23 @@ const pl = (company: string, amountUsd: number, extra: Partial<Pledge> = {}) =>
 
 Deno.test("sponsors: one row per company across initiatives, biggest total first", () => {
   const s = topSponsors(cfg, [
-    { pledges: [pl("EF", 10000), pl("Acme", 3000)] },
-    { pledges: [pl(" ef ", 5000, { logoCid: "cid1", url: "https://ef" }), pl("Acme", 4000)] },
+    { pledges: [pl("EF", 10000), pl("Acme", 6000)] },
+    { pledges: [pl(" ef ", 5000, { logoCid: "cid1", url: "https://ef" }), pl("Acme", 6000)] },
   ]);
-  assertEquals(s.map((x) => [x.company, x.totalUsd]), [["EF", 15000], ["Acme", 7000]]);
+  assertEquals(s.map((x) => [x.company, x.totalUsd]), [["EF", 15000], ["Acme", 12000]]);
   assertEquals(s[0].logoUrl, "https://gw.example/ipfs/cid1");
   assertEquals(s[0].url, "https://ef");
 });
 
 Deno.test("sponsors: withdrawn and empty pledges do not count, all the rest are listed", () => {
-  const pledges = ["A", "B", "C", "D", "E", "F", "G", "H", "I"].map((c, i) => pl(c, 6000 + i));
+  const pledges = ["A", "B", "C", "D", "E", "F", "G", "H", "I"].map((c, i) => pl(c, 11000 + i));
   pledges.push(pl("Z", 99999, { status: "withdrawn" }), pl("Y", 0), pl("  ", 50000));
   const s = topSponsors(cfg, [{ pledges }]);
   assertEquals(s.map((x) => x.company), ["I", "H", "G", "F", "E", "D", "C", "B", "A"]);
 });
 
 Deno.test("sponsors: the response stays bounded at 50", () => {
-  const pledges = Array.from({ length: 60 }, (_, i) => pl(`Co ${i}`, 6000 + i));
+  const pledges = Array.from({ length: 60 }, (_, i) => pl(`Co ${i}`, 11000 + i));
   const s = topSponsors(cfg, [{ pledges }]);
   assertEquals(s.length, 50);
   assertEquals(s[0].company, "Co 59");
@@ -58,15 +58,15 @@ Deno.test("sponsors: the response stays bounded at 50", () => {
 
 Deno.test("sponsors: the name shown is the biggest pledge's spelling", () => {
   const s = topSponsors(cfg, [{
-    pledges: [pl("acme", 1000), pl("ACME", 500), pl("Acme ", 4000)],
+    pledges: [pl("acme", 3000), pl("ACME", 500), pl("Acme ", 7000)],
   }]);
-  assertEquals(s.map((x) => [x.company, x.totalUsd]), [["Acme", 5500]]);
+  assertEquals(s.map((x) => [x.company, x.totalUsd]), [["Acme", 10500]]);
 });
 
-Deno.test("sponsors: a slot takes $5,000 pledged in total, across initiatives", () => {
+Deno.test("sponsors: a slot takes $10,000 pledged in total, across initiatives", () => {
   const s = topSponsors(cfg, [
-    { pledges: [pl("Small", 4999.99), pl("Split", 2500), pl("Exact", 5000)] },
-    { pledges: [pl("Split", 2500), pl("Gone", 9000, { status: "withdrawn" }), pl("Gone", 100)] },
+    { pledges: [pl("Small", 9999.99), pl("Split", 5000), pl("Exact", 10000)] },
+    { pledges: [pl("Split", 5000), pl("Gone", 19000, { status: "withdrawn" }), pl("Gone", 100)] },
   ]);
   assertEquals(s.map((x) => x.company), ["Exact", "Split"]);
 });

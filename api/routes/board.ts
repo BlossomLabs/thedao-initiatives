@@ -60,7 +60,7 @@ export interface Sponsor {
 }
 
 /** What a company has to pledge in total for a slot among the top sponsors. */
-export const SPONSOR_MIN_USD = 5000;
+export const SPONSOR_MIN_USD = 10000;
 
 /** The leaderboard of pledgers across the published initiatives: withdrawn pledges
  * do not count, and one company is one row whatever the casing or spacing of its

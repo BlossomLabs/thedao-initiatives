@@ -144,11 +144,11 @@ it("desktop: the Backers column shows the pledgers' logos, and +N for the backer
   expect(row.getAllByText("+3")).toHaveLength(2);
   expect(row.getByText("4 backers")).toHaveClass("sr-only");
   unmount();
-  // four logos fill the column: with more backers than that, three and the rest as +N
+  // all four pledgers show, and the backers beyond them as +N
   const second = mount({ cards: [withLogos(4, 6)] });
   row = within(screen.getByRole("listitem"));
-  expect(row.getAllByRole("img")).toHaveLength(3);
-  expect(row.getAllByText("+3")).toHaveLength(2);
+  expect(row.getAllByRole("img")).toHaveLength(4);
+  expect(row.getAllByText("+2")).toHaveLength(2);
   second.unmount();
   // the logos are all the backers: no +N
   mount({ cards: [withLogos(4, 4)] });
@@ -307,7 +307,7 @@ it("the vote results' list has no Funded column, and no figure looks like a link
   }
   // The rows drop the cell too: its grid has one column fewer than the board's.
   expect(
-    container.querySelector(".grid-cols-\\[2rem_4\\.25rem_minmax\\(0\\,1fr\\)_5\\.5rem_11rem\\]"),
+    container.querySelector(".grid-cols-\\[2rem_4\\.25rem_minmax\\(0\\,1fr\\)_7rem_11rem\\]"),
   )
     .not.toBeNull();
   expect(screen.queryByText(/needed/i)).toBeNull();

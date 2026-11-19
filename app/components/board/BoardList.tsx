@@ -43,18 +43,18 @@ type Watch = { has: (id: string) => boolean; toggle: (id: string) => void };
  * the window's.
  */
 const COLUMNS =
-  "grid grid-cols-[2rem_4.25rem_minmax(0,1fr)_4rem_5.5rem_11rem] gap-x-4 @max-[720px]/list:grid-cols-1";
+  "grid grid-cols-[2rem_4.25rem_minmax(0,1fr)_4rem_7rem_11rem] gap-x-4 @max-[720px]/list:grid-cols-1";
 /** With the admin ratings, once the list is 880px wide: a Rating column after the
  * title. Narrower, the column would squeeze the titles to a word a line, so
  * the star goes at the end of the title line instead (compact rows: after the amount). */
 const RATED_COLUMNS =
-  `${COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_6rem_4rem_5.5rem_11rem]`;
+  `${COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_6rem_4rem_7rem_11rem]`;
 /** The vote results' list: no Funded column, since each bar's what-if tick and callout
  * carry it. The same widths otherwise, with and without the Rating column. */
 const VOTE_COLUMNS =
-  "grid grid-cols-[2rem_4.25rem_minmax(0,1fr)_5.5rem_11rem] gap-x-4 @max-[720px]/list:grid-cols-1";
+  "grid grid-cols-[2rem_4.25rem_minmax(0,1fr)_7rem_11rem] gap-x-4 @max-[720px]/list:grid-cols-1";
 const VOTE_RATED_COLUMNS =
-  `${VOTE_COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_6rem_5.5rem_11rem]`;
+  `${VOTE_COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_6rem_7rem_11rem]`;
 const ROW =
   "col-span-full grid grid-cols-subgrid items-center px-4 @max-[720px]/list:grid-cols-[auto_minmax(0,1fr)_auto] @max-[720px]/list:gap-x-3";
 const NUM = "text-right tnum whitespace-nowrap";
@@ -156,9 +156,8 @@ function Row(
   const standing = vote?.show && card.vote !== "closed"
     ? voteStanding(summary.total, r.goalUsd, vote, card.vote === "ballot")
     : null;
-  // The Backers column: every logo when they are all the backers, else three and "+N" for the rest.
-  const shownLogos = backers > logos.length ? logos.slice(0, 3) : logos;
-  const more = backers - shownLogos.length;
+  // The Backers column: every pledger's logo (up to four), then "+N" for the rest.
+  const more = backers - logos.length;
   const pctOn = standing ? standing.kind !== "near" : pct >= 1;
   const full = fullyFunded(card, votePct);
   const votedFull = (votePct ?? 0) > 0 && full;
@@ -194,7 +193,7 @@ function Row(
   // line). Without a logo, the silhouette.
   const logoStack = (small = false) => (
     <>
-      {shownLogos.map((l, i) => (
+      {logos.map((l, i) => (
         <span key={i} className={cn("flex first:ml-0", small ? "-ml-1" : "-ml-1.5")}>
           <BackerLogo
             logoUrl={l.logoUrl}

@@ -50,9 +50,13 @@ async function fillForm() {
   fireEvent.change(screen.getByRole("textbox", { name: "Pledge Contact Email" }), {
     target: { value: " donor@example.com " },
   });
-  fireEvent.change(screen.getByRole("textbox", { name: "Who are you talking with?" }), {
-    target: { value: " Alex " },
+  fireEvent.change(screen.getByRole("textbox", { name: "Backer Telegram Handle" }), {
+    target: { value: " @alex " },
   });
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Who are you talking with from TheDAO?" }),
+    { target: { value: " Jake " } },
+  );
   fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
     target: { value: " We would like to fund this work. " },
   });
@@ -77,7 +81,8 @@ it("opens from Sponsors and sends the selected initiative and all pledge contact
     pledgeAmount: 25000.5,
     pledgeOrg: "Acme",
     email: "donor@example.com",
-    pledgeContact: "Alex",
+    pledgeTelegram: "@alex",
+    pledgeContact: "Jake",
     message: "We would like to fund this work.",
     page: "/",
   });
@@ -110,7 +115,9 @@ it("validates amount and email, and preserves pledge details after failed delive
   await screen.findByRole("alert");
   expect(screen.getByRole("combobox", { name: "Initiative" })).toHaveValue("Compiler security");
   expect(screen.getByRole("textbox", { name: "Pledge Organization" })).toHaveValue(" Acme ");
-  expect(screen.getByRole("textbox", { name: "Who are you talking with?" })).toHaveValue(" Alex ");
+  expect(screen.getByRole("textbox", { name: "Backer Telegram Handle" })).toHaveValue(" @alex ");
+  expect(screen.getByRole("textbox", { name: "Who are you talking with from TheDAO?" }))
+    .toHaveValue(" Jake ");
   expect(screen.getByRole("button", { name: "Send pledge request" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.click(screen.getByRole("button", { name: "Pledge to an Initiative" }));

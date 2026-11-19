@@ -24,7 +24,8 @@ const pledge = {
   pledgeAmount: " $25,000.50 ",
   pledgeOrg: " Acme ",
   email: " donor@example.com ",
-  pledgeContact: " Alex ",
+  pledgeTelegram: " @alex ",
+  pledgeContact: " Jake ",
   message: "We would like to fund this work.",
   page: "/",
 };
@@ -54,7 +55,7 @@ Deno.test("support: pledge requests forward current initiative facts and every c
       const call = h.fetchLog.at(-1)!;
       assertEquals(call.url, UPSTREAM);
       const sent = JSON.parse(String(call.init!.body));
-      assertEquals(sent.name, "Alex");
+      assertEquals(sent.name, "@alex");
       assertEquals(sent.email, "donor@example.com");
       for (
         const line of [
@@ -67,7 +68,8 @@ Deno.test("support: pledge requests forward current initiative facts and every c
           "Pledge Amount: $25,000.50",
           "Pledge Org: Acme",
           "Pledge Contact Email: donor@example.com",
-          "Who are you talking with?: Alex",
+          "Backer Telegram Handle: @alex",
+          "Who are you talking with from TheDAO?: Jake",
           "Message: We would like to fund this work.",
         ]
       ) assertStringIncludes(sent.message, line);
@@ -96,6 +98,9 @@ Deno.test("support: invalid or unpublished pledge requests never reach the relay
         { pledgeAmount: { amount: 5000 } },
         { pledgeOrg: " " },
         { pledgeOrg: "x".repeat(161) },
+        { pledgeTelegram: undefined },
+        { pledgeTelegram: " " },
+        { pledgeTelegram: "x".repeat(65) },
         { pledgeContact: undefined },
         { pledgeContact: "x".repeat(121) },
         { email: "" },

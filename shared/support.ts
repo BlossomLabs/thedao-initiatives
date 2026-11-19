@@ -21,6 +21,7 @@ export const SUPPORT_MESSAGE_MAX = 4000;
 export const SUPPORT_TRANSACTION_URL_MAX = 500;
 export const PLEDGE_ORG_MAX = 160;
 export const PLEDGE_CONTACT_MAX = 120;
+export const PLEDGE_TELEGRAM_MAX = 64;
 export const PLEDGE_AMOUNT_MAX = 100_000_000;
 
 /** USD, to the cent; accepts a dollar sign and grouping commas. */

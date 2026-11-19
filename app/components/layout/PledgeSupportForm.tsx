@@ -3,6 +3,7 @@ import {
   parsePledgeAmount,
   PLEDGE_CONTACT_MAX,
   PLEDGE_ORG_MAX,
+  PLEDGE_TELEGRAM_MAX,
   SUPPORT_MESSAGE_MAX,
 } from "@shared/support";
 import { inputMax, tooLong } from "@shared/draft/caps";
@@ -38,6 +39,7 @@ export default function PledgeSupportForm(
   );
   const [org, setOrg] = useState("");
   const [email, setEmail] = useState("");
+  const [telegram, setTelegram] = useState("");
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +65,8 @@ export default function PledgeSupportForm(
 
   const canSend = !sending && Boolean(
     initiative && search === initiative.title && initiatives.some((i) => i.id === initiative.id) &&
-      amount.trim() && org.trim() && email.trim() && contact.trim() && message.trim(),
+      amount.trim() && org.trim() && email.trim() && telegram.trim() &&
+      contact.trim() && message.trim(),
   );
   const clearError = (field: string) => setErrors((prev) => ({ ...prev, [field]: "" }));
   const fieldError = (field: string) =>
@@ -88,6 +91,9 @@ export default function PledgeSupportForm(
       next.amount = "Enter a pledge amount between $0.01 and $100,000,000 (USD).";
     }
     if (org.trim().length > PLEDGE_ORG_MAX) next.org = tooLong("The pledge org", PLEDGE_ORG_MAX);
+    if (telegram.trim().length > PLEDGE_TELEGRAM_MAX) {
+      next.telegram = tooLong("The Telegram handle", PLEDGE_TELEGRAM_MAX);
+    }
     if (contact.trim().length > PLEDGE_CONTACT_MAX) {
       next.contact = tooLong("The contact name", PLEDGE_CONTACT_MAX);
     }
@@ -110,6 +116,7 @@ export default function PledgeSupportForm(
           pledgeAmount,
           pledgeOrg: org.trim(),
           email: email.trim(),
+          pledgeTelegram: telegram.trim(),
           pledgeContact: contact.trim(),
           message: message.trim(),
           page: globalThis.location?.pathname ?? "",
@@ -221,10 +228,28 @@ export default function PledgeSupportForm(
       </label>
       {fieldError("email")}
       <label className="flex flex-col gap-1.5 text-[12.5px] text-white/80">
-        Who are you talking with?
+        Backer Telegram Handle
         <Input
-          autoComplete="name"
-          placeholder="e.g. Jake from TheDAO"
+          autoComplete="off"
+          placeholder="e.g. @alex"
+          required
+          maxLength={inputMax(PLEDGE_TELEGRAM_MAX)}
+          disabled={sending}
+          value={telegram}
+          onChange={(e) => {
+            setTelegram(e.target.value);
+            clearError("telegram");
+          }}
+          {...invalid("telegram")}
+          className="py-2.5 text-[13.5px]"
+        />
+      </label>
+      {fieldError("telegram")}
+      <label className="flex flex-col gap-1.5 text-[12.5px] text-white/80">
+        Who are you talking with from TheDAO?
+        <Input
+          autoComplete="off"
+          placeholder="e.g. No one, Jake, Griff, or Cotabe"
           required
           maxLength={inputMax(PLEDGE_CONTACT_MAX)}
           disabled={sending}

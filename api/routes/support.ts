@@ -15,6 +15,7 @@ import {
   parsePledgeAmount,
   PLEDGE_CONTACT_MAX,
   PLEDGE_ORG_MAX,
+  PLEDGE_TELEGRAM_MAX,
   receiptTransactionError,
   SUPPORT_CATEGORIES,
   SUPPORT_MESSAGE_MAX,
@@ -50,6 +51,7 @@ export function supportRoutes(deps: Deps) {
       "pledgeAmount",
       "pledgeOrg",
       "pledgeContact",
+      "pledgeTelegram",
       "screenshot",
       "page",
     ]);
@@ -73,6 +75,7 @@ export function supportRoutes(deps: Deps) {
       throw new HttpError(400, "transaction links are only supported for receipt requests");
     }
     let contact = "";
+    let telegram = "";
     const pledgeInfo: string[] = [];
     if (pledge) {
       const initiativeId = capped(body.initiativeId, 100, "The initiative ID");
@@ -86,6 +89,8 @@ export function supportRoutes(deps: Deps) {
       }
       const org = capped(body.pledgeOrg, PLEDGE_ORG_MAX, "The pledge org");
       if (!org) throw new HttpError(400, "add a pledge org");
+      telegram = capped(body.pledgeTelegram, PLEDGE_TELEGRAM_MAX, "The Telegram handle");
+      if (!telegram) throw new HttpError(400, "add the backer's Telegram handle");
       contact = capped(body.pledgeContact, PLEDGE_CONTACT_MAX, "The contact name");
       if (!contact) throw new HttpError(400, "tell us who you are talking with");
       const usd = (n: number) =>
@@ -100,10 +105,11 @@ export function supportRoutes(deps: Deps) {
         `Pledge Amount: ${usd(amount)}`,
         `Pledge Org: ${org}`,
         `Pledge Contact Email: ${email}`,
-        `Who are you talking with?: ${contact}`,
+        `Backer Telegram Handle: ${telegram}`,
+        `Who are you talking with from TheDAO?: ${contact}`,
       );
     } else if (
-      ["initiativeId", "pledgeAmount", "pledgeOrg", "pledgeContact"].some((key) =>
+      ["initiativeId", "pledgeAmount", "pledgeOrg", "pledgeTelegram", "pledgeContact"].some((key) =>
         body[key] !== undefined
       )
     ) {
@@ -158,7 +164,7 @@ export function supportRoutes(deps: Deps) {
         signal: AbortSignal.timeout(15_000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: contact,
+          name: telegram || contact,
           email,
           message: text,
           ...(screenshot ? { screenshot } : {}),

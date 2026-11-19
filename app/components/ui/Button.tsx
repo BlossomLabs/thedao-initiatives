@@ -35,13 +35,13 @@ export function Button({
   children,
   type = "button",
   ...rest
-}: Common & React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean }) {
+}: Common & React.ComponentPropsWithRef<"button"> & { loading?: boolean }) {
   return (
     <button
       type={type}
       className={classes(variant, sm, className)}
-      disabled={rest.disabled || loading}
       {...rest}
+      disabled={rest.disabled || loading}
     >
       {loading && <Loader2 className="size-4 animate-spin" />}
       {children}

@@ -899,7 +899,7 @@ export default function VotePage(
         <header className="pt-4 text-center max-sm:hidden">
           <p className="kicker m-0">What should TheDAO prioritize?</p>
           <h1 className="mt-3 font-inter-tight text-[clamp(28px,5vw,40px)] font-bold leading-[1.1] tracking-[-.03em] text-white">
-            Your ballot
+            Build your ballot
           </h1>
           {
             /* Two lines at most: the rules, deadlines and what unranked means are said

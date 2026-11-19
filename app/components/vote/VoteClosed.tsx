@@ -320,14 +320,17 @@ export default function VoteClosed(
     <div className="space-y-6">
       {live
         ? (
-          <Header kicker={badgeKicker(n, round)} title="Your ballot">
+          <Header kicker={badgeKicker(n, round)} title="Your ballot and results">
             It counts. You can change it until each tier settles; next to it, the live result: what
             the vote would fund if it ended now.
           </Header>
         )
         : (
           // The same page as during the vote, its last state: the vote is over.
-          <Header kicker={`${badgeKicker(n, round)} · Voting has closed`} title="Your ballot">
+          <Header
+            kicker={`${badgeKicker(n, round)} · Voting has closed`}
+            title="Your ballot and results"
+          >
             The vote ended {closeText}. Here is your ballot next to TheDAO's result.
           </Header>
         )}

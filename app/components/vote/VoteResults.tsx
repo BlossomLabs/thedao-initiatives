@@ -636,12 +636,17 @@ export default function VoteResults(
 
 
           <>
-            would be funded by {plural(n, "ballot")} from the{" "}
-            {poolEstimated(R) ? `${R.pool!.eth.toLocaleString("en-US")} ETH` : usd(pool)}{" "}
-            <span className="text-vote">{POOL_NAME}</span>
-            {poolEstimated(R) && (
-              <span title={poolNoteText(R) ?? undefined}>{` (about ${usdShort(pool)})`}</span>
-            )}
+            {
+              // The pool by name, then its amount (#135): ETH while it isn't sold, its
+              // dollar estimate and why in the hover; plain text, not vote gold.
+            }
+            would be funded by {plural(n, "ballot")} from the {POOL_NAME} {poolEstimated(R)
+              ? (
+                <span title={`About ${usdShort(pool)}. ${poolNoteText(R) ?? ""}`.trim()}>
+                  ({R.pool!.eth.toLocaleString("en-US")} ETH)
+                </span>
+              )
+              : `(${usd(pool)})`}
             {rv && tierBEmpty(rv) && TIER_B_NOTE}
           </>
 

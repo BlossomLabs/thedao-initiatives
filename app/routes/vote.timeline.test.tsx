@@ -592,7 +592,7 @@ it("the results page follows every event", async () => {
     switch (name) {
       case "two ballots":
         expect(t, name).toMatchObject({ alpha: "S", beta: "A" });
-        expect(page, name).toMatch(/by 2 ballots from the \$1,200/);
+        expect(page, name).toMatch(/by 2 ballots from the demo pool \(\$1,200/);
         break;
       case "somebody else votes":
         expect(page, name).toMatch(/by 3 ballots/);
@@ -607,7 +607,7 @@ it("the results page follows every event", async () => {
         expect(chipLabel("TheDAO's ballot", "alpha"), name).toMatch(/\$100$/);
         break;
       case "the pool grows":
-        expect(page, name).toMatch(/from the \$1,500/);
+        expect(page, name).toMatch(/from the demo pool \(\$1,500/);
         break;
       case "S-Tier window 1":
         expect((await roundBox()).text, name).toContain("If nothing changes");

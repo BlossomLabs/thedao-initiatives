@@ -282,3 +282,20 @@ Deno.test("vote briefs: the old shared record moves to one key each, newer keys 
   assertEquals((await brief(a.id)).current, true);
   h.close();
 });
+
+Deno.test("vote briefs: an old record of 150 briefs moves in batches (100 checks per write)", async () => {
+  const { h, view } = await setup();
+  const r = await h.db.initiatives.insert({ title: "Kept", status: "approved", goalUsd: 1 });
+  const old: Record<string, unknown> = {};
+  for (let i = 0; i < 149; i++) old[`other-${i}`] = { ...bigBrief(i), what: [] };
+  const { inputHash } = await import("../services/vote-briefs.ts");
+  old[r.id] = { ...bigBrief(0), hash: await inputHash(r) };
+  // Under the 64 KiB cap as a single value, like production's.
+  for (const k of Object.keys(old).slice(0, 60)) old[k] = { ...(old[k] as object), what: [] };
+  await h.kv.set(["meta", "vote_briefs"], old);
+  const fresh = (await import("../db/mod.ts")).createDb(h.kv);
+  assertEquals(Object.keys(await fresh.voteBriefs.all()).length, 150);
+  assertEquals((await h.kv.get(["meta", "vote_briefs"])).value, null);
+  assertEquals((await view())[r.slug].what?.length, 3);
+  h.close();
+});

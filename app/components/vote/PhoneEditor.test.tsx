@@ -13,6 +13,13 @@ vi.mock("~/hooks/use-vote-briefs", () => ({
 import { SWIPE_PX, swipeStep } from "./PhoneCard";
 
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
+// What others say (reviews and comments) has its own test (OthersSay.test.tsx): here
+// none load.
+vi.mock("./OthersSay", async (actual) => ({
+  ...(await actual<typeof import("./OthersSay")>()),
+  useRating: () => undefined,
+  useOthersSay: () => ({ reviews: [], comments: [], failed: false }),
+}));
 
 // A phone: every media query matches (the editor asks only for the phone's).
 beforeEach(() => {

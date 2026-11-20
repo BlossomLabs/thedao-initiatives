@@ -11,6 +11,18 @@ import { cn } from "~/lib/utils";
 import type { BallotItem } from "./TierBallot";
 import BriefList, { askText, PledgerStack } from "./BriefList";
 import NewPill from "./NewPill";
+import { useMedia } from "~/hooks/use-media";
+import {
+  othersLabel,
+  OthersList,
+  type OthersTab,
+  RatingLine,
+  useOthersSay,
+  useRating,
+} from "./OthersSay";
+
+/** From this width the card has room for what others say beside it. */
+export const WIDE_PEEK = "(min-width: 860px)";
 
 /** A ballot initiative's card: a little about it, where it goes on this ballot (a tier, the
  * list, or skipped) and a link to its full page. It opens and closes with the browser's own morph
@@ -71,6 +83,11 @@ export default function InitiativePeek<W extends string>(
   },
 ) {
   const titleId = useId();
+  // What others say, beside the card where it fits; the tab stays as ‹ › steps.
+  const wide = useMedia(WIDE_PEEK);
+  const [othersTab, setOthersTab] = useState<OthersTab>("reviews");
+  const rating = useRating(item);
+  const others = useOthersSay(item, wide);
   /** Where it is now: "S-Tier · Must fund", "Not ranked yet", "Skipped". */
   const now = choices.find((c) => c.value === current);
   const canChange = choices.some((c) => !c.disabled);
@@ -172,211 +189,257 @@ export default function InitiativePeek<W extends string>(
         aria-modal="true"
         aria-labelledby={titleId}
         // Positioned, so it paints over the dim (an absolute layer) before it.
-        className="relative w-[min(400px,100%)]"
+        className="relative w-[min(400px,100%)] min-[860px]:w-[800px]"
       >
         {/* Always the same size: the text scrolls, the choices stay at the bottom. */}
         <div
           data-peek-box=""
           className={cn(
-            "flex h-[min(520px,calc(100dvh-40px))] flex-col overflow-hidden rounded-[18px] border bg-panel-modal shadow-modal",
+            "flex h-[min(520px,calc(100dvh-40px))] overflow-hidden rounded-[18px] border bg-panel-modal shadow-modal",
             // A new initiative's card is edged in the New pill's sky, as its tile is.
             isNew ? "border-dao-sky/60" : "border-edge2",
           )}
         >
-          {/* The header stays put: what it is, its title, where it goes. */}
-          <div className="flex flex-none flex-col gap-3 px-5 pb-3 pt-5">
-            <div className="flex items-start justify-between gap-3">
-              <p className="m-0 flex min-w-0 items-center gap-1.5 truncate text-[12.5px] text-white/55">
-                {cat && (
-                  <CategoryDot
-                    slug={cat}
-                    className="size-[7px] flex-none"
-                    data-peek-dot=""
-                  />
-                )}
-                {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
-                {item.askUsd !== undefined && (
-                  <span className="whitespace-nowrap tnum">
-                    {cat && "· "}
-                    {askText(item)}
-                  </span>
-                )}
-              </p>
-              <div className="-my-1 -mr-1 flex flex-none items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="Close"
-                  onClick={close}
-                  className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
-                >
-                  <X className="size-4" aria-hidden="true" />
-                </button>
+          <div className="flex min-w-0 flex-1 flex-col">
+            {/* The header stays put: what it is, its title, where it goes. */}
+            <div className="flex flex-none flex-col gap-3 px-5 pb-3 pt-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="m-0 flex min-w-0 items-center gap-1.5 truncate text-[12.5px] text-white/55">
+                  {cat && (
+                    <CategoryDot
+                      slug={cat}
+                      className="size-[7px] flex-none"
+                      data-peek-dot=""
+                    />
+                  )}
+                  {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
+                  {item.askUsd !== undefined && (
+                    <span className="whitespace-nowrap tnum">
+                      {cat && "· "}
+                      {askText(item)}
+                    </span>
+                  )}
+                </p>
+                <div className="-my-1 -mr-1 flex flex-none items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Close"
+                    onClick={close}
+                    className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
+                  >
+                    <X className="size-4" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <h3
-              id={titleId}
-              data-peek-title=""
-              className="m-0 font-inter-tight text-[18px] font-medium leading-snug text-white"
-            >
-              {item.title}
-            </h3>
-            {/* Where it is on this ballot, as a stamp; its pen opens the places it can go. */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {note
-                ? (
-                  // Settled: a gold stamp with a lock; why, in a popover (hover, focus or tap).
-                  <Tooltip.Root open={noteOpen} onOpenChange={setNoteOpen}>
-                    <Tooltip.Trigger
-                      delay={150}
-                      closeOnClick={false}
-                      render={
-                        <span
-                          tabIndex={0}
-                          aria-label={note}
-                          data-peek-place=""
-                          onClick={() => setNoteOpen(true)}
-                          className={cn(
-                            STAMP,
-                            "pr-2 outline-none focus-visible:ring-2 focus-visible:ring-vote",
-                            SETTLED,
-                          )}
-                        />
-                      }
+              <h3
+                id={titleId}
+                data-peek-title=""
+                className="m-0 font-inter-tight text-[18px] font-medium leading-snug text-white"
+              >
+                {item.title}
+              </h3>
+              {/* Where it is on this ballot, as a stamp; its pen opens the places it can go. */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {note
+                  ? (
+                    // Settled: a gold stamp with a lock; why, in a popover (hover, focus or tap).
+                    <Tooltip.Root open={noteOpen} onOpenChange={setNoteOpen}>
+                      <Tooltip.Trigger
+                        delay={150}
+                        closeOnClick={false}
+                        render={
+                          <span
+                            tabIndex={0}
+                            aria-label={note}
+                            data-peek-place=""
+                            onClick={() => setNoteOpen(true)}
+                            className={cn(
+                              STAMP,
+                              "pr-2 outline-none focus-visible:ring-2 focus-visible:ring-vote",
+                              SETTLED,
+                            )}
+                          />
+                        }
+                      >
+                        {now?.display}
+                        <Lock className="size-3" aria-hidden="true" />
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Positioner side="bottom" sideOffset={6} className="z-[220]">
+                          <Tooltip.Popup
+                            data-peek-note=""
+                            className="max-w-[260px] rounded-[12px] border border-edge2 bg-panel px-2.5 py-1.5 font-inter-tight text-[12.5px] leading-snug text-white shadow-menu outline-none"
+                          >
+                            {note}
+                          </Tooltip.Popup>
+                        </Tooltip.Positioner>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
+                  )
+                  : (
+                    <span
+                      data-peek-place=""
+                      className={cn(
+                        STAMP,
+                        canChange ? "pr-1" : "pr-2.5",
+                        now && now.value.length === 1 ? IN_TIER : OFF_TIER,
+                      )}
                     >
                       {now?.display}
-                      <Lock className="size-3" aria-hidden="true" />
-                    </Tooltip.Trigger>
-                    <Tooltip.Portal>
-                      <Tooltip.Positioner side="bottom" sideOffset={6} className="z-[220]">
-                        <Tooltip.Popup
-                          data-peek-note=""
-                          className="max-w-[260px] rounded-[12px] border border-edge2 bg-panel px-2.5 py-1.5 font-inter-tight text-[12.5px] leading-snug text-white shadow-menu outline-none"
+                      {canChange && (
+                        <Select
+                          value={current}
+                          items={choices.map((c) => ({ value: c.value, label: c.display }))}
+                          onValueChange={(v) => {
+                            if (v != null) choose(v as W);
+                          }}
                         >
-                          {note}
-                        </Tooltip.Popup>
-                      </Tooltip.Positioner>
-                    </Tooltip.Portal>
-                  </Tooltip.Root>
-                )
-                : (
-                  <span
-                    data-peek-place=""
-                    className={cn(
-                      STAMP,
-                      canChange ? "pr-1" : "pr-2.5",
-                      now && now.value.length === 1 ? IN_TIER : OFF_TIER,
-                    )}
-                  >
-                    {now?.display}
-                    {canChange && (
-                      <Select
-                        value={current}
-                        items={choices.map((c) => ({ value: c.value, label: c.display }))}
-                        onValueChange={(v) => {
-                          if (v != null) choose(v as W);
-                        }}
-                      >
-                        <SelectPrimitive.Trigger
-                          aria-label={`Change where ${item.title} goes`}
-                          data-peek-select=""
-                          className="grid size-[22px] place-items-center rounded-[5px] bg-white/[.08] text-current outline-none transition-colors hover:bg-white/[.16] focus-visible:ring-2 focus-visible:ring-current data-[popup-open]:bg-white/[.16]"
-                        >
-                          <Pencil className="size-3" aria-hidden="true" />
-                        </SelectPrimitive.Trigger>
-                        <SelectContent>
-                          {choices.map((c) => (
-                            <SelectItem
-                              key={c.value}
-                              value={c.value}
-                              disabled={c.disabled}
-                              aria-label={c.name}
-                            >
-                              <span className="flex items-center gap-2.5">
-                                <b
-                                  className={cn(
-                                    "flex w-5 flex-none justify-center font-inter-tight font-bold",
-                                    c.value.length === 1 ? "text-dao-green" : "text-white/55",
-                                  )}
-                                >
-                                  {c.grade}
-                                </b>
-                                {c.label}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </span>
+                          <SelectPrimitive.Trigger
+                            aria-label={`Change where ${item.title} goes`}
+                            data-peek-select=""
+                            className="grid size-[22px] place-items-center rounded-[5px] bg-white/[.08] text-current outline-none transition-colors hover:bg-white/[.16] focus-visible:ring-2 focus-visible:ring-current data-[popup-open]:bg-white/[.16]"
+                          >
+                            <Pencil className="size-3" aria-hidden="true" />
+                          </SelectPrimitive.Trigger>
+                          <SelectContent>
+                            {choices.map((c) => (
+                              <SelectItem
+                                key={c.value}
+                                value={c.value}
+                                disabled={c.disabled}
+                                aria-label={c.name}
+                              >
+                                <span className="flex items-center gap-2.5">
+                                  <b
+                                    className={cn(
+                                      "flex w-5 flex-none justify-center font-inter-tight font-bold",
+                                      c.value.length === 1 ? "text-dao-green" : "text-white/55",
+                                    )}
+                                  >
+                                    {c.grade}
+                                  </b>
+                                  {c.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </span>
+                  )}
+                {paid && (
+                  <span className="font-inter-tight text-[12.5px] text-vote">You paid {paid}</span>
                 )}
-              {paid && (
-                <span className="font-inter-tight text-[12.5px] text-vote">You paid {paid}</span>
+                {/* Who pledged, on the right, as tall as the stamp. */}
+                <PledgerStack item={item} size={32} className="ml-auto" />
+              </div>
+              {withdrawn && (
+                <p className="m-0 font-inter-tight text-[12.5px] leading-snug text-dao-red-pale">
+                  {withdrawn}
+                </p>
               )}
-              {/* Who pledged, on the right, as tall as the stamp. */}
-              <PledgerStack item={item} size={32} className="ml-auto" />
             </div>
-            {withdrawn && (
-              <p className="m-0 font-inter-tight text-[12.5px] leading-snug text-dao-red-pale">
-                {withdrawn}
-              </p>
-            )}
-          </div>
-          {/* Only the description scrolls; the arrows on its faded edges scroll it too. */}
-          <div ref={descWrap} className="relative min-h-0 flex-1">
-            <div
-              ref={desc}
-              // Keyboard users scroll it with the arrow keys once it has the focus.
-              tabIndex={scrolls ? 0 : undefined}
-              aria-label={scrolls ? "About this initiative" : undefined}
-              style={scrolls ? { maskImage: MASK, WebkitMaskImage: MASK } : undefined}
-              className="h-full overflow-y-auto overscroll-contain px-5 pb-3 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-dao-green/60 [&::-webkit-scrollbar]:hidden"
-            >
-              {/* Observed: the bullets arrive after the card opens, and its edges move. */}
-              <div data-peek-text="">
-                <BriefList item={item} className="text-[13.5px]" />
+            {/* Only the description scrolls; the arrows on its faded edges scroll it too. */}
+            <div ref={descWrap} className="relative min-h-0 flex-1">
+              <div
+                ref={desc}
+                // Keyboard users scroll it with the arrow keys once it has the focus.
+                tabIndex={scrolls ? 0 : undefined}
+                aria-label={scrolls ? "About this initiative" : undefined}
+                style={scrolls ? { maskImage: MASK, WebkitMaskImage: MASK } : undefined}
+                className="h-full overflow-y-auto overscroll-contain px-5 pb-3 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-dao-green/60 [&::-webkit-scrollbar]:hidden"
+              >
+                {/* Observed: the bullets arrive after the card opens, and its edges move. */}
+                <div data-peek-text="">
+                  <BriefList item={item} className="text-[13.5px]" />
+                </div>
+              </div>
+              {edges.top && <ScrollArrow dir={-1} onClick={() => page(-1)} />}
+              {edges.bottom && <ScrollArrow dir={1} onClick={() => page(1)} />}
+            </div>
+            <div className="flex flex-col gap-3 border-t border-white/[.06] px-5 pb-5 pt-3">
+              <div className="flex items-center gap-2">
+                {nav && nav.index >= 0 && nav.count > 1 && (
+                  // The previous and next initiative on the ballot.
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Previous initiative"
+                      disabled={nav.index === 0}
+                      onClick={() => nav.onStep(-1)}
+                      className={STEP}
+                    >
+                      <ChevronLeft className="size-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Next initiative"
+                      disabled={nav.index === nav.count - 1}
+                      onClick={() => nav.onStep(1)}
+                      className={STEP}
+                    >
+                      <ChevronRight className="size-4" aria-hidden="true" />
+                    </button>
+                  </>
+                )}
+                <LinkButton
+                  className="ml-auto"
+                  variant="ghost"
+                  sm
+                  to={`/initiative/${item.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Open full page for ${item.title} (opens in a new tab)`}
+                >
+                  Open full page
+                </LinkButton>
               </div>
             </div>
-            {edges.top && <ScrollArrow dir={-1} onClick={() => page(-1)} />}
-            {edges.bottom && <ScrollArrow dir={1} onClick={() => page(1)} />}
           </div>
-          <div className="flex flex-col gap-3 border-t border-white/[.06] px-5 pb-5 pt-3">
-            <div className="flex items-center gap-2">
-              {nav && nav.index >= 0 && nav.count > 1 && (
-                // The previous and next initiative on the ballot.
-                <>
+          {wide && (
+            <aside
+              aria-labelledby={`${titleId}-others`}
+              className="flex w-[400px] flex-none flex-col gap-3 border-l border-white/[.08] bg-black/[.08] px-5 pb-5 pt-5"
+            >
+              <div className="flex items-center gap-3">
+                <h4
+                  id={`${titleId}-others`}
+                  className="m-0 font-inter-tight text-[16px] font-semibold text-white"
+                >
+                  What others say
+                </h4>
+                <RatingLine summary={rating} className="ml-auto text-[13px]" />
+              </div>
+              <div role="tablist" aria-label="What others say" className="flex gap-1.5">
+                {(["reviews", "comments"] as const).map((t) => (
                   <button
+                    key={t}
                     type="button"
-                    aria-label="Previous initiative"
-                    disabled={nav.index === 0}
-                    onClick={() => nav.onStep(-1)}
-                    className={STEP}
+                    role="tab"
+                    aria-selected={othersTab === t}
+                    onClick={() => setOthersTab(t)}
+                    className={cn(
+                      "min-h-8 rounded-full border px-3 text-[12.5px] transition-colors",
+                      othersTab === t
+                        ? "border-white/40 bg-white/10 text-white"
+                        : "border-white/15 text-white/75 hover:border-white/30 hover:text-white",
+                    )}
                   >
-                    <ChevronLeft className="size-4" aria-hidden="true" />
+                    {othersLabel(
+                      t,
+                      t === "reviews" ? others.reviews?.length : others.comments?.length,
+                    )}
                   </button>
-                  <button
-                    type="button"
-                    aria-label="Next initiative"
-                    disabled={nav.index === nav.count - 1}
-                    onClick={() => nav.onStep(1)}
-                    className={STEP}
-                  >
-                    <ChevronRight className="size-4" aria-hidden="true" />
-                  </button>
-                </>
-              )}
-              <LinkButton
-                className="ml-auto"
-                variant="ghost"
-                sm
-                to={`/initiative/${item.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Open full page for ${item.title} (opens in a new tab)`}
+                ))}
+              </div>
+              <div
+                role="tabpanel"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]"
               >
-                Open full page
-              </LinkButton>
-            </div>
-          </div>
+                <OthersList item={item} tab={othersTab} data={others} rating={rating} />
+              </div>
+            </aside>
+          )}
         </div>
         {
           // On the card's top edge (the box clips, this wrapper doesn't); after the box,

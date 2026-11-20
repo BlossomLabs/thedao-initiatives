@@ -12,6 +12,13 @@ vi.mock("~/hooks/use-vote-briefs", () => ({
 }));
 
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
+// What others say (reviews and comments) has its own test (OthersSay.test.tsx): here
+// none load.
+vi.mock("./OthersSay", async (actual) => ({
+  ...(await actual<typeof import("./OthersSay")>()),
+  useRating: () => undefined,
+  useOthersSay: () => ({ reviews: [], comments: [], failed: false }),
+}));
 afterEach(cleanup);
 
 // The info card's Details is a router link.

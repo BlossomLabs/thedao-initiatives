@@ -10,6 +10,17 @@ import type { PeekChoice } from "./InitiativePeek";
 import type { BallotItem } from "./TierBallot";
 import BriefList, { PledgerStack } from "./BriefList";
 import NewPill from "./NewPill";
+import {
+  othersLabel,
+  OthersList,
+  type OthersTab,
+  RatingLine,
+  useOthersSay,
+  useRating,
+} from "./OthersSay";
+
+/** The card's tabs: what it is, then what others say about it. */
+type CardTab = "about" | OthersTab;
 import { ofGoal } from "../../../shared/vote/brief";
 
 /** How far a finger has to travel sideways for a swipe to the next or previous card. */
@@ -73,6 +84,8 @@ export default function PhoneCard<W extends string>(
   },
 ) {
   const titleId = useId();
+  // The tab stays as the deck moves on, so you can read the reviews card after card.
+  const [tab, setTab] = useState<CardTab>("about");
   const tiers = choices.filter((c) => c.value.length === 1);
   const others = choices.filter((c) => c.value.length !== 1);
   const now = choices.find((c) => c.value === current);
@@ -260,7 +273,7 @@ export default function PhoneCard<W extends string>(
             style={{ transform: underneath(0), transition: ease("ease-out") }}
             className={cn(CARD, "z-0", after.isNew && NEW_EDGE)}
           >
-            <Face face={after} nav={nav} />
+            <Face face={after} nav={nav} tab={tab} />
           </article>
         )}
         {next && (
@@ -272,7 +285,7 @@ export default function PhoneCard<W extends string>(
             style={{ transform: underneath(on), transition: ease("ease-out") }}
             className={cn(CARD, "z-[1]", next.isNew && NEW_EDGE)}
           >
-            <Face face={next} nav={nav} />
+            <Face face={next} nav={nav} tab={tab} />
           </article>
         )}
         <article
@@ -286,6 +299,8 @@ export default function PhoneCard<W extends string>(
             titleId={titleId}
             nav={nav}
             onStep={step}
+            tab={tab}
+            onTab={setTab}
           />
         </article>
         {prev && (
@@ -297,7 +312,7 @@ export default function PhoneCard<W extends string>(
             style={{ transform: offLeft(back), transition: ease("ease-out") }}
             className={cn(CARD, "z-20", prev.isNew && NEW_EDGE)}
           >
-            <Face face={prev} nav={nav} />
+            <Face face={prev} nav={nav} tab={tab} />
           </article>
         )}
       </div>
@@ -370,14 +385,19 @@ const CARD =
 
 /** What a card shows: the initiative, its ask and bullets, and ‹ Open full page ›. */
 function Face(
-  { face: { item, note, withdrawn, paid, isNew }, titleId, nav, onStep }: {
+  { face: { item, note, withdrawn, paid, isNew }, titleId, nav, onStep, tab, onTab }: {
     face: CardFace;
     titleId?: string;
     nav: { index: number; count: number };
     /** Only the top card steps; the one underneath just looks the same. */
     onStep?: (dir: -1 | 1) => void;
+    tab: CardTab;
+    /** Only the top card switches tabs, and only it loads what others say. */
+    onTab?: (tab: CardTab) => void;
   },
 ) {
+  const rating = useRating(item);
+  const others = useOthersSay(item, Boolean(onTab) && tab !== "about");
   const r = item.card?.initiative;
   /** "75% of goal", beside the ask. */
   const share = item.askUsd === undefined ? "" : ofGoal(item.askUsd, r?.goalUsd ?? 0);
@@ -404,6 +424,7 @@ function Face(
             </span>
           </span>
           {paid && <span className="ml-2 text-vote">You paid {paid}</span>}
+          <RatingLine summary={rating} className="text-[14px]" />
           {/* Who pledged, on the right, as on the desktop card. */}
           <PledgerStack item={item} size={32} className="ml-auto" />
         </p>
@@ -416,8 +437,37 @@ function Face(
         // Its own scroller: vertical only, or the browser takes a sideways swipe over the
         // bullets for itself and the card never moves.
       }
-      <div className="mt-3.5 min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <BriefList item={item} className="select-text text-[14px]" />
+      <div
+        role="tablist"
+        aria-label="About this initiative"
+        className="mt-3 grid flex-none grid-cols-3 gap-1 rounded-xl bg-black/15 p-[3px]"
+      >
+        {(["about", "reviews", "comments"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => onTab?.(t)}
+            className={cn(
+              "min-h-9 rounded-[9px] text-[13px] transition-colors",
+              tab === t ? "bg-white/[.16] font-semibold text-white" : "text-white/70",
+            )}
+          >
+            {t === "about" ? "About" : othersLabel(
+              t,
+              t === "reviews" ? others.reviews?.length ?? rating?.count : others.comments?.length,
+            )}
+          </button>
+        ))}
+      </div>
+      <div
+        role="tabpanel"
+        className="mt-3 min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {tab === "about"
+          ? <BriefList item={item} className="select-text text-[14px]" />
+          : <OthersList item={item} tab={tab} data={others} rating={rating} />}
       </div>
       <div className="mt-3 flex flex-none items-center justify-between gap-2">
         <button

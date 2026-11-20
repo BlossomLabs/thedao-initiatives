@@ -1074,6 +1074,46 @@
   .md a {
     @apply text-dao-green;
   }
+  /* a review's or comment's text in the ballot's Details card: small, unjustified, its
+     headings no bigger than bold text */
+  .md-note {
+    @apply max-w-none font-inter-tight font-normal text-[13px] leading-[1.5] text-[#dce5ef];
+    text-align: left;
+    hyphens: manual;
+  }
+  .md-note p,
+  .md-note ul,
+  .md-note ol,
+  .md-note pre,
+  .md-note blockquote,
+  .md-note .md-table {
+    margin: 0 0 6px;
+  }
+  .md-note > :last-child {
+    margin-bottom: 0;
+  }
+  .md-note ul,
+  .md-note ol {
+    padding-left: 18px;
+  }
+  .md-note li {
+    margin: 2px 0;
+  }
+  .md-note h1,
+  .md-note h2,
+  .md-note h3,
+  .md-note h4,
+  .md-note h5,
+  .md-note h6 {
+    @apply m-0 mb-1 font-inter-tight text-[13px] font-semibold normal-case tracking-normal
+      text-white;
+  }
+  .md-note code {
+    @apply text-[12px];
+  }
+  .md-note pre {
+    @apply px-3 py-2;
+  }
   /* rules panel body: numbered process list, tighter than the details body */
   .rules-body {
     @apply max-w-none;

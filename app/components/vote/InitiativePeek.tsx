@@ -83,6 +83,17 @@ export default function InitiativePeek<W extends string>(
   },
 ) {
   const titleId = useId();
+  /** The card's x: in its header, or the side panel's when there is one. */
+  const closeX = (
+    <button
+      type="button"
+      aria-label="Close"
+      onClick={onClose}
+      className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
+    >
+      <X className="size-4" aria-hidden="true" />
+    </button>
+  );
   // What others say, beside the card where it fits; the tab stays as ‹ › steps.
   const wide = useMedia(WIDE_PEEK);
   const [othersTab, setOthersTab] = useState<OthersTab>("reviews");
@@ -220,16 +231,12 @@ export default function InitiativePeek<W extends string>(
                     </span>
                   )}
                 </p>
-                <div className="-my-1 -mr-1 flex flex-none items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="Close"
-                    onClick={close}
-                    className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
-                  >
-                    <X className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
+                {
+                  // With the side panel open, the x sits at the card's top right, over it.
+                  !wide && (
+                    <div className="-my-1 -mr-1 flex flex-none items-center gap-1">{closeX}</div>
+                  )
+                }
               </div>
               <h3
                 id={titleId}
@@ -409,6 +416,7 @@ export default function InitiativePeek<W extends string>(
                   What others say
                 </h4>
                 <RatingLine summary={rating} className="ml-auto text-[13px]" />
+                <div className="-my-1 -mr-1 flex flex-none items-center">{closeX}</div>
               </div>
               <div role="tablist" aria-label="What others say" className="flex gap-1.5">
                 {(["reviews", "comments"] as const).map((t) => (

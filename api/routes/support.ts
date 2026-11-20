@@ -16,6 +16,7 @@ import {
   PLEDGE_CONTACT_MAX,
   PLEDGE_ORG_MAX,
   PLEDGE_TELEGRAM_MAX,
+  pledgeAmountError,
   receiptTransactionError,
   SUPPORT_CATEGORIES,
   SUPPORT_MESSAGE_MAX,
@@ -84,9 +85,7 @@ export function supportRoutes(deps: Deps) {
         throw new HttpError(400, "select an available initiative");
       }
       const amount = parsePledgeAmount(body.pledgeAmount);
-      if (amount === null) {
-        throw new HttpError(400, "Enter a pledge amount between $0.01 and $100,000,000 (USD).");
-      }
+      if (amount === null) throw new HttpError(400, pledgeAmountError(body.pledgeAmount)!);
       const org = capped(body.pledgeOrg, PLEDGE_ORG_MAX, "The pledge org");
       if (!org) throw new HttpError(400, "add a pledge org");
       telegram = capped(body.pledgeTelegram, PLEDGE_TELEGRAM_MAX, "The Telegram handle");

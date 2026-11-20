@@ -4,6 +4,7 @@ import {
   PLEDGE_CONTACT_MAX,
   PLEDGE_ORG_MAX,
   PLEDGE_TELEGRAM_MAX,
+  pledgeAmountError,
   SUPPORT_MESSAGE_MAX,
 } from "@shared/support";
 import { inputMax, tooLong } from "@shared/draft/caps";
@@ -87,9 +88,7 @@ export default function PledgeSupportForm(
     if (!canSend || !initiative || sendingRef.current) return;
     const next: Record<string, string> = {};
     const pledgeAmount = parsePledgeAmount(amount);
-    if (pledgeAmount === null) {
-      next.amount = "Enter a pledge amount between $0.01 and $100,000,000 (USD).";
-    }
+    if (pledgeAmount === null) next.amount = pledgeAmountError(amount)!;
     if (org.trim().length > PLEDGE_ORG_MAX) next.org = tooLong("The pledge org", PLEDGE_ORG_MAX);
     if (telegram.trim().length > PLEDGE_TELEGRAM_MAX) {
       next.telegram = tooLong("The Telegram handle", PLEDGE_TELEGRAM_MAX);

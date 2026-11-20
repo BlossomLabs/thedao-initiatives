@@ -92,6 +92,8 @@ Deno.test("support: invalid or unpublished pledge requests never reach the relay
         { pledgeAmount: undefined },
         { pledgeAmount: "0" },
         { pledgeAmount: "-5" },
+        { pledgeAmount: "100" },
+        { pledgeAmount: "499.99" },
         { pledgeAmount: "1e6" },
         { pledgeAmount: "1.001" },
         { pledgeAmount: 100000001 },
@@ -117,6 +119,12 @@ Deno.test("support: invalid or unpublished pledge requests never reach the relay
       });
       assertEquals(res.status, 400, JSON.stringify(patch));
     }
+    const small = await h.req("/api/support", {
+      method: "POST",
+      json: { ...pledge, initiativeId: initiative.id, pledgeAmount: "$100" },
+    });
+    assertEquals(small.status, 400);
+    assertEquals((await small.json()).error, "The minimum pledge is $500.");
     for (const status of ["pending", "rejected", "archived"] as const) {
       const hidden = await h.db.initiatives.insert({ title: status, status });
       const res = await h.req("/api/support", {

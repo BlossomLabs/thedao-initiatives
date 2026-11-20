@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Sponsors from "~/components/board/Sponsors";
 import PledgeRequestLink from "~/components/initiative/PledgeRequestLink";
 import { SupportPanel } from "./SupportWidget";
@@ -122,6 +122,21 @@ it("validates amount and email, and preserves pledge details after failed delive
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.click(screen.getByRole("button", { name: "Pledge to an Initiative" }));
   expect(screen.getByRole("textbox", { name: "Pledge Organization" })).toHaveValue("");
+});
+
+it("refuses a pledge below $500 with the minimum, and sends $500", async () => {
+  const fetchMock = vi.fn(() => Promise.resolve(new Response('{"ok":true}')));
+  vi.stubGlobal("fetch", fetchMock);
+  openForm();
+  await fillForm();
+  const amount = screen.getByRole("textbox", { name: "Pledge Amount (USD)" });
+  fireEvent.change(amount, { target: { value: "100" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send pledge request" }));
+  expect(screen.getByText("The minimum pledge is $500.")).toBeInTheDocument();
+  expect(fetchMock).not.toHaveBeenCalled();
+  fireEvent.change(amount, { target: { value: "500" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send pledge request" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 });
 
 it("searches initiatives and closes the choices on Escape while keeping the form open", async () => {

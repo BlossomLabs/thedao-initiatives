@@ -22,15 +22,32 @@ export const SUPPORT_TRANSACTION_URL_MAX = 500;
 export const PLEDGE_ORG_MAX = 160;
 export const PLEDGE_CONTACT_MAX = 120;
 export const PLEDGE_TELEGRAM_MAX = 64;
+export const PLEDGE_AMOUNT_MIN = 500;
 export const PLEDGE_AMOUNT_MAX = 100_000_000;
 
-/** USD, to the cent; accepts a dollar sign and grouping commas. */
-export function parsePledgeAmount(raw: unknown): number | null {
+/** USD, to the cent; accepts a dollar sign and grouping commas. Any positive amount, no limits. */
+function readPledgeAmount(raw: unknown): number | null {
   if (typeof raw !== "string" && typeof raw !== "number") return null;
   const value = String(raw).trim().replace(/^\$/, "").replace(/,/g, "");
   if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
   const amount = Number(value);
-  return amount > 0 && amount <= PLEDGE_AMOUNT_MAX ? amount : null;
+  return amount > 0 ? amount : null;
+}
+
+/** A pledge amount from $500 to $100,000,000, or null. */
+export function parsePledgeAmount(raw: unknown): number | null {
+  const amount = readPledgeAmount(raw);
+  return amount !== null && amount >= PLEDGE_AMOUNT_MIN && amount <= PLEDGE_AMOUNT_MAX
+    ? amount
+    : null;
+}
+
+/** What the pledge form and the API say about an amount they refuse; null when it is fine. */
+export function pledgeAmountError(raw: unknown): string | null {
+  if (parsePledgeAmount(raw) !== null) return null;
+  const amount = readPledgeAmount(raw);
+  if (amount !== null && amount < PLEDGE_AMOUNT_MIN) return "The minimum pledge is $500.";
+  return "Enter a pledge amount between $500 and $100,000,000 (USD).";
 }
 
 /** Transaction links are forwarded as text; neither the API nor the widget fetches them. */

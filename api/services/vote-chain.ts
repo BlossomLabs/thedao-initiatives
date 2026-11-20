@@ -312,8 +312,9 @@ export function createVoteChain(
       return tx ? "pending" : "unknown";
     },
     async estimateRecordFor() {
-      // A record() of an 81-byte ballot uses well under 150k gas.
-      return 150_000n * (await pub.getGasPrice());
+      // A record() reads every initiative's ask: mainnet ballots used 1.3M-2.65M gas
+      // (Nov 2026), so price a heavy one at 3M.
+      return 3_000_000n * (await pub.getGasPrice());
     },
     async relayerNonce() {
       if (!account) throw new Error("VOTE_RELAYER_KEY is not configured");

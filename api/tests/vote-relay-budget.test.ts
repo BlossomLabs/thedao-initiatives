@@ -183,9 +183,9 @@ Deno.test("ballot sponsorship pins gas and both fees in the actual signed transa
 Deno.test("ballot sponsorship rejects costly estimates, costly fees, costly totals and estimate failures without signing", async () => {
   for (
     const patch of [
-      { estimate: 8_200_000n },
+      { estimate: 10_200_000n },
       { baseFee: BALLOT_RELAY_FEE },
-      { estimate: 3_000_000n },
+      { estimate: 8_000_000n },
       { estimateError: true },
     ]
   ) {

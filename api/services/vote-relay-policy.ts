@@ -1,10 +1,12 @@
 /** Sponsorship limits, not ballot validity limits: voters can always pay for their own
- * transaction. Four million gas leaves room above the 80-project contract gas test and
- * an ordinary smart-wallet signature. A transaction can spend at most 0.005 ETH. */
-export const BALLOT_RELAY_GAS = 4_000_000n;
+ * transaction. Ten million gas leaves room above the heaviest mainnet ballots so far
+ * (2.65M used, 3.2M padded) and an ordinary smart-wallet signature, well under the
+ * protocol's 16.7M per-transaction cap. A transaction can spend at most 0.02 ETH
+ * (a 3.2M-gas ballot up to about 6 gwei). */
+export const BALLOT_RELAY_GAS = 10_000_000n;
 export const CONTRACT_SIGNATURE_GAS = 500_000n;
 export const BALLOT_RELAY_FEE = 20_000_000_000n; // 20 gwei
-export const BALLOT_RELAY_COST = 5_000_000_000_000_000n; // 0.005 ETH
+export const BALLOT_RELAY_COST = 20_000_000_000_000_000n; // 0.02 ETH
 
 export class RelayBudgetError extends Error {
   constructor(readonly reason: "signature" | "gas" | "fee" | "cost") {

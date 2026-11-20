@@ -12,17 +12,10 @@ import type { BallotItem } from "./TierBallot";
 import BriefList, { askText, PledgerStack } from "./BriefList";
 import NewPill from "./NewPill";
 import { useMedia } from "~/hooks/use-media";
-import {
-  othersLabel,
-  OthersList,
-  type OthersTab,
-  RatingLine,
-  useOthersSay,
-  useRating,
-} from "./OthersSay";
+import { othersLabel, OthersList, type OthersTab, useOthersSay, useRating } from "./OthersSay";
 
 /** From this width the card has room for what others say beside it. */
-export const WIDE_PEEK = "(min-width: 860px)";
+export const WIDE_PEEK = "(min-width: 1000px)";
 
 /** A ballot initiative's card: a little about it, where it goes on this ballot (a tier, the
  * list, or skipped) and a link to its full page. It opens and closes with the browser's own morph
@@ -200,7 +193,7 @@ export default function InitiativePeek<W extends string>(
         aria-modal="true"
         aria-labelledby={titleId}
         // Positioned, so it paints over the dim (an absolute layer) before it.
-        className="relative w-[min(400px,100%)] min-[860px]:w-[800px]"
+        className="relative w-[min(400px,100%)] min-[1000px]:w-[960px]"
       >
         {/* Always the same size: the text scrolls, the choices stay at the bottom. */}
         <div
@@ -406,39 +399,33 @@ export default function InitiativePeek<W extends string>(
           {wide && (
             <aside
               aria-labelledby={`${titleId}-others`}
-              className="flex w-[400px] flex-none flex-col gap-3 border-l border-white/[.08] bg-black/[.08] px-5 pb-5 pt-5"
+              className="flex w-1/3 flex-none flex-col gap-3 border-l border-white/[.08] bg-black/[.08] px-5 pb-5 pt-5"
             >
+              <h4 id={`${titleId}-others`} className="sr-only">What others say</h4>
               <div className="flex items-center gap-3">
-                <h4
-                  id={`${titleId}-others`}
-                  className="m-0 font-inter-tight text-[16px] font-semibold text-white"
-                >
-                  What others say
-                </h4>
-                <RatingLine summary={rating} className="ml-auto text-[13px]" />
-                <div className="-my-1 -mr-1 flex flex-none items-center">{closeX}</div>
-              </div>
-              <div role="tablist" aria-label="What others say" className="flex gap-1.5">
-                {(["reviews", "comments"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    role="tab"
-                    aria-selected={othersTab === t}
-                    onClick={() => setOthersTab(t)}
-                    className={cn(
-                      "min-h-8 rounded-full border px-3 text-[12.5px] transition-colors",
-                      othersTab === t
-                        ? "border-white/40 bg-white/10 text-white"
-                        : "border-white/15 text-white/75 hover:border-white/30 hover:text-white",
-                    )}
-                  >
-                    {othersLabel(
-                      t,
-                      t === "reviews" ? others.reviews?.length : others.comments?.length,
-                    )}
-                  </button>
-                ))}
+                <div role="tablist" aria-label="What others say" className="flex gap-1.5">
+                  {(["reviews", "comments"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      role="tab"
+                      aria-selected={othersTab === t}
+                      onClick={() => setOthersTab(t)}
+                      className={cn(
+                        "min-h-8 rounded-full border px-3 text-[12.5px] transition-colors",
+                        othersTab === t
+                          ? "border-white/40 bg-white/10 text-white"
+                          : "border-white/15 text-white/75 hover:border-white/30 hover:text-white",
+                      )}
+                    >
+                      {othersLabel(
+                        t,
+                        t === "reviews" ? others.reviews?.length : others.comments?.length,
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="-my-1 -mr-1 ml-auto flex flex-none items-center">{closeX}</div>
               </div>
               <div
                 role="tabpanel"

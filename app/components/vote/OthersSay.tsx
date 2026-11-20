@@ -117,7 +117,8 @@ export function OthersList(
     item: BallotItem;
     tab: OthersTab;
     data: OthersData;
-    /** Over the reviews: their average and 5★ to 1★ bars, as on the page. */
+    /** Over the reviews: their average and 5★ to 1★ bars, as on the page, once there are
+     * enough reviews for an average; before that, only the reviews. */
     rating?: RatingSummary;
   },
 ) {
@@ -145,9 +146,9 @@ export function OthersList(
   }
   return (
     <>
-      {tab === "reviews" && rating && rating.count > 0 && (
+      {tab === "reviews" && hasRatingAverage(rating) && (
         <div className="mb-3 rounded-xl bg-white/[.05] px-3 py-3">
-          <RatingHistogram summary={rating} />
+          <RatingHistogram summary={rating!} noun="review" />
         </div>
       )}
       <ul className="m-0 list-none space-y-2 p-0" aria-label={othersLabel(tab, undefined)}>

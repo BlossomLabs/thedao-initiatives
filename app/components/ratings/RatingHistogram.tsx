@@ -3,9 +3,10 @@ import { hasRatingAverage, type RatingSummary } from "@shared/ratings";
 import { StarRow } from "./Stars";
 import { REVIEWER } from "~/lib/reviewer";
 
-/** The average over five rows, 5★ to 1★, each with its share of the voting NFTs used to rate. */
+/** The average over five rows, 5★ to 1★, each with its share of the voting NFTs used to rate.
+ * `noun` counts them ("3 reviews" on the ballot); by default the reviewers. */
 export default function RatingHistogram(
-  { summary }: { summary: RatingSummary },
+  { summary, noun = REVIEWER }: { summary: RatingSummary; noun?: string },
 ) {
   const { avg, count, dist } = summary;
   return (
@@ -17,7 +18,7 @@ export default function RatingHistogram(
           </span>
         )}
         {hasRatingAverage(summary) && <StarRow value={avg} />}
-        <span className="small dim">{count ? plural(count, REVIEWER) : "No ratings yet"}</span>
+        <span className="small dim">{count ? plural(count, noun) : "No ratings yet"}</span>
       </div>
       {!hasRatingAverage(summary) && (
         <p className="small dim mt-2">Average shown after 3 reviewers.</p>

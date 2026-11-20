@@ -61,8 +61,8 @@ it("lists the reviews as given, with their text, and comments with the proposer'
       rating={{ avg: 3.5, count: 2, dist: [0, 1, 0, 0, 1], mine: null }}
     />,
   );
-  // The 5★ to 1★ bars come first, over the reviews.
-  expect(screen.getByRole("list", { name: "Ratings by stars" })).toBeInTheDocument();
+  // Two reviews are too few for an average: no 5★ to 1★ bars, only the reviews.
+  expect(screen.queryByRole("list", { name: "Ratings by stars" })).toBeNull();
   const reviews = within(screen.getByRole("list", { name: "Reviews" })).getAllByRole("listitem");
   expect(reviews.map((li) => li.textContent)).toEqual([
     expect.stringContaining("Too costly"),
@@ -74,6 +74,24 @@ it("lists the reviews as given, with their text, and comments with the proposer'
   expect(c).toHaveTextContent("Comment q1");
   expect(c).toHaveTextContent("Proposer · We will");
   expect(c).toHaveTextContent("9 votes");
+});
+
+it("from three reviews on, the average and its bars come first, counted in reviews", () => {
+  render(
+    <OthersList
+      item={item}
+      tab="reviews"
+      data={{
+        reviews: [review("a", 4, 30), review("b", 4, 20), review("c", 3, 10)],
+        comments: [],
+        failed: false,
+      }}
+      rating={{ avg: 3.67, count: 3, dist: [0, 0, 1, 2, 0], mine: null }}
+    />,
+  );
+  expect(screen.getByRole("list", { name: "Ratings by stars" })).toBeInTheDocument();
+  expect(screen.getByText("3.7")).toBeInTheDocument();
+  expect(screen.getByText("3 reviews")).toBeInTheDocument();
 });
 
 it("none yet points to the page to write the first one", () => {

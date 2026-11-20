@@ -230,3 +230,55 @@ Deno.test("vote briefs: calls refused JSON mode together each retry without it",
   assertEquals(inputs.length, 3);
   h.close();
 });
+
+/** A brief about the size of a real one (~0.6 KB serialized). */
+const bigBrief = (n: number) => ({
+  hash: "0".repeat(64),
+  what: [1, 2, 3].map((i) => ({
+    title: `Point ${i} of initiative ${n}`,
+    text: `A sentence long enough to stand for a real bullet on the card, number ${i}. `.repeat(2),
+  })),
+  adoption: ["Two execution clients must run it in production for a quarter"],
+  at: 1,
+});
+
+Deno.test("vote briefs: one key per initiative, so they keep saving past 64 KiB in all", async () => {
+  const { h, rewrite, brief } = await setup();
+  // 150 stored briefs: far more than one 64 KiB value could hold.
+  for (let i = 0; i < 150; i++) await h.db.voteBriefs.set(`other-${i}`, bigBrief(i));
+  const r = await h.db.initiatives.insert({ title: "Defimon", status: "approved", goalUsd: 1 });
+  const res = await rewrite(r.id);
+  assertEquals(res.status, 200);
+  assertEquals((await brief(r.id)).current, true);
+  assertEquals(Object.keys(await h.db.voteBriefs.all()).length, 151);
+  h.close();
+});
+
+Deno.test("vote briefs: the old shared record moves to one key each, newer keys winning", async () => {
+  const { h, view, brief } = await setup();
+  const a = await h.db.initiatives.insert({ title: "A", status: "approved", goalUsd: 1 });
+  const b = await h.db.initiatives.insert({ title: "B", status: "approved", goalUsd: 1 });
+  const { inputHash } = await import("../services/vote-briefs.ts");
+  const legacy = (r: typeof a, text: string) => ({
+    hash: "",
+    what: [{ title: r.title, text }],
+    adoption: [],
+    at: 1,
+  });
+  const old = {
+    [a.id]: { ...legacy(a, "Old A."), hash: await inputHash(a) },
+    [b.id]: legacy(b, "Old B."),
+  };
+  // As production holds it before this change; B already has a newer brief of its own.
+  await h.kv.set(["vote_brief", b.id], legacy(b, "New B."));
+  await h.kv.set(["meta", "vote_briefs"], old);
+  const fresh = (await import("../db/mod.ts")).createDb(h.kv);
+  const all = await fresh.voteBriefs.all();
+  assertEquals(all[a.id].what[0].text, "Old A.");
+  assertEquals(all[b.id].what[0].text, "New B.");
+  assertEquals((await h.kv.get(["meta", "vote_briefs"])).value, null);
+  // The app reads the moved brief.
+  assertEquals((await view())[a.slug].what, [{ title: "A", text: "Old A." }]);
+  assertEquals((await brief(a.id)).current, true);
+  h.close();
+});

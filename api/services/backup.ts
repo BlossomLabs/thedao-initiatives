@@ -44,6 +44,7 @@ export const BACKUP_PREFIXES = [
   "safe_balances",
   "safe_sync",
   "vote",
+  "vote_brief",
   "watchlist",
 ] as const;
 

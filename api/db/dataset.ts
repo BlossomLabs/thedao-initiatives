@@ -37,6 +37,7 @@ const DURABLE = new Set([
   "safe_balances",
   "safe_sync",
   "vote",
+  "vote_brief",
   "watchlist",
   "terms_accept",
   "terms_verified",

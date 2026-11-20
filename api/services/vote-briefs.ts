@@ -1,25 +1,16 @@
 /** The vote briefs (#96): the bullets of each initiative's card on /vote. "Paid on
  * adoption" is built here from the milestones on every read; the rest is written by the
  * model only when an admin reviews the text: an approval, an accepted edit, an admin's own
- * live edit, or Rewrite summary on the initiative's admin page. Never from a view. They
- * are stored under meta, keyed to the text they were written from, so an edit makes them
- * stale instead of wrong. */
+ * live edit, or Rewrite summary on the initiative's admin page. Never from a view. Each is
+ * stored under its own key (db/vote-briefs.ts), keyed to the text it was written from, so
+ * an edit makes it stale instead of wrong. */
 import type { Deps } from "../middleware/context.ts";
 import type { Initiative } from "../db/types.ts";
 import { AiError } from "./ai.ts";
 import { BRIEF_FORMAT, type VoteBrief, type WhatBullet } from "../../shared/vote/brief.ts";
+import type { StoredBrief } from "../db/vote-briefs.ts";
 
-export const BRIEFS_META = "vote_briefs";
-
-export interface StoredBrief {
-  /** sha-256 of the model's input and BRIEF_FORMAT: the bullets stand for exactly this
-   * text, written this way. */
-  hash: string;
-  what: WhatBullet[];
-  adoption: string[];
-  at: number;
-}
-export type StoredBriefs = Record<string, StoredBrief>;
+export type { StoredBrief, StoredBriefs } from "../db/vote-briefs.ts";
 
 /** What the model reads: the public text and the milestones, nothing about money raised. */
 export function briefInput(r: Initiative) {
@@ -65,7 +56,7 @@ export async function buildBriefs(
   cards: { initiative: { id: string; slug: string } }[],
 ): Promise<Record<string, VoteBrief>> {
   const { db } = deps;
-  const stored = (await db.meta.getPublic<StoredBriefs>(BRIEFS_META)) ?? {};
+  const stored = await db.voteBriefs.all();
   const out: Record<string, VoteBrief> = {};
   await Promise.all(cards.map(async (c) => {
     const r = await db.initiatives.get(c.initiative.id);
@@ -79,11 +70,7 @@ export async function buildBriefs(
 /** Admin → an initiative: its stored brief (even one written for an older text) and
  * whether it stands for the live text. */
 export async function briefFor(deps: Pick<Deps, "db">, id: string) {
-  const [r, stored] = await Promise.all([
-    deps.db.initiatives.get(id),
-    deps.db.meta.get<StoredBriefs>(BRIEFS_META),
-  ]);
-  const s = stored?.[id];
+  const [r, s] = await Promise.all([deps.db.initiatives.get(id), deps.db.voteBriefs.get(id)]);
   if (!r || !s) return { brief: null, current: false, at: null };
   return { brief: briefOf(r, s), current: s.hash === await inputHash(r), at: s.at };
 }
@@ -101,7 +88,11 @@ export async function writeBrief(
   if (!(await db.meta.aiBudgetOk())) throw new AiError("today's AI call cap is reached");
   const [lines, hash] = await Promise.all([ai.voteBrief(briefInput(r)), inputHash(r)]);
   const brief: StoredBrief = { hash, ...lines, at: deps.now() };
-  await db.meta.update<StoredBriefs>(BRIEFS_META, (cur) => ({ ...cur, [id]: brief }));
+  try {
+    await db.voteBriefs.set(id, brief);
+  } catch (e) {
+    throw new AiError(`the summary was written but not saved: ${String(e).slice(0, 160)}`);
+  }
 }
 
 /** An admin approved the initiative, accepted an edit, or edited it live: rewrite its

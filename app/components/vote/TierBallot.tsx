@@ -1077,6 +1077,16 @@ export default function TierBallot(
         announce={announce}
         card={peek && (() => {
           const i = items.find((it) => it.slug === peek.slug);
+          const at = peek.order.indexOf(peek.slug);
+          const face = (slug: string | undefined) => {
+            const it = slug === undefined ? undefined : items.find((x) => x.slug === slug);
+            return it && {
+              item: it,
+              note: noteOf(it.slug),
+              withdrawn: withdrawnOf(it.slug),
+              paid: paidOf(it.slug),
+            };
+          };
           return i && (
             <PhoneCard
               item={i}
@@ -1091,6 +1101,11 @@ export default function TierBallot(
               note={noteOf(peek.slug)}
               withdrawn={withdrawnOf(peek.slug)}
               paid={paidOf(peek.slug)}
+              neighbors={at < 0 ? undefined : {
+                prev: face(peek.order[at - 1]),
+                next: face(peek.order[at + 1]),
+                after: face(peek.order[at + 2]),
+              }}
               onClose={() => closePeek()}
             />
           );

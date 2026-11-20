@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import { useState } from "react";
@@ -101,6 +101,46 @@ it("swipes to the next initiative in the order the list showed", () => {
   expect(screen.getByRole("dialog", { name: "BETA" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Previous initiative" }));
   expect(screen.getByRole("dialog", { name: "ALPHA" })).toBeInTheDocument();
+});
+
+it("throws the card out to the left, and brings the previous one back from there", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: !query.includes("reduced-motion"),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  render(<Ballot />);
+  fireEvent.click(screen.getByRole("button", { name: /ALPHA/ }));
+  const under = () => document.querySelector<HTMLElement>("[data-phone-under]")!;
+  // At rest, the next card waits underneath, tilted.
+  expect(under().dataset.phoneUnder).toBe("beta");
+  expect(under().style.transform).toContain("rotate(4deg)");
+  fireEvent.click(screen.getByRole("button", { name: "Next initiative" }));
+  const article = screen.getByRole("heading", { name: "ALPHA" }).closest("article")!;
+  expect(article.style.transform).toContain("rotate(-22deg)");
+  // The third is already there, under the second, before the second comes up.
+  expect(document.querySelector<HTMLElement>("[data-phone-after]")!.dataset.phoneAfter)
+    .toBe("gamma");
+  // As it flies, the one underneath straightens up.
+  expect(under().style.transform).toContain("rotate(0deg)");
+  act(() => vi.advanceTimersByTime(300));
+  expect(screen.getByRole("dialog", { name: "BETA" })).toBeInTheDocument();
+  // Underneath is always the next one; the one gone by waits off to the left.
+  expect(under().dataset.phoneUnder).toBe("gamma");
+  const prev = () => document.querySelector<HTMLElement>("[data-phone-prev]")!;
+  expect(prev().dataset.phonePrev).toBe("alpha");
+  expect(prev().style.transform).toContain("rotate(-22deg)");
+  // Going back pulls it back on top, flat, and the open card sinks under it.
+  fireEvent.click(screen.getByRole("button", { name: "Previous initiative" }));
+  expect(prev().style.transform).toContain("rotate(0deg)");
+  expect(screen.getByRole("heading", { name: "BETA" }).closest("article")!.style.transform)
+    .toContain("rotate(4deg)");
+  act(() => vi.advanceTimersByTime(300));
+  expect(screen.getByRole("dialog", { name: "ALPHA" })).toBeInTheDocument();
+  expect(under().dataset.phoneUnder).toBe("beta");
+  vi.useRealTimers();
 });
 
 it("tells a swipe from a short drag, and stops at the ends", () => {

@@ -15,6 +15,20 @@ import { ofGoal } from "../../../shared/vote/brief";
 export const SWIPE_PX = 70;
 /** A move this far, mostly sideways, makes it a swipe rather than a tap or a scroll. */
 const SLOP = 10;
+/** How long a card takes to fly out of the window. */
+const LEAVE_MS = 220;
+/** How far the finger travels before the card underneath has come fully to the front. */
+const LIFT_PX = 160;
+/** The tilt of the card waiting underneath. */
+const UNDER_TILT = 4;
+
+/** One side of the stack: an initiative, as its card shows it. */
+export type CardFace = {
+  item: BallotItem;
+  note?: string;
+  withdrawn?: string;
+  paid?: string;
+};
 
 /** Where a swipe ends: the next card (1), the previous (-1), or back where it was (0). */
 export function swipeStep(dx: number, index: number, count: number): -1 | 0 | 1 {
@@ -27,10 +41,13 @@ export function swipeStep(dx: number, index: number, count: number): -1 | 0 | 1 
  * On a phone, an initiative's card fills the screen: what it is, then where it goes on
  * this ballot (the three tiers as big buttons, Not ranked and Skip under them). A choice
  * moves it and the card stays; a swipe sideways (or ‹ ›) goes to the next or previous
- * initiative, in the order the list showed when the card opened.
+ * initiative, in the order the list showed when the card opened. Like a deck: the next
+ * card waits underneath (tilted, a little smaller) and straightens up as the top one flies
+ * out to the left. The cards gone by sit off to the left: a swipe right pulls the last of
+ * them back on top, and the open one sinks back under it.
  */
 export default function PhoneCard<W extends string>(
-  { item, nav, choices, current, onChoose, note, withdrawn, paid, onClose }: {
+  { item, nav, choices, current, onChoose, note, withdrawn, paid, neighbors, onClose }: {
     item: BallotItem;
     nav: { index: number; count: number; onStep: (dir: -1 | 1) => void };
     /** The three tiers, then the list and skipped, in order (as InitiativePeek's). */
@@ -44,6 +61,9 @@ export default function PhoneCard<W extends string>(
     withdrawn?: string;
     /** What this badge paid for it, once its tier has settled: "$7,000". */
     paid?: string;
+    /** The card before this one (off to the left), the next (underneath), and the one
+     * after that (under the next, ready to show as soon as the next one lifts). */
+    neighbors?: { prev?: CardFace; next?: CardFace; after?: CardFace };
     onClose: () => void;
   },
 ) {
@@ -52,23 +72,33 @@ export default function PhoneCard<W extends string>(
   const others = choices.filter((c) => c.value.length !== 1);
   const now = choices.find((c) => c.value === current);
   const inTier = current.length === 1;
-  const r = item.card?.initiative;
-  /** "75% of goal", beside the ask. */
-  const share = item.askUsd === undefined ? "" : ofGoal(item.askUsd, r?.goalUsd ?? 0);
-  const cat = r?.categories[0];
 
-  // The swipe: how far the card has followed the finger, and which way the next one
-  // came in from (for its slide).
+  // The swipe: how far the card has followed the finger.
   const [dx, setDx] = useState(0);
-  const [from, setFrom] = useState<-1 | 0 | 1>(0);
+  /** The card on its way out of the window: to the left (1, next) or the right (-1). */
+  const [leaving, setLeaving] = useState<-1 | 0 | 1>(0);
+  const leavingRef = useRef(false);
+  const deck = useRef<HTMLDivElement>(null);
   const track = useRef<{ id: number; x0: number; y0: number; sideways?: boolean } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
+  // A step throws this card out of the window the way it was going; the one underneath
+  // is in its place by the time it's gone.
   const step = (dir: -1 | 1) => {
+    if (leavingRef.current) return;
     if (dir === 1 && nav.index >= nav.count - 1) return;
     if (dir === -1 && nav.index <= 0) return;
-    setFrom(dir);
-    setDx(0);
-    nav.onStep(dir);
+    const arrive = () => {
+      leavingRef.current = false;
+      setLeaving(0);
+      setDx(0);
+      nav.onStep(dir);
+    };
+    if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return arrive();
+    leavingRef.current = true;
+    setLeaving(dir);
+    timer.current = setTimeout(arrive, LEAVE_MS);
   };
 
   const onCloseRef = useRef(onClose);
@@ -96,7 +126,7 @@ export default function PhoneCard<W extends string>(
 
   const swipe = {
     onPointerDown: (e: React.PointerEvent) => {
-      if ((e.target as HTMLElement).closest("button, a")) return;
+      if (leavingRef.current || (e.target as HTMLElement).closest("button, a")) return;
       track.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
     },
     onPointerMove: (e: React.PointerEvent) => {
@@ -131,6 +161,33 @@ export default function PhoneCard<W extends string>(
     },
   };
 
+  const tracking = Boolean(track.current?.sideways);
+  const moving = leaving;
+  const ease = (how: string) => tracking ? "none" : `transform ${LEAVE_MS}ms ${how}`;
+  const prev = neighbors?.prev;
+  const next = neighbors?.next;
+  const after = neighbors?.after;
+  /** How far a card travels to leave the window: its width and a little more. */
+  const away = (deck.current?.offsetWidth ?? 360) + 64;
+  /** Going on: 0 at rest, 1 when the top card is gone and the next one is up. */
+  const on = moving === 1 ? 1 : dx < 0 && next ? Math.min(1, -dx / LIFT_PX) : 0;
+  /** Going back: how far the previous card has come back from the left (0 to 1). */
+  const back = moving === -1 ? 1 : dx > 0 && prev ? Math.min(1, dx / away) : 0;
+  /** ... and how far the open card has sunk under it. */
+  const sink = moving === -1 ? 1 : dx > 0 && prev ? Math.min(1, dx / LIFT_PX) : 0;
+  /** A card waiting underneath, `l` of the way up to the top (1 = flat on top). */
+  const underneath = (l: number) =>
+    `translateY(${(1 - l) * 14}px) scale(${0.92 + 0.08 * l}) rotate(${UNDER_TILT * (1 - l)}deg)`;
+  /** A card off to the left, `l` of the way back (1 = flat on top). */
+  const offLeft = (l: number) => `translateX(${-(1 - l) * away}px) rotate(${-22 * (1 - l)}deg)`;
+  const top = moving === 1
+    ? offLeft(0)
+    : prev && (dx > 0 || moving === -1)
+    ? underneath(1 - sink)
+    : dx
+    ? `translateX(${dx}px) rotate(${dx / 18}deg)`
+    : "none";
+
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
@@ -138,7 +195,7 @@ export default function PhoneCard<W extends string>(
       aria-modal="true"
       aria-labelledby={titleId}
       data-phone-card={item.slug}
-      className="fixed inset-0 z-[200] flex flex-col bg-dao-blue bg-[linear-gradient(160deg,var(--color-dao-blue)_30%,var(--color-dao-blue-dark)_90%)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(.5rem,env(safe-area-inset-top))]"
+      className="fixed inset-0 z-[200] flex flex-col overflow-hidden bg-dao-blue bg-[linear-gradient(160deg,var(--color-dao-blue)_30%,var(--color-dao-blue-dark)_90%)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(.5rem,env(safe-area-inset-top))]"
     >
       <div className="flex flex-none items-center gap-2 px-4">
         <button
@@ -170,89 +227,67 @@ export default function PhoneCard<W extends string>(
         />
       </div>
 
-      <div className="relative min-h-0 flex-1 px-4 pt-3.5">
+      <div ref={deck} className="relative isolate min-h-0 flex-1">
+        {
+          /* One key per initiative, so a card moving from underneath to the top (or back)
+            is the same element and doesn't blink. */
+        }
+        {after && (
+          <article
+            key={after.item.slug}
+            aria-hidden="true"
+            inert
+            data-phone-after={after.item.slug}
+            style={{ transform: underneath(0), transition: ease("ease-out") }}
+            className={cn(CARD, "z-0")}
+          >
+            <Face face={after} nav={nav} />
+          </article>
+        )}
+        {next && (
+          <article
+            key={next.item.slug}
+            aria-hidden="true"
+            inert
+            data-phone-under={next.item.slug}
+            style={{ transform: underneath(on), transition: ease("ease-out") }}
+            className={cn(CARD, "z-[1]")}
+          >
+            <Face face={next} nav={nav} />
+          </article>
+        )}
         <article
           key={item.slug}
           {...swipe}
-          style={{
-            transform: dx ? `translateX(${dx}px) rotate(${dx / 40}deg)` : undefined,
-            transition: track.current?.sideways ? "none" : undefined,
-          }}
-          className={cn(
-            "flex h-full touch-pan-y select-none flex-col rounded-[20px] border border-white/15 bg-white/[.07] p-5 shadow-[0_14px_30px_rgba(0,0,0,.2)] transition-transform duration-200",
-            from === 1 &&
-              "motion-safe:animate-in motion-safe:slide-in-from-right-10 motion-safe:fade-in",
-            from === -1 &&
-              "motion-safe:animate-in motion-safe:slide-in-from-left-10 motion-safe:fade-in",
-          )}
+          style={{ transform: top, transition: ease(moving === 1 ? "ease-in" : "ease-out") }}
+          className={cn(CARD, "z-10 touch-pan-y")}
         >
-          <p className="m-0 flex min-w-0 items-center gap-1.5 truncate text-[13px] text-white/65">
-            {cat && <CategoryDot slug={cat} className="size-2 flex-none" />}
-            {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
-          </p>
-          <h2
-            id={titleId}
-            className="m-0 mt-2.5 font-inter-tight text-[22px] font-bold leading-[1.22] text-white"
-          >
-            {item.title}
-          </h2>
-          {item.askUsd !== undefined && (
-            <p className="m-0 mt-2.5 flex flex-wrap items-center gap-x-2 text-[15px] tnum">
-              <span>
-                <b className="font-semibold text-white">{usd(item.askUsd)}</b>{" "}
-                <span className="text-white/60">
-                  ask{share && ` (${share})`}
-                </span>
-              </span>
-              {paid && <span className="ml-2 text-vote">You paid {paid}</span>}
-              {/* Who pledged, on the right, as on the desktop card. */}
-              <PledgerStack item={item} size={32} className="ml-auto" />
-            </p>
-          )}
-          {note && <p className="m-0 mt-2 text-[13px] leading-snug text-vote">{note}</p>}
-          {withdrawn && (
-            <p className="m-0 mt-2 text-[13px] leading-snug text-dao-red-pale">{withdrawn}</p>
-          )}
-          <div className="mt-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <BriefList item={item} className="select-text text-[14px]" />
-          </div>
-          <div className="mt-3 flex flex-none items-center justify-between gap-2">
-            <button
-              type="button"
-              aria-label="Previous initiative"
-              disabled={nav.index === 0}
-              onClick={() => step(-1)}
-              className="grid size-11 place-items-center rounded-full border border-white/15 text-white/80 disabled:opacity-30"
-            >
-              <ChevronLeft className="size-5" aria-hidden="true" />
-            </button>
-            <LinkButton
-              variant="ghost"
-              sm
-              to={`/initiative/${item.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Open full page for ${item.title} (opens in a new tab)`}
-            >
-              Open full page
-            </LinkButton>
-            <button
-              type="button"
-              aria-label="Next initiative"
-              disabled={nav.index >= nav.count - 1}
-              onClick={() => step(1)}
-              className="grid size-11 place-items-center rounded-full border border-white/15 text-white/80 disabled:opacity-30"
-            >
-              <ChevronRight className="size-5" aria-hidden="true" />
-            </button>
-          </div>
+          <Face
+            face={{ item, note, withdrawn, paid }}
+            titleId={titleId}
+            nav={nav}
+            onStep={step}
+          />
         </article>
+        {prev && (
+          <article
+            key={prev.item.slug}
+            aria-hidden="true"
+            inert
+            data-phone-prev={prev.item.slug}
+            style={{ transform: offLeft(back), transition: ease("ease-out") }}
+            className={cn(CARD, "z-20")}
+          >
+            <Face face={prev} nav={nav} />
+          </article>
+        )}
       </div>
-      <p className="m-0 flex-none pt-2 text-center text-[12px] text-white/50">
-        Swipe for the next initiative
-      </p>
 
-      <div className="flex-none px-4 pt-3" role="group" aria-label={`Where ${item.title} goes`}>
+      <div
+        className="relative z-10 flex-none px-4 pt-3"
+        role="group"
+        aria-label={`Where ${item.title} goes`}
+      >
         <div className="grid grid-cols-3 gap-2">
           {tiers.map((c) => {
             const on = c.value === current;
@@ -305,5 +340,89 @@ export default function PhoneCard<W extends string>(
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** The cards share a solid face (the one underneath must not show through). */
+const CARD =
+  "absolute inset-x-4 bottom-0 top-3.5 flex origin-[50%_85%] select-none flex-col rounded-[20px] border border-white/15 bg-[color-mix(in_srgb,white_7%,var(--color-dao-blue))] p-5 shadow-[0_14px_30px_rgba(0,0,0,.2)]";
+
+/** What a card shows: the initiative, its ask and bullets, and ‹ Open full page ›. */
+function Face(
+  { face: { item, note, withdrawn, paid }, titleId, nav, onStep }: {
+    face: CardFace;
+    titleId?: string;
+    nav: { index: number; count: number };
+    /** Only the top card steps; the one underneath just looks the same. */
+    onStep?: (dir: -1 | 1) => void;
+  },
+) {
+  const r = item.card?.initiative;
+  /** "75% of goal", beside the ask. */
+  const share = item.askUsd === undefined ? "" : ofGoal(item.askUsd, r?.goalUsd ?? 0);
+  const cat = r?.categories[0];
+  return (
+    <>
+      <p className="m-0 flex min-w-0 items-center gap-1.5 truncate text-[13px] text-white/65">
+        {cat && <CategoryDot slug={cat} className="size-2 flex-none" />}
+        {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
+      </p>
+      <h2
+        id={titleId}
+        className="m-0 mt-2.5 font-inter-tight text-[22px] font-bold leading-[1.22] text-white"
+      >
+        {item.title}
+      </h2>
+      {item.askUsd !== undefined && (
+        <p className="m-0 mt-2.5 flex flex-wrap items-center gap-x-2 text-[15px] tnum">
+          <span>
+            <b className="font-semibold text-white">{usd(item.askUsd)}</b>{" "}
+            <span className="text-white/60">
+              ask{share && ` (${share})`}
+            </span>
+          </span>
+          {paid && <span className="ml-2 text-vote">You paid {paid}</span>}
+          {/* Who pledged, on the right, as on the desktop card. */}
+          <PledgerStack item={item} size={32} className="ml-auto" />
+        </p>
+      )}
+      {note && <p className="m-0 mt-2 text-[13px] leading-snug text-vote">{note}</p>}
+      {withdrawn && (
+        <p className="m-0 mt-2 text-[13px] leading-snug text-dao-red-pale">{withdrawn}</p>
+      )}
+      <div className="mt-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <BriefList item={item} className="select-text text-[14px]" />
+      </div>
+      <div className="mt-3 flex flex-none items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-label="Previous initiative"
+          disabled={nav.index === 0}
+          onClick={() => onStep?.(-1)}
+          className="grid size-11 place-items-center rounded-full border border-white/15 text-white/80 disabled:opacity-30"
+        >
+          <ChevronLeft className="size-5" aria-hidden="true" />
+        </button>
+        <LinkButton
+          variant="ghost"
+          sm
+          to={`/initiative/${item.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open full page for ${item.title} (opens in a new tab)`}
+        >
+          Open full page
+        </LinkButton>
+        <button
+          type="button"
+          aria-label="Next initiative"
+          disabled={nav.index >= nav.count - 1}
+          onClick={() => onStep?.(1)}
+          className="grid size-11 place-items-center rounded-full border border-white/15 text-white/80 disabled:opacity-30"
+        >
+          <ChevronRight className="size-5" aria-hidden="true" />
+        </button>
+      </div>
+    </>
   );
 }

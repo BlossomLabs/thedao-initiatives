@@ -1,8 +1,9 @@
 import { flushSync } from "react-dom";
 
 /** The browser's own morph (View Transitions) between a ballot initiative and its card.
- * Both sides mark the same three parts: the box (`data-peek-box`), the title
- * (`data-peek-title`) and the category dot (`data-peek-dot`). Each part gets a shared
+ * Both sides mark the same parts: the box (`data-peek-box`), the title
+ * (`data-peek-title`), the category dot (`data-peek-dot`) and the New pill
+ * (`data-peek-new`), when there is one. Each part gets a shared
  * name just before the change and loses it after, so only the one initiative morphs.
  *
  * While its card is open the initiative stays in its place as a dashed box
@@ -13,7 +14,7 @@ import { flushSync } from "react-dom";
  * is named, so only the morphing card is drawn above the dim.
  * Without View Transitions, or with reduced motion, the change just happens. */
 
-const NAMES = ["peek", "peek-title", "peek-dot"] as const;
+const NAMES = ["peek", "peek-title", "peek-dot", "peek-new"] as const;
 
 function parts(root: Element | null): (HTMLElement | null)[] {
   if (!root) return [];
@@ -23,6 +24,9 @@ function parts(root: Element | null): (HTMLElement | null)[] {
     pick("[data-peek-box]") ?? (root as HTMLElement),
     pick("[data-peek-title]"),
     pick("[data-peek-dot]"),
+    // The New pill sits outside the card's clipping box: named on its own, it moves with
+    // the card instead of staying in the page under it.
+    pick("[data-peek-new]"),
   ];
 }
 

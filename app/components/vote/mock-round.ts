@@ -154,6 +154,9 @@ function sampleBallot(round: VoteManifest, asks: bigint[]) {
   return { ballot, s, a, b };
 }
 
+/** How many initiatives were added to the example round after badge `n` sent its ballot. */
+const NEW_SINCE_SENT = 3;
+
 /** A small seeded random generator: the same made-up ballots on every page load. */
 function seeded(seed: number) {
   let s = seed >>> 0;
@@ -183,7 +186,11 @@ function crowd(
   const favA = [a[0], a[2]];
   const favB = [b[1]];
   const ballots = new Map<string, Uint8Array>();
-  if (withOwn) ballots.set(String(n), encodeBallot(slugs, sample.ballot));
+  // Sent before the newest few were put on the ballot: the editor marks those New.
+  const sentWith = slugs.length - NEW_SINCE_SENT > Object.keys(sample.ballot).length
+    ? slugs.slice(0, slugs.length - NEW_SINCE_SENT)
+    : slugs;
+  if (withOwn) ballots.set(String(n), encodeBallot(sentWith, sample.ballot));
   for (let v = 1; v <= VOTERS; v++) {
     const id = String(v);
     if (id === String(n)) continue;
@@ -215,7 +222,11 @@ function tallied(
   const { slugs } = round;
   const m = slugs.length;
   const voters = [...ballots.keys()].sort();
-  const rows = voters.map((v) => [...ballots.get(v)!]);
+  // As the replay does: a ballot sent before later projects joined leaves them unplaced.
+  const rows = voters.map((v) => {
+    const b = [...ballots.get(v)!];
+    return [...b, ...Array(Math.max(0, m - b.length)).fill(255)];
+  });
   const pool = BigInt(round.poolUsd);
   const each = voters.length ? pool / BigInt(voters.length) : 0n;
   const inp: ChainInputs = {
@@ -252,6 +263,7 @@ function tallied(
     live,
     voters,
     accepted: Object.fromEntries(voters.map((v) => [v, bytesToHex(ballots.get(v)!)])),
+    acceptedLengths: Object.fromEntries(voters.map((v) => [v, ballots.get(v)!.length])),
   };
 }
 
@@ -404,6 +416,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     registrationClosesAt: settledCount ? first[0] + WINDOW : first[0] + LONGEST,
     tiers,
     accepted: t.accepted,
+    acceptedLengths: t.acceptedLengths,
     live: kind === "finished"
       ? (() => {
         const all = settledTiers.flatMap((x) => (x.status === "settled" ? x.funded : []));

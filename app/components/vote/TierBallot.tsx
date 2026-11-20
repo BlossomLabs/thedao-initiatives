@@ -12,6 +12,7 @@ import {
   Undo2,
 } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
+import NewPill from "./NewPill";
 import StickyAside from "~/components/layout/StickyAside";
 import type { Card } from "~/lib/api-types";
 import type { AiSearchResult } from "../../../shared/ai-search";
@@ -67,6 +68,8 @@ export type BallotItem = {
   card?: Card;
   /** What the round asks the pool for it, in dollars (its cost in the tally). */
   askUsd?: number;
+  /** Put on the ballot after this badge's ballot was last sent: first in the list, marked New. */
+  isNew?: boolean;
 };
 
 /** Where an initiative is: a tier, the list, or skipped (off the list, out of sight;
@@ -504,7 +507,10 @@ export default function TierBallot(
   }, [picked]);
 
   const unranked = useMemo(
-    () => items.filter((i) => !tiers[i.slug] && !skipped?.has(i.slug)),
+    // The ones added since the last send first, so they aren't missed.
+    () =>
+      items.filter((i) => !tiers[i.slug] && !skipped?.has(i.slug))
+        .sort((a, b) => Number(Boolean(b.isNew)) - Number(Boolean(a.isNew))),
     [items, tiers, skipped],
   );
   const skippedItems = useMemo(
@@ -611,6 +617,9 @@ export default function TierBallot(
       { ghost: "to", landed: () => setClosing(undefined) },
     ).then(() => boxEl(slug)?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true }));
   };
+
+  /** New, and still waiting in the list (or skipped): placed in a tier, it's seen. */
+  const fresh = (i: BallotItem) => Boolean(i.isNew) && !tiers[i.slug];
 
   /** A card's insides: the grip, the title, and its category and goal. */
   const tileFace = (i: BallotItem) => {
@@ -722,19 +731,22 @@ export default function TierBallot(
         data-ballot-box={i.slug}
         data-peek-box=""
         className={cn(
-          "relative overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-colors",
+          // Not clipped, so the New pill can sit on the top edge; the tile clips itself.
+          "relative rounded-xl border bg-white/5 transition-colors",
+          fresh(i) ? "border-dao-sky/60" : "border-white/10",
           isSkipped && "opacity-60 hover:opacity-100",
           landed?.slug === i.slug && "motion-safe:animate-chip-land",
         )}
         data-peek-slot={slotOf(i.slug)}
       >
+        {fresh(i) && <NewPill />}
         {/* Only a handle to drag: Details opens the card. */}
         <div
           data-ballot-tile={i.slug}
           {...grab(i.slug, false)}
           className={cn(
             TILE,
-            "relative flex w-full select-none items-center gap-2 overflow-hidden pl-2 text-left transition-opacity duration-150 [-webkit-touch-callout:none]",
+            "relative flex w-full select-none items-center gap-2 overflow-hidden rounded-[inherit] pl-2 text-left transition-opacity duration-150 [-webkit-touch-callout:none]",
             quick ? "pr-[112px] sm:pr-[150px]" : "pr-[44px] sm:pr-[76px]",
             !disabled && "cursor-grab hover:bg-white/[.03]",
             drag?.slug === i.slug && "opacity-40",
@@ -794,7 +806,8 @@ export default function TierBallot(
     const isFunded = settledHere && Boolean(funded?.has(i.slug));
     const paidText = paidOf(i.slug);
     return (
-      <li key={i.slug} data-ballot-box={i.slug}>
+      <li key={i.slug} data-ballot-box={i.slug} className="relative">
+        {fresh(i) && <NewPill />}
         <button
           type="button"
           aria-haspopup="dialog"
@@ -805,6 +818,8 @@ export default function TierBallot(
               ? "border-vote/50 bg-vote/[.08]"
               : landed?.slug === i.slug
               ? "border-dao-green/60"
+              : fresh(i)
+              ? "border-dao-sky/60"
               : "border-white/10",
             settledHere && funded && !isFunded && "opacity-55",
             skipped?.has(i.slug) && !tiers[i.slug] && "opacity-60",
@@ -1085,6 +1100,7 @@ export default function TierBallot(
               note: noteOf(it.slug),
               withdrawn: withdrawnOf(it.slug),
               paid: paidOf(it.slug),
+              isNew: fresh(it),
             };
           };
           return i && (
@@ -1101,6 +1117,7 @@ export default function TierBallot(
               note={noteOf(peek.slug)}
               withdrawn={withdrawnOf(peek.slug)}
               paid={paidOf(peek.slug)}
+              isNew={fresh(i)}
               neighbors={at < 0 ? undefined : {
                 prev: face(peek.order[at - 1]),
                 next: face(peek.order[at + 1]),
@@ -1330,6 +1347,7 @@ export default function TierBallot(
             note={noteOf(peek.slug)}
             withdrawn={withdrawnOf(peek.slug)}
             paid={paidOf(peek.slug)}
+            isNew={fresh(i)}
             onClose={() => closePeek()}
           />
         );

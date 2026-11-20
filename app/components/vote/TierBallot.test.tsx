@@ -527,3 +527,57 @@ it("a withdrawn initiative alone in an open tier above other picks holds its pla
     "Withdrawn from the vote: it holds A-Tier's place, so your picks below keep their tier, and gets nothing.",
   );
 });
+
+it("initiatives added since the last send come first in the list, marked New, until placed", () => {
+  const added = [
+    { slug: "alpha", title: "ALPHA" },
+    { slug: "beta", title: "BETA" },
+    { slug: "gamma", title: "GAMMA", isNew: true },
+    { slug: "delta", title: "DELTA", isNew: true },
+  ];
+  const ballot = (tiers: Partial<Record<string, Tier>>) => (
+    <MemoryRouter>
+      <TierBallot
+        items={added}
+        tiers={tiers}
+        disabled={false}
+        locked={new Set<Tier>()}
+        onChange={vi.fn()}
+        onReplace={vi.fn()}
+      />
+    </MemoryRouter>
+  );
+  const { rerender } = render(ballot({}));
+  const list = screen.getByRole("list", { name: "Not ranked yet" });
+  const titles = within(list).getAllByRole("listitem").map((li) =>
+    within(li).getByText(/^[A-Z]+$/).textContent
+  );
+  expect(titles).toEqual(["GAMMA", "DELTA", "ALPHA", "BETA"]);
+  expect(within(list).getAllByText("New")).toHaveLength(2);
+
+  rerender(ballot({ gamma: "A" }));
+  expect(within(screen.getByRole("list", { name: "Not ranked yet" })).getAllByText("New"))
+    .toHaveLength(1);
+});
+
+it("Details on a new initiative shows New too, until it's placed", async () => {
+  const added = [{ slug: "alpha", title: "ALPHA" }, { slug: "beta", title: "BETA", isNew: true }];
+  const onChange = vi.fn();
+  inRouter(
+    <TierBallot
+      items={added}
+      tiers={{}}
+      disabled={false}
+      locked={new Set<Tier>()}
+      onChange={onChange}
+      onReplace={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Details for BETA" }));
+  const card = await screen.findByRole("dialog", { name: "BETA" });
+  expect(within(card.parentElement!).getByText("New")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  fireEvent.click(screen.getByRole("button", { name: "Details for ALPHA" }));
+  const other = await screen.findByRole("dialog", { name: "ALPHA" });
+  expect(within(other.parentElement!).queryByText("New")).toBeNull();
+});

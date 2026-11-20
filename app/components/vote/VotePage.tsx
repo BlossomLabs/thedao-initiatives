@@ -260,7 +260,11 @@ export default function VotePage(
   const rv = mock
     ? mockData &&
       (mockSent && n !== null
-        ? { ...mockData.view, accepted: { ...mockData.view.accepted, [String(n)]: mockSent } }
+        ? {
+          ...mockData.view,
+          accepted: { ...mockData.view.accepted, [String(n)]: mockSent },
+          acceptedLengths: { ...mockData.view.acceptedLengths, [String(n)]: R.slugs.length },
+        }
         : mockData.view)
     : roundQ.data;
   useEffect(() => {
@@ -403,13 +407,22 @@ export default function VotePage(
   // Each initiative's ask is the chain's, served with the round: none while it's unknown
   // (or served short).
   const asks = servedAsks(R, rv?.asks);
+  // A sent ballot lists the initiatives on the ballot then: any after them were added
+  // since, and are marked New. None before a first send: everything is new then.
+  const sentLength = n !== null && countedNow ? rv?.acceptedLengths?.[String(n)] : undefined;
   const items = useMemo<BallotItem[]>(() => {
     const cards = new Map(board.data?.cards.map((c) => [c.initiative.slug, c]));
-    return R.slugs.map((slug) => {
+    return R.slugs.map((slug, i) => {
       const card = cards.get(slug);
-      return { slug, title: card?.initiative.title ?? slug, card, askUsd: askOf(R, asks, slug) };
+      return {
+        slug,
+        title: card?.initiative.title ?? slug,
+        card,
+        askUsd: askOf(R, asks, slug),
+        ...(sentLength !== undefined && i >= sentLength ? { isNew: true } : {}),
+      };
     });
-  }, [board.data, R, asks]);
+  }, [board.data, R, asks, sentLength]);
 
   // A holder of several voting badges votes once per badge: pick which one.
   const picker = myBallot && ids.length > 1 && (

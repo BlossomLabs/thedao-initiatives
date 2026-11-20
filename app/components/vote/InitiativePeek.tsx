@@ -10,6 +10,7 @@ import { categoryOf } from "~/lib/categories";
 import { cn } from "~/lib/utils";
 import type { BallotItem } from "./TierBallot";
 import BriefList, { askText, PledgerStack } from "./BriefList";
+import NewPill from "./NewPill";
 
 /** A ballot initiative's card: a little about it, where it goes on this ballot (a tier, the
  * list, or skipped) and a link to its full page. It opens and closes with the browser's own morph
@@ -49,7 +50,7 @@ export type PeekChoice<W extends string> = {
 };
 
 export default function InitiativePeek<W extends string>(
-  { item, nav, choices, current, onChoose, note, withdrawn, paid, onClose }: {
+  { item, nav, choices, current, onChoose, note, withdrawn, paid, isNew, onClose }: {
     item: BallotItem;
     /** ‹ › through the ballot: where this one is (-1 when it's not in the order). */
     nav?: { index: number; count: number; onStep: (dir: -1 | 1) => void };
@@ -64,6 +65,8 @@ export default function InitiativePeek<W extends string>(
     withdrawn?: string;
     /** What this badge paid for it, once its tier has settled: "$7,000". */
     paid?: string;
+    /** Added since this badge last sent its ballot, and not in a tier yet. */
+    isNew?: boolean;
     onClose: () => void;
   },
 ) {
@@ -371,6 +374,11 @@ export default function InitiativePeek<W extends string>(
             </div>
           </div>
         </div>
+        {
+          // On the card's top edge (the box clips, this wrapper doesn't); after the box,
+          // so it's drawn over it, in a morph too.
+        }
+        {isNew && <NewPill card />}
       </div>
     </div>,
     document.body,

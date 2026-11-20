@@ -32,14 +32,16 @@ export default function WatchlistButton(
 
 /** "New": approved in the last 7 days. On a card it sits on the top edge with
  * Featured and AI pick, in their shape; sky, since red means OpSec and danger here. */
-export function NewMarker({ className }: { className?: string }) {
+export function NewMarker(
+  { className, title = "Approved in the last 7 days" }: { className?: string; title?: string },
+) {
   return (
     <span
       className={cn(
         "rounded-full border border-[rgba(90,200,250,.45)] bg-[#1d4a66] px-2.5 py-[3px] font-inter-tight text-[11px] font-bold uppercase tracking-[.4px] text-[#9ddcfb]",
         className,
       )}
-      title="Approved in the last 7 days"
+      title={title}
     >
       New
     </span>

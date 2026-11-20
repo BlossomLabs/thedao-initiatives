@@ -9,6 +9,7 @@ import { cn } from "~/lib/utils";
 import type { PeekChoice } from "./InitiativePeek";
 import type { BallotItem } from "./TierBallot";
 import BriefList, { PledgerStack } from "./BriefList";
+import NewPill from "./NewPill";
 import { ofGoal } from "../../../shared/vote/brief";
 
 /** How far a finger has to travel sideways for a swipe to the next or previous card. */
@@ -28,6 +29,8 @@ export type CardFace = {
   note?: string;
   withdrawn?: string;
   paid?: string;
+  /** Added since this badge last sent its ballot, and not in a tier yet. */
+  isNew?: boolean;
 };
 
 /** Where a swipe ends: the next card (1), the previous (-1), or back where it was (0). */
@@ -47,7 +50,7 @@ export function swipeStep(dx: number, index: number, count: number): -1 | 0 | 1 
  * them back on top, and the open one sinks back under it.
  */
 export default function PhoneCard<W extends string>(
-  { item, nav, choices, current, onChoose, note, withdrawn, paid, neighbors, onClose }: {
+  { item, nav, choices, current, onChoose, note, withdrawn, paid, isNew, neighbors, onClose }: {
     item: BallotItem;
     nav: { index: number; count: number; onStep: (dir: -1 | 1) => void };
     /** The three tiers, then the list and skipped, in order (as InitiativePeek's). */
@@ -61,6 +64,8 @@ export default function PhoneCard<W extends string>(
     withdrawn?: string;
     /** What this badge paid for it, once its tier has settled: "$7,000". */
     paid?: string;
+    /** Added since this badge last sent its ballot, and not in a tier yet. */
+    isNew?: boolean;
     /** The card before this one (off to the left), the next (underneath), and the one
      * after that (under the next, ready to show as soon as the next one lifts). */
     neighbors?: { prev?: CardFace; next?: CardFace; after?: CardFace };
@@ -263,7 +268,7 @@ export default function PhoneCard<W extends string>(
           className={cn(CARD, "z-10 touch-pan-y")}
         >
           <Face
-            face={{ item, note, withdrawn, paid }}
+            face={{ item, note, withdrawn, paid, isNew }}
             titleId={titleId}
             nav={nav}
             onStep={step}
@@ -349,7 +354,7 @@ const CARD =
 
 /** What a card shows: the initiative, its ask and bullets, and ‹ Open full page ›. */
 function Face(
-  { face: { item, note, withdrawn, paid }, titleId, nav, onStep }: {
+  { face: { item, note, withdrawn, paid, isNew }, titleId, nav, onStep }: {
     face: CardFace;
     titleId?: string;
     nav: { index: number; count: number };
@@ -363,6 +368,7 @@ function Face(
   const cat = r?.categories[0];
   return (
     <>
+      {isNew && <NewPill card />}
       <p className="m-0 flex min-w-0 items-center gap-1.5 truncate text-[13px] text-white/65">
         {cat && <CategoryDot slug={cat} className="size-2 flex-none" />}
         {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}

@@ -82,6 +82,9 @@ export type RoundView = {
   accepted: Record<string, string>;
   /** Accepted revision per badge; absent only in older responses and examples. */
   acceptedNonces?: Record<string, number>;
+  /** How many initiatives each accepted ballot listed as sent: any after it are new to
+   * that badge. Absent in older responses. */
+  acceptedLengths?: Record<string, number>;
   rejected: {
     tokenId: string;
     nonce: number;

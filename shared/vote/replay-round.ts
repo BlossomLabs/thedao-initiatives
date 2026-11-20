@@ -285,6 +285,8 @@ export function roundJson(st: Round, slugs: string[]) {
       ) => [t, `0x${[...b].map((x) => x.toString(16).padStart(2, "0")).join("")}`]),
     ),
     acceptedNonces: Object.fromEntries(st.acceptedNonces),
+    /** tokenId → how many projects its ballot listed as sent (later ones are new to it). */
+    acceptedLengths: Object.fromEntries(st.acceptedLengths),
     rejected: st.rejected,
     live: {
       funded: named(st.live.order),

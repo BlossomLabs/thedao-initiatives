@@ -682,3 +682,10 @@ it("rejected revisions leave the accepted nonce unchanged and revocation removes
   const revoked = run([first, r("a", 2, null)], T);
   expect(revoked.acceptedNonces.has("a")).toBe(false);
 });
+
+it("keeps how many projects a ballot listed as sent, though it pads the later ones", () => {
+  const state = run([r("a", 1, [1])], T);
+  expect([...state.accepted.get("a")!]).toEqual([1, X]);
+  expect(state.acceptedLengths.get("a")).toBe(1);
+  expect(run([r("a", 1, [1]), r("a", 2, null)], T).acceptedLengths.has("a")).toBe(false);
+});

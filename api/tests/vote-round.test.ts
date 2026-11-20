@@ -280,10 +280,29 @@ Deno.test("vote round mine: the signed-in account's badges, or none; needs a ses
   const token = await h.mint(PLAIN);
   assertEquals(await j(await h.req(voteRequestPath(h.deps, "/api/vote/mine"), { token })), {
     ids: [],
+    fresh: {},
   });
   state.owners.set(17n, PLAIN);
   assertEquals(await j(await h.req(voteRequestPath(h.deps, "/api/vote/mine"), { token })), {
     ids: [17],
+    fresh: {},
+  });
+  h.close();
+});
+
+Deno.test("mine: how many initiatives joined since each badge last sent its ballot", async () => {
+  const { h, state } = await setup();
+  const token = await h.mint(PLAIN);
+  state.owners.set(17n, PLAIN);
+  state.owners.set(18n, PLAIN);
+  // 17 sent before b and c joined; 18 sent with all three.
+  state.logs = [
+    { tokenId: "17", ballot: "0x01" as Hex, timestamp: NOW - 100, block: 1, nonce: 1 },
+    { tokenId: "18", ballot: "0x01ffff" as Hex, timestamp: NOW - 90, block: 2, nonce: 1 },
+  ];
+  assertEquals(await j(await h.req(voteRequestPath(h.deps, "/api/vote/mine"), { token })), {
+    ids: [17, 18],
+    fresh: { "17": 2 },
   });
   h.close();
 });
@@ -294,6 +313,7 @@ Deno.test("real round mine: every voting badge the account holds, in order", asy
   const token = await h.mint(PLAIN);
   assertEquals(await j(await h.req(voteRequestPath(h.deps, "/api/vote/mine"), { token })), {
     ids: [12, 40],
+    fresh: {},
   });
   h.close();
 });

@@ -584,12 +584,23 @@ export function voteRoutes(deps: Deps) {
     return c.body(body, 200, headers);
   });
 
-  /** The badges the signed-in account votes with, so the menu and /vote lead to its ballot. */
+  /** The badges the signed-in account votes with, so the menu and /vote lead to its ballot,
+   * and how many initiatives joined the ballot since each last sent its own (`fresh`, only
+   * those with some): the menu's chip, in the same request. The count comes from the
+   * replay this isolate already keeps for a few seconds; a failed replay leaves it out and
+   * never fails the badges. */
   r.get("/mine", requireAuth, async (c) => {
     const d = await dc();
     await limit("mine", c.var.ip);
-    const ids = await d.chain.idsOf(c.var.user!.address as Hex);
-    return c.json({ ids: [...ids].sort((a, b) => a - b) });
+    const [ids, st] = await Promise.all([
+      d.chain.idsOf(c.var.user!.address as Hex),
+      recentRound(d).catch(() => null),
+    ]);
+    const sorted = [...ids].sort((a, b) => a - b);
+    return c.json({
+      ids: sorted,
+      fresh: st ? freshSince(st, d.manifest.slugs.length, sorted) : {},
+    });
   });
 
   /** Admin → Vote: who pays for relayed ballots, and what it has left. */
@@ -852,3 +863,22 @@ export function voteRoutes(deps: Deps) {
 
 /** The replay a vote instance reads (its in-flight chain read and few-second cache). */
 export type VoteReplay = ReturnType<typeof voteRoutes>["replay"];
+
+/** For each badge that sent a ballot, how many projects joined after it (a sent ballot
+ * lists the projects on the round then), withdrawn ones aside; only badges with some. */
+export function freshSince(
+  st: Pick<Round, "acceptedLengths" | "withdrawnFlags">,
+  projects: number,
+  ids: number[],
+): Record<string, number> {
+  const out = new Set(st.withdrawnFlags ?? []);
+  const fresh: Record<string, number> = {};
+  for (const id of ids) {
+    const sent = st.acceptedLengths.get(String(id));
+    if (sent === undefined) continue;
+    let n = 0;
+    for (let i = sent; i < projects; i++) if (!out.has(i)) n++;
+    if (n) fresh[String(id)] = n;
+  }
+  return fresh;
+}

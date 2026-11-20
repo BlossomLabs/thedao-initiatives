@@ -103,6 +103,31 @@ it("swipes to the next initiative in the order the list showed", () => {
   expect(screen.getByRole("dialog", { name: "ALPHA" })).toBeInTheDocument();
 });
 
+it("a swipe can start on the ‹ › row or the bullets; its click doesn't press the button", () => {
+  render(<Ballot />);
+  fireEvent.click(screen.getByRole("button", { name: /ALPHA/ }));
+  const swipeFrom = (el: HTMLElement) => {
+    fireEvent.pointerDown(el, { pointerId: 1, clientX: 300, clientY: 400 });
+    fireEvent.pointerMove(el, { pointerId: 1, clientX: 280, clientY: 402 });
+    fireEvent.pointerMove(el, { pointerId: 1, clientX: 180, clientY: 404 });
+    fireEvent.pointerUp(el, { pointerId: 1, clientX: 180, clientY: 404 });
+    // What the browser sends after a press and release on the same button.
+    fireEvent.click(el, { detail: 1 });
+  };
+  const next = () => screen.getAllByRole("button", { name: "Next initiative" })[0];
+  swipeFrom(next());
+  // One step, the swipe's: the click that followed it didn't step again.
+  expect(screen.getByRole("dialog", { name: "BETA" })).toBeInTheDocument();
+  // A plain tap on › still steps.
+  fireEvent.pointerDown(next(), { pointerId: 2, clientX: 300, clientY: 400 });
+  fireEvent.pointerUp(next(), { pointerId: 2, clientX: 300, clientY: 400 });
+  fireEvent.click(next(), { detail: 1 });
+  expect(screen.getByRole("dialog", { name: "GAMMA" })).toBeInTheDocument();
+  // The bullets' scroller lets the browser pan only up and down: sideways is the card's.
+  const article = screen.getByRole("heading", { name: "GAMMA" }).closest("article")!;
+  expect(article.querySelector(".overflow-y-auto")).toHaveClass("touch-pan-y");
+});
+
 it("throws the card out to the left, and brings the previous one back from there", () => {
   vi.useFakeTimers();
   vi.stubGlobal("matchMedia", (query: string) => ({

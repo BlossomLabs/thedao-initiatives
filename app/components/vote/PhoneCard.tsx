@@ -85,6 +85,8 @@ export default function PhoneCard<W extends string>(
   const leavingRef = useRef(false);
   const deck = useRef<HTMLDivElement>(null);
   const track = useRef<{ id: number; x0: number; y0: number; sideways?: boolean } | null>(null);
+  /** A swipe that began on a button or a link: its click is the swipe's, not the button's. */
+  const swallowClick = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -130,8 +132,11 @@ export default function PhoneCard<W extends string>(
   }, []);
 
   const swipe = {
+    // Anywhere on the card, the bullets and the ‹ Open full page › row too: a tap there
+    // still works, as only a sideways move turns it into a swipe.
     onPointerDown: (e: React.PointerEvent) => {
-      if (leavingRef.current || (e.target as HTMLElement).closest("button, a")) return;
+      swallowClick.current = false;
+      if (leavingRef.current) return;
       track.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
     },
     onPointerMove: (e: React.PointerEvent) => {
@@ -156,6 +161,7 @@ export default function PhoneCard<W extends string>(
       const t = track.current;
       track.current = null;
       if (!t || t.id !== e.pointerId || !t.sideways) return;
+      swallowClick.current = true;
       const dir = swipeStep(dx, nav.index, nav.count);
       if (dir) step(dir);
       else setDx(0);
@@ -163,6 +169,14 @@ export default function PhoneCard<W extends string>(
     onPointerCancel: () => {
       track.current = null;
       setDx(0);
+    },
+    // The click a browser sends after the swipe's press and release; a keyboard's (no
+    // pointer, `detail` 0) always goes through.
+    onClickCapture: (e: React.MouseEvent) => {
+      if (!swallowClick.current || e.detail === 0) return;
+      swallowClick.current = false;
+      e.preventDefault();
+      e.stopPropagation();
     },
   };
 
@@ -396,7 +410,11 @@ function Face(
       {withdrawn && (
         <p className="m-0 mt-2 text-[13px] leading-snug text-dao-red-pale">{withdrawn}</p>
       )}
-      <div className="mt-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {
+        // Its own scroller: vertical only, or the browser takes a sideways swipe over the
+        // bullets for itself and the card never moves.
+      }
+      <div className="mt-3.5 min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <BriefList item={item} className="select-text text-[14px]" />
       </div>
       <div className="mt-3 flex flex-none items-center justify-between gap-2">

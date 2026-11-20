@@ -1,5 +1,5 @@
-import { useRound, useVoteBase } from "~/lib/vote-round";
-import { ballotStorageKey } from "../../../shared/vote/keys";
+import { useRound, useVoteBase, useVoteEnvironment } from "~/lib/vote-round";
+import { ballotStorageKey, roundId } from "../../../shared/vote/keys";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { bytesToHex, type Hex } from "viem";
@@ -30,7 +30,8 @@ import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useBoard } from "~/hooks/use-board";
-import { useBadgeRatings, useMyBadges, useVoteRound } from "~/hooks/use-vote";
+import { mineKey, useBadgeRatings, useMyBadges, useVoteRound } from "~/hooks/use-vote";
+import { useQueryClient } from "@tanstack/react-query";
 import { useBallotSubmit } from "~/hooks/use-vote-send";
 import { errorMessage } from "~/lib/api";
 import { countedTiers, lockedLabels } from "~/lib/vote-locks";
@@ -55,6 +56,7 @@ import {
 import { rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
 import { poolName, PoolNote } from "~/components/vote/pool";
 import { askOf, servedAsks, withdrawnProjects } from "~/lib/vote-results";
+import { newSinceSent } from "~/lib/vote-new";
 
 const closed = (m: VoteManifest) => voteNow() / 1000 >= m.closesAt;
 const notOpenYet = (m: VoteManifest) => voteNow() / 1000 < m.opensAt;
@@ -334,6 +336,17 @@ export default function VotePage(
   // Start from the ballot that counts when this browser has none, and keep the settled
   // tiers as they were counted: they can't change, whatever this browser last had.
   const countedNow = n !== null ? rv?.accepted[String(n)] : undefined;
+  // A newer sent ballot lists every initiative: the menu's New count (from /api/vote/mine,
+  // cached for minutes) is asked again. A first send needs none, as nothing was new before.
+  const qc = useQueryClient();
+  const voteEnv = useVoteEnvironment();
+  const lastCounted = useRef(countedNow);
+  useEffect(() => {
+    const before = lastCounted.current;
+    lastCounted.current = countedNow;
+    if (mock || !me || !before || !countedNow || before === countedNow) return;
+    void qc.invalidateQueries({ queryKey: mineKey(voteEnv, roundId(R), me) });
+  }, [countedNow]);
   const settledNow = rv?.tiers.filter((t) => t.status === "settled").length ?? 0;
   useEffect(() => {
     if (!countedNow) return;
@@ -856,6 +869,7 @@ export default function VotePage(
           roundBox={roundStepsOnly}
           live={{
             onEdit: () => showEditor(true),
+            fresh: n === null ? 0 : newSinceSent(rv, R.slugs, n),
             asks,
             tally: rv && {
               tiers: rv.live.tiers ?? {},

@@ -7,11 +7,16 @@ import TopBar from "./TopBar";
 const state = vi.hoisted(() => ({
   deployed: true,
   badges: [7] as number[],
+  /** The most initiatives new to a badge since its last send, as /api/vote/mine says. */
+  fresh: 0,
 }));
 vi.mock("~/components/wallet/ConnectButton", () => ({ default: () => null }));
 vi.mock("~/components/wallet/WatchlistOfferSlot", () => ({ default: () => null }));
 vi.mock("~/context/session", () => ({ useSession: () => ({ session: { address: "0x1" } }) }));
-vi.mock("~/hooks/use-vote", () => ({ useMyBadges: () => ({ data: state.badges }) }));
+vi.mock("~/hooks/use-vote", () => ({
+  useMyBadges: () => ({ data: state.badges }),
+  useBallotNews: () => ({ data: state.fresh }),
+}));
 vi.mock("~/lib/vote-round", async (orig) => ({
   ...(await orig<typeof import("~/lib/vote-round")>()),
   useRoundLoaded: () => true,
@@ -22,6 +27,7 @@ vi.mock("~/lib/vote-round", async (orig) => ({
 afterEach(() => {
   state.deployed = true;
   state.badges = [7];
+  state.fresh = 0;
 });
 
 const mount = (path: string, env: "production" | "test" = "production") =>
@@ -80,4 +86,16 @@ it("without a badge only Vote; without a round, neither", () => {
   mount("/");
   expect(screen.getAllByRole("navigation", { name: "Site" }).at(-1)!.querySelectorAll("a"))
     .toHaveLength(2);
+});
+
+it("My ballot carries how many initiatives are new since the ballot was sent", () => {
+  state.fresh = 3;
+  mount("/vote");
+  const link = desktop().getByRole("link", { name: /My ballot/ });
+  expect(link).toHaveTextContent("My ballot3 new initiatives");
+});
+
+it("no chip with nothing new", () => {
+  mount("/vote");
+  expect(desktop().getByRole("link", { name: "My ballot" })).toBeInTheDocument();
 });

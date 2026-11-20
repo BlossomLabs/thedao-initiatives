@@ -201,16 +201,37 @@ export function useBadgeRatings(tokenId: string | null, enabled = true) {
 /** The badges the signed-in account votes with in this round (the voting badges it
  * holds in the real vote; its one test badge in a test vote), ascending. Off until
  * `me` is known. */
-export function useMyBadges(me: string | null, enabled = true) {
+/** What /api/vote/mine says about the signed-in account: its voting badges, and for each
+ * that sent a ballot how many initiatives joined since (only those with some). */
+export type Mine = { ids: number[]; fresh?: Record<string, number> };
+
+/** The one request behind the account's badges and their new-initiative counts, cached ten
+ * minutes; the vote page refreshes it when this badge's sent ballot changes. */
+function useMine<T>(me: string | null, enabled: boolean, select: (m: Mine) => T) {
   const ROUND = useRound();
   const api = useVoteApi();
 
   return useQuery({
-    queryKey: [useVoteEnvironment(), "vote-mine", roundId(ROUND), me?.toLowerCase()],
+    queryKey: mineKey(useVoteEnvironment(), roundId(ROUND), me),
     enabled: enabled && Boolean(me),
     staleTime: 10 * 60_000,
-    queryFn: async (): Promise<number[]> => (await api<{ ids: number[] }>("/api/vote/mine")).ids,
+    queryFn: () => api<Mine>("/api/vote/mine"),
+    select,
   });
+}
+export const mineKey = (env: string, round: string, me: string | null) =>
+  [env, "vote-mine", round, me?.toLowerCase()] as const;
+
+const idsOf = (m: Mine) => m.ids;
+export function useMyBadges(me: string | null, enabled = true) {
+  return useMine(me, enabled, idsOf);
+}
+
+/** The most initiatives new to any of the account's badges since it last sent its ballot:
+ * the chip beside My ballot. 0 when none, or before a first send. */
+const mostFresh = (m: Mine) => Math.max(0, ...Object.values(m.fresh ?? {}));
+export function useBallotNews(me: string | null, enabled = true) {
+  return useMine(me, enabled, mostFresh);
 }
 
 export const apiCode = (e: unknown): string | undefined =>

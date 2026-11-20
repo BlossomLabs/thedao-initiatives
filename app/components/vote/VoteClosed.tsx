@@ -15,6 +15,7 @@ import { askOf, servedAsks } from "~/lib/vote-results";
 import { errorMessage } from "~/lib/api";
 import { decodeBallot, encodeBallot, type Tier, TIERS } from "../../../shared/vote/ballot";
 import { type VoteManifest } from "../../../shared/vote/manifest";
+import NewCount from "./NewCount";
 
 function Header(
   { kicker, title = "Voting has closed", children }: {
@@ -109,6 +110,9 @@ export default function VoteClosed(
     roundBox?: React.ReactNode;
     live?: {
       onEdit: () => void;
+      /** How many initiatives are new since this ballot was sent: a sky "3 new unplaced"
+       * after the count of placed ones. */
+      fresh?: number;
       /** The chain's asks (micro-USD, manifest order), for the ring; absent while they're
        * being worked out, when the ring shows what the badge allocated instead. */
       asks?: string[];
@@ -238,7 +242,15 @@ export default function VoteClosed(
         : allocated > 0
         ? `${dollars(allocated)}${shareUsd ? ` of your ${dollars(shareUsd)} share` : " allocated"}`
         : live
-        ? `Counts · ${Object.keys(sent ?? {}).length} initiatives placed`
+        ? (
+          <>
+            {Object.keys(sent ?? {}).length} initiatives placed
+            {
+              // On a line of its own, under the count.
+            }
+            <NewCount n={live.fresh ?? 0} words className="mt-1 flex w-fit" />
+          </>
+        )
         : "Nothing on it was funded"}
       action={live && (
         // During the vote the ballot is the one to change: its own button.

@@ -5,7 +5,8 @@ import { cn } from "~/lib/utils";
 import Pop from "~/components/ui/Pop";
 import WatchlistOfferSlot from "~/components/wallet/WatchlistOfferSlot";
 import { useSession } from "~/context/session";
-import { useMyBadges } from "~/hooks/use-vote";
+import { useBallotNews, useMyBadges } from "~/hooks/use-vote";
+import NewCount from "~/components/vote/NewCount";
 import { useRound, useRoundLoaded, useVoteBase } from "~/lib/vote-round";
 import { roundDeployed } from "../../../shared/vote/manifest";
 
@@ -27,7 +28,14 @@ const menuLink = ({ isActive }: { isActive: boolean }) =>
     isActive ? "text-dao-green" : "text-soft",
   );
 
-type NavItem = { to: string; label: string; end?: boolean; active?: (path: string) => boolean };
+type NavItem = {
+  to: string;
+  label: string;
+  end?: boolean;
+  active?: (path: string) => boolean;
+  /** My ballot: how many initiatives are new since the ballot was last sent. */
+  fresh?: number;
+};
 
 const LINKS: NavItem[] = [
   { to: "/", label: "Initiatives", end: true },
@@ -45,6 +53,8 @@ function useVoteLinks(): NavItem[] {
   const deployed = roundDeployed(round);
   const { session } = useSession();
   const badges = useMyBadges(session?.address ?? null, deployed);
+  // In the same request as the badges (/api/vote/mine): the most any badge has to catch up on.
+  const fresh = useBallotNews(session?.address ?? null, deployed).data ?? 0;
   if (!deployed) return [];
   const ballot = `${base}/ballot`;
   return [
@@ -53,6 +63,7 @@ function useVoteLinks(): NavItem[] {
       ? [{
         to: ballot,
         label: "My ballot",
+        fresh,
         active: (path: string) => path === ballot || path.startsWith(`${ballot}/`),
       }]
       : []),
@@ -100,9 +111,15 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
   // The static shell is prerendered once (at "/") and served for every URL
   // without a page of its own, so it marks no link as current: plain links,
   // which also keeps its HTML identical to what the client hydrates there.
+  const text = (l: NavItem) => (
+    <>
+      {l.label}
+      {l.fresh ? <NewCount n={l.fresh} className="ml-1.5 align-[1px]" /> : null}
+    </>
+  );
   const item = (l: NavItem, style: typeof link) =>
     staticShell
-      ? <Link key={l.to} to={l.to} className={style({ isActive: false })}>{l.label}</Link>
+      ? <Link key={l.to} to={l.to} className={style({ isActive: false })}>{text(l)}</Link>
       : l.active
       ? (
         <Link
@@ -111,10 +128,10 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
           aria-current={l.active(pathname) ? "page" : undefined}
           className={style({ isActive: l.active(pathname) })}
         >
-          {l.label}
+          {text(l)}
         </Link>
       )
-      : <NavLink key={l.to} to={l.to} end={l.end} className={style}>{l.label}</NavLink>;
+      : <NavLink key={l.to} to={l.to} end={l.end} className={style}>{text(l)}</NavLink>;
   const links = (style: typeof link) =>
     staticShell ? LINKS.map((l) => item(l, style)) : <NavLinks render={(l) => item(l, style)} />;
 

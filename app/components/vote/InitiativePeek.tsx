@@ -177,7 +177,11 @@ export default function InitiativePeek<W extends string>(
         {/* Always the same size: the text scrolls, the choices stay at the bottom. */}
         <div
           data-peek-box=""
-          className="flex h-[min(520px,calc(100dvh-40px))] flex-col overflow-hidden rounded-[18px] border border-edge2 bg-panel-modal shadow-modal"
+          className={cn(
+            "flex h-[min(520px,calc(100dvh-40px))] flex-col overflow-hidden rounded-[18px] border bg-panel-modal shadow-modal",
+            // A new initiative's card is edged in the New pill's sky, as its tile is.
+            isNew ? "border-dao-sky/60" : "border-edge2",
+          )}
         >
           {/* The header stays put: what it is, its title, where it goes. */}
           <div className="flex flex-none flex-col gap-3 px-5 pb-3 pt-5">

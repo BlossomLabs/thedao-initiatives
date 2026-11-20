@@ -258,7 +258,7 @@ export default function PhoneCard<W extends string>(
             inert
             data-phone-after={after.item.slug}
             style={{ transform: underneath(0), transition: ease("ease-out") }}
-            className={cn(CARD, "z-0")}
+            className={cn(CARD, "z-0", after.isNew && NEW_EDGE)}
           >
             <Face face={after} nav={nav} />
           </article>
@@ -270,7 +270,7 @@ export default function PhoneCard<W extends string>(
             inert
             data-phone-under={next.item.slug}
             style={{ transform: underneath(on), transition: ease("ease-out") }}
-            className={cn(CARD, "z-[1]")}
+            className={cn(CARD, "z-[1]", next.isNew && NEW_EDGE)}
           >
             <Face face={next} nav={nav} />
           </article>
@@ -279,7 +279,7 @@ export default function PhoneCard<W extends string>(
           key={item.slug}
           {...swipe}
           style={{ transform: top, transition: ease(moving === 1 ? "ease-in" : "ease-out") }}
-          className={cn(CARD, "z-10 touch-pan-y")}
+          className={cn(CARD, "z-10 touch-pan-y", isNew && NEW_EDGE)}
         >
           <Face
             face={{ item, note, withdrawn, paid, isNew }}
@@ -295,7 +295,7 @@ export default function PhoneCard<W extends string>(
             inert
             data-phone-prev={prev.item.slug}
             style={{ transform: offLeft(back), transition: ease("ease-out") }}
-            className={cn(CARD, "z-20")}
+            className={cn(CARD, "z-20", prev.isNew && NEW_EDGE)}
           >
             <Face face={prev} nav={nav} />
           </article>
@@ -363,6 +363,8 @@ export default function PhoneCard<W extends string>(
 }
 
 /** The cards share a solid face (the one underneath must not show through). */
+/** A new initiative's card: edged in the New pill's sky, as its row in the list is. */
+const NEW_EDGE = "border-dao-sky/60";
 const CARD =
   "absolute inset-x-4 bottom-0 top-3.5 flex origin-[50%_85%] select-none flex-col rounded-[20px] border border-white/15 bg-[color-mix(in_srgb,white_7%,var(--color-dao-blue))] p-5 shadow-[0_14px_30px_rgba(0,0,0,.2)]";
 

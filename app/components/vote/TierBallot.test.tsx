@@ -576,8 +576,10 @@ it("Details on a new initiative shows New too, until it's placed", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Details for BETA" }));
   const card = await screen.findByRole("dialog", { name: "BETA" });
   expect(within(card.parentElement!).getByText("New")).toBeInTheDocument();
+  expect(card.querySelector("[data-peek-box]")).toHaveClass("border-dao-sky/60");
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.click(screen.getByRole("button", { name: "Details for ALPHA" }));
   const other = await screen.findByRole("dialog", { name: "ALPHA" });
   expect(within(other.parentElement!).queryByText("New")).toBeNull();
+  expect(other.querySelector("[data-peek-box]")).not.toHaveClass("border-dao-sky/60");
 });

@@ -22,6 +22,18 @@ if (g.Deno && g.addEventListener) {
   });
 }
 
+// The API the dev server forwards to. Only `dev:prod` (API_PROXY): its requests carry
+// production's own origin, or its cross-site guard refuses every POST from localhost.
+// Dev server only; the build never reads `server.proxy`.
+const apiTarget = process.env.API_PROXY || "http://localhost:8000";
+const api = process.env.API_PROXY
+  ? {
+    target: apiTarget,
+    changeOrigin: true,
+    headers: { origin: new URL(apiTarget).origin, referer: new URL(apiTarget).origin + "/" },
+  }
+  : apiTarget;
+
 export default defineConfig({
   plugins: [tailwindcss(), !process.env.VITEST && reactRouter()],
   server: {
@@ -32,10 +44,10 @@ export default defineConfig({
     watch: { ignored: ["**/*.tmp.*"], usePolling: true, interval: 250 },
     // API and web share one origin in production; mirror that in dev.
     proxy: {
-      "/api": process.env.API_PROXY || "http://localhost:8000",
-      "/healthz": process.env.API_PROXY || "http://localhost:8000",
-      "/vote/llms.txt": process.env.API_PROXY || "http://localhost:8000",
-      "^/initiative/[a-z0-9-]+(-PRIVATE)?\\.md$": process.env.API_PROXY || "http://localhost:8000",
+      "/api": api,
+      "/healthz": api,
+      "/vote/llms.txt": api,
+      "^/initiative/[a-z0-9-]+(-PRIVATE)?\\.md$": api,
     },
   },
   resolve: {

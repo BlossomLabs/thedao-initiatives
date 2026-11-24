@@ -24,6 +24,12 @@ export function ruleMessage(e: RuleError): string {
     }
     case "group": {
       const tier = tierName(TIERS[e.tier]);
+      // Every grant has an affiliation of its own (#147): one grant alone over half (an RFP
+      // has no affiliation, so it never is).
+      if (e.projects.length === 1) {
+        return `One grant can hold at most half of ${tier}'s goals, and the marked one ` +
+          `holds more. Add more initiatives to ${tier}, or move it to a lower tier.`;
+      }
       return `Initiatives with the same affiliation can hold at most half of ${tier}'s goals, ` +
         `and the marked ones hold more. Move some of them out of ${tier}, or add initiatives ` +
         `not affiliated with them.`;
@@ -58,7 +64,9 @@ export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
     case "group":
       return {
         ok: false,
-        text: `One affiliation holds over half of ${tierName(TIERS[e.tier])}`,
+        text: `One ${e.projects.length === 1 ? "grant" : "affiliation"} holds over half of ${
+          tierName(TIERS[e.tier])
+        }`,
       };
     case "empty_tier":
       return {
@@ -85,23 +93,28 @@ export function explainBelow(e: RuleError): boolean {
 export type AffiliationFlag = { tag: string; reason: string };
 
 /** The cards the affiliation rules blame, by project index: an affiliation over half a
- * tier, or affiliated projects that count as one. A card blamed twice gets both. */
+ * tier, or affiliated projects that count as one. A project alone over half (its own
+ * affiliation, or one it is the only one of in the tier, #147) is tagged "Over half",
+ * not with the affiliation's name. A card blamed twice gets both. */
 export function affiliationFlags(
   errors: RuleError[],
   groupName: (group: number) => string,
 ): Map<number, AffiliationFlag> {
   const found = new Map<number, { tags: string[]; reasons: string[] }>();
+  const mark = (p: number, tag: string, reason: string) => {
+    const f = found.get(p) ?? { tags: [], reasons: [] };
+    if (!f.tags.includes(tag)) f.tags.push(tag);
+    f.reasons.push(reason);
+    found.set(p, f);
+  };
   const blame = (projects: number[], group: number, why: string) => {
-    for (const p of projects) {
-      const f = found.get(p) ?? { tags: [], reasons: [] };
-      const name = groupName(group);
-      if (!f.tags.includes(name)) f.tags.push(name);
-      f.reasons.push(`Affiliated with ${name}: ${why}`);
-      found.set(p, f);
-    }
+    const name = groupName(group);
+    for (const p of projects) mark(p, name, `Affiliated with ${name}: ${why}`);
   };
   for (const e of errors) {
-    if (e.rule === "group") {
+    if (e.rule === "group" && e.projects.length === 1) {
+      mark(e.projects[0], "Over half", `Over half of ${tierName(TIERS[e.tier])} on its own`);
+    } else if (e.rule === "group") {
       blame(e.projects, e.group, `over half of ${tierName(TIERS[e.tier])}`);
     } else if (e.rule === "independent") {
       for (const r of e.related) {

@@ -156,3 +156,23 @@ it("affiliationFlags: the cards each rule blames, a card in two affiliations get
   });
   expect(flags.get(3)?.reason).toBe("Affiliated with Argot: counts as one in S-Tier");
 });
+
+it("group with one grant in the tier: the grant alone is over half, no affiliation named (#147)", () => {
+  const alone: RuleError = {
+    rule: "group",
+    tier: 0,
+    group: 6,
+    groupUsd: 200n,
+    tierUsd: 350n,
+    projects: [24],
+  };
+  expect(say(alone)).toBe(
+    "One grant can hold at most half of S-Tier's goals, and the marked one holds more. Add more initiatives to S-Tier, or move it to a lower tier.",
+  );
+  expect(ruleStatus([alone])).toEqual({ ok: false, text: "One grant holds over half of S-Tier" });
+  expect(ruleStatus([colibri]).text).toBe("One affiliation holds over half of S-Tier");
+  expect(explainBelow(alone)).toBe(true);
+  const flags = affiliationFlags([alone, colibri], (g) => (g === 6 ? "SEAL" : "colibri"));
+  expect(flags.get(24)).toEqual({ tag: "Over half", reason: "Over half of S-Tier on its own" });
+  expect(flags.get(0)?.tag).toBe("colibri");
+});

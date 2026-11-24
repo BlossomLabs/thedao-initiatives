@@ -73,7 +73,9 @@ export function voteLlms(
     `- In ${sTier}, the initiatives of one affiliation can hold at most half of the tier's ` +
     "total registered goals. Check each affiliation separately; an initiative with several affiliations " +
     "counts its full registered goal toward each. Exactly half is allowed. Donations and " +
-    "pledges do not change this share.",
+    "pledges do not change this share. Every grant has at least one affiliation (one of its " +
+    "own when it has no other), so a single grant can't hold more than half either; an RFP " +
+    "has none.",
     ...(tierA
       ? [`- ${aTier} follows the same two independence and affiliation rules.`]
       : [`- ${aTier} has no independence minimum or affiliation limit in this round.`]),

@@ -11,12 +11,17 @@ import { jsonBody, s } from "../lib/body.ts";
 import { capped, EMAIL_RE } from "../lib/validate.ts";
 import { SUPPORT_MESSAGES_PER_HOUR_PER_IP } from "../config.ts";
 import {
+  isReceiptIssuedTo,
   isSupportCategory,
   parsePledgeAmount,
   PLEDGE_CONTACT_MAX,
   PLEDGE_ORG_MAX,
   PLEDGE_TELEGRAM_MAX,
   pledgeAmountError,
+  RECEIPT_ADDRESS_MAX,
+  RECEIPT_COUNTRY_MAX,
+  RECEIPT_ISSUED_TO,
+  RECEIPT_NAME_MAX,
   receiptTransactionError,
   SUPPORT_CATEGORIES,
   SUPPORT_MESSAGE_MAX,
@@ -35,6 +40,11 @@ export function supportScreenLine(s: SupportScreen): string {
   if (!s.verdict) return `AI screen failed: ${s.error}`;
   return `AI screen: ${VERDICT_WORD[s.verdict]}${s.summary ? `: ${s.summary}` : ""}`;
 }
+/** One header line: a typed line break can't start a line of its own. */
+const oneLine = (v: string) => v.split(/\s*[\r\n]+\s*/).filter(Boolean).join(", ");
+
+const RECEIPT_FIELDS = ["receiptIssuedTo", "receiptName", "receiptCountry", "receiptAddress"];
+
 const SCREENSHOT_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 export function supportRoutes(deps: Deps) {
@@ -48,6 +58,10 @@ export function supportRoutes(deps: Deps) {
       "message",
       "email",
       "transactionUrl",
+      "receiptIssuedTo",
+      "receiptName",
+      "receiptCountry",
+      "receiptAddress",
       "initiativeId",
       "pledgeAmount",
       "pledgeOrg",
@@ -69,11 +83,30 @@ export function supportRoutes(deps: Deps) {
       throw new HttpError(400, "that email does not look right");
     }
     const transactionUrl = s(body.transactionUrl, SUPPORT_TRANSACTION_URL_MAX + 1);
+    let legalName = "";
+    const receiptInfo: string[] = [];
     if (receipt) {
       const error = receiptTransactionError(transactionUrl);
       if (error) throw new HttpError(400, error);
+      if (!isReceiptIssuedTo(body.receiptIssuedTo)) {
+        throw new HttpError(400, "say who the receipt is issued to");
+      }
+      legalName = oneLine(capped(body.receiptName, RECEIPT_NAME_MAX, "The legal name"));
+      if (!legalName) throw new HttpError(400, "add the legal name for the receipt");
+      const country = oneLine(capped(body.receiptCountry, RECEIPT_COUNTRY_MAX, "The country"));
+      if (!country) throw new HttpError(400, "add the country for the receipt");
+      const address = oneLine(capped(body.receiptAddress, RECEIPT_ADDRESS_MAX, "The address"));
+      receiptInfo.push(
+        `Transaction: ${transactionUrl}`,
+        `Receipt issued to: ${RECEIPT_ISSUED_TO[body.receiptIssuedTo]}`,
+        `Legal name: ${legalName}`,
+        `Country: ${country}`,
+        ...(address ? [`Address: ${address}`] : []),
+      );
     } else if (body.transactionUrl !== undefined) {
       throw new HttpError(400, "transaction links are only supported for receipt requests");
+    } else if (RECEIPT_FIELDS.some((key) => body[key] !== undefined)) {
+      throw new HttpError(400, "receipt details are only supported for receipt requests");
     }
     let contact = "";
     let telegram = "";
@@ -149,7 +182,7 @@ export function supportRoutes(deps: Deps) {
       }]`,
       ...(screen ? [supportScreenLine(screen)] : []),
       ...(unknownDomains.length ? [`Unknown link domains: ${unknownDomains.join(", ")}`] : []),
-      ...(receipt ? [`Transaction: ${transactionUrl}`] : []),
+      ...receiptInfo,
       ...pledgeInfo,
       ...(pageUrl ? [`Page: ${pageUrl}`] : []),
     ];
@@ -163,7 +196,7 @@ export function supportRoutes(deps: Deps) {
         signal: AbortSignal.timeout(15_000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: telegram || contact,
+          name: telegram || contact || legalName,
           email,
           message: text,
           ...(screenshot ? { screenshot } : {}),

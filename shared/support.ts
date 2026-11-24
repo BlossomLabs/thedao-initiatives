@@ -19,6 +19,26 @@ export function isSupportCategory(v: unknown): v is SupportCategory {
 
 export const SUPPORT_MESSAGE_MAX = 4000;
 export const SUPPORT_TRANSACTION_URL_MAX = 500;
+/** Who a donation receipt is made out to. */
+export const RECEIPT_ISSUED_TO = {
+  organization: "Organization",
+  individual: "Individual",
+} as const;
+
+export type ReceiptIssuedTo = keyof typeof RECEIPT_ISSUED_TO;
+
+export function isReceiptIssuedTo(v: unknown): v is ReceiptIssuedTo {
+  return typeof v === "string" && Object.hasOwn(RECEIPT_ISSUED_TO, v);
+}
+
+export const RECEIPT_NAME_MAX = 160;
+export const RECEIPT_COUNTRY_MAX = 80;
+export const RECEIPT_ADDRESS_MAX = 300;
+
+/** The line under the receipt form's button. */
+export const RECEIPT_NOTE =
+  "We'll email your receipt once the donation is confirmed and the initiative funding goal is reached.";
+
 export const PLEDGE_ORG_MAX = 160;
 export const PLEDGE_CONTACT_MAX = 120;
 export const PLEDGE_TELEGRAM_MAX = 64;

@@ -15,6 +15,12 @@ import {
   X,
 } from "lucide-react";
 import {
+  RECEIPT_ADDRESS_MAX,
+  RECEIPT_COUNTRY_MAX,
+  RECEIPT_ISSUED_TO,
+  RECEIPT_NAME_MAX,
+  RECEIPT_NOTE,
+  type ReceiptIssuedTo,
   receiptTransactionError,
   SUPPORT_CATEGORIES,
   SUPPORT_CATEGORY_KEYS,
@@ -53,6 +59,10 @@ const CATEGORY_UI: Record<
 /** The same loose shape the server checks; a typo is caught before sending. */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const ISSUED_TO_KEYS = Object.keys(RECEIPT_ISSUED_TO) as ReceiptIssuedTo[];
+
+const LABEL = "text-[12.5px] text-white/80";
+
 const ICON_BTN =
   "inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white";
 
@@ -80,6 +90,12 @@ export function SupportPanel() {
   const [category, setCategory] = useState<SupportCategory | null>(null);
   const [email, setEmail] = useState("");
   const [transactionUrl, setTransactionUrl] = useState("");
+  const [issuedTo, setIssuedTo] = useState<ReceiptIssuedTo | null>(null);
+  const [legalName, setLegalName] = useState("");
+  const [country, setCountry] = useState("");
+  const [address, setAddress] = useState("");
+  /** Under-the-field errors for the receipt details, by field. */
+  const [receiptErrors, setReceiptErrors] = useState<Record<string, string>>({});
   const [pledgeInitiative, setPledgeInitiative] = useState<string | null>(null);
   /** The amount the pledge form opens with, when the request named one. */
   const [pledgeAmount, setPledgeAmount] = useState<number | null>(null);
@@ -101,15 +117,25 @@ export function SupportPanel() {
   const panelId = useId();
   const emailId = useId();
   const transactionId = useId();
+  const receiptId = useId();
   const messageId = useId();
 
   useEffect(() => setMounted(true), []);
+
+  const clearReceiptDetails = useCallback(() => {
+    setIssuedTo(null);
+    setLegalName("");
+    setCountry("");
+    setAddress("");
+    setReceiptErrors({});
+  }, []);
 
   const reset = useCallback(() => {
     setView("picker");
     setCategory(null);
     setEmail("");
     setTransactionUrl("");
+    clearReceiptDetails();
     setPledgeInitiative(null);
     setPledgeAmount(null);
     setText("");
@@ -117,7 +143,7 @@ export function SupportPanel() {
     setError(null);
     setEmailError(null);
     setTransactionError(null);
-  }, []);
+  }, [clearReceiptDetails]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -134,6 +160,7 @@ export function SupportPanel() {
       setError(null);
       setEmailError(null);
       setTransactionError(null);
+      setReceiptErrors({});
       setView("form");
       setOpen(true);
       // Also focus when a receipt form is already open for another donation.
@@ -188,6 +215,7 @@ export function SupportPanel() {
     setView("picker");
     setText("");
     setTransactionUrl("");
+    clearReceiptDetails();
     setPledgeInitiative(null);
     setScreenshot(null);
     setError(null);
@@ -232,7 +260,11 @@ export function SupportPanel() {
 
   const overCap = text.trim().length > SUPPORT_MESSAGE_MAX;
   const canSend = Boolean(category) && !overCap && !sending &&
-    (receipt ? Boolean(email.trim() && transactionUrl.trim()) : text.trim().length > 0);
+    (receipt
+      ? Boolean(
+        email.trim() && transactionUrl.trim() && issuedTo && legalName.trim() && country.trim(),
+      )
+      : text.trim().length > 0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,16 +279,37 @@ export function SupportPanel() {
         : "That email does not look right. Fix it, or leave it blank."
       : null;
     const badTransaction = receipt ? receiptTransactionError(transactionUrl) : null;
+    const badReceipt: Record<string, string> = {};
+    if (receipt) {
+      if (legalName.trim().length > RECEIPT_NAME_MAX) {
+        badReceipt.name = tooLong("The legal name", RECEIPT_NAME_MAX);
+      }
+      if (country.trim().length > RECEIPT_COUNTRY_MAX) {
+        badReceipt.country = tooLong("The country", RECEIPT_COUNTRY_MAX);
+      }
+      if (address.trim().length > RECEIPT_ADDRESS_MAX) {
+        badReceipt.address = tooLong("The address", RECEIPT_ADDRESS_MAX);
+      }
+    }
     setEmailError(badEmail);
     setTransactionError(badTransaction);
-    if (badEmail || badTransaction) return;
+    setReceiptErrors(badReceipt);
+    if (badEmail || badTransaction || Object.keys(badReceipt).length) return;
     setSending(true);
     try {
       await api("/api/support", {
         json: {
           category,
           email: email.trim(),
-          ...(receipt ? { transactionUrl: transactionUrl.trim() } : {}),
+          ...(receipt
+            ? {
+              transactionUrl: transactionUrl.trim(),
+              receiptIssuedTo: issuedTo,
+              receiptName: legalName.trim(),
+              receiptCountry: country.trim(),
+              receiptAddress: address.trim(),
+            }
+            : {}),
           message: text.trim(),
           page: globalThis.location?.pathname ?? "",
           ...(screenshot ? { screenshot } : {}),
@@ -361,13 +414,18 @@ export function SupportPanel() {
         )}
 
         {view === "form" && category && !pledge && (
-          <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-2.5 p-3">
+          <form
+            ref={formRef}
+            onSubmit={submit}
+            noValidate
+            className="flex max-h-[calc(100dvh-10rem)] flex-col gap-2.5 overflow-y-auto p-3"
+          >
             {receipt && (
               <>
                 <p className="m-0 text-[13px] text-muted">
-                  Share your email and donation transaction link to request a donation receipt.
+                  Tell us who the receipt is for and which donation it covers.
                 </p>
-                <label htmlFor={emailId} className="text-[12.5px] text-white/80">
+                <label htmlFor={emailId} className={LABEL}>
                   Email
                 </label>
               </>
@@ -396,7 +454,7 @@ export function SupportPanel() {
             )}
             {receipt && (
               <>
-                <label htmlFor={transactionId} className="text-[12.5px] text-white/80">
+                <label htmlFor={transactionId} className={LABEL}>
                   Transaction link
                 </label>
                 <Input
@@ -420,6 +478,88 @@ export function SupportPanel() {
                     {transactionError}
                   </p>
                 )}
+                <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
+                  <legend className={cn(LABEL, "mb-1.5 p-0")}>Receipt issued to</legend>
+                  <div className="flex gap-2">
+                    {ISSUED_TO_KEYS.map((k) => (
+                      <label
+                        key={k}
+                        className={cn(
+                          "flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 font-inter-tight text-[13px] text-white transition-colors duration-150 hover:border-[rgba(92,183,90,.45)]",
+                          issuedTo === k && "border-dao-green text-dao-green",
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name={receiptId + "-issued-to"}
+                          value={k}
+                          checked={issuedTo === k}
+                          onChange={() => setIssuedTo(k)}
+                          required
+                        />
+                        {RECEIPT_ISSUED_TO[k]}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <ReceiptField
+                  id={receiptId + "-name"}
+                  label="Legal name"
+                  error={receiptErrors.name}
+                >
+                  <Input
+                    id={receiptId + "-name"}
+                    placeholder={issuedTo === "organization"
+                      ? "e.g. Acme Foundation"
+                      : "Your full legal name"}
+                    autoComplete={issuedTo === "organization" ? "organization" : "name"}
+                    required
+                    maxLength={inputMax(RECEIPT_NAME_MAX)}
+                    value={legalName}
+                    onChange={(e) => {
+                      setLegalName(e.target.value);
+                      setReceiptErrors((p) => ({ ...p, name: "" }));
+                    }}
+                    {...invalid(receiptId + "-name", receiptErrors.name)}
+                  />
+                </ReceiptField>
+                <ReceiptField
+                  id={receiptId + "-country"}
+                  label="Country"
+                  error={receiptErrors.country}
+                >
+                  <Input
+                    id={receiptId + "-country"}
+                    placeholder="e.g. Switzerland"
+                    autoComplete="country-name"
+                    required
+                    maxLength={inputMax(RECEIPT_COUNTRY_MAX)}
+                    value={country}
+                    onChange={(e) => {
+                      setCountry(e.target.value);
+                      setReceiptErrors((p) => ({ ...p, country: "" }));
+                    }}
+                    {...invalid(receiptId + "-country", receiptErrors.country)}
+                  />
+                </ReceiptField>
+                <ReceiptField
+                  id={receiptId + "-address"}
+                  label="Address (optional)"
+                  error={receiptErrors.address}
+                >
+                  <Input
+                    id={receiptId + "-address"}
+                    placeholder="Street, city, postcode"
+                    autoComplete="street-address"
+                    maxLength={inputMax(RECEIPT_ADDRESS_MAX)}
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      setReceiptErrors((p) => ({ ...p, address: "" }));
+                    }}
+                    {...invalid(receiptId + "-address", receiptErrors.address)}
+                  />
+                </ReceiptField>
               </>
             )}
             <Textarea
@@ -427,8 +567,7 @@ export function SupportPanel() {
               ref={textareaRef}
               aria-label={receipt ? "Message (optional)" : "Message"}
               value={text}
-              onChange={(e) =>
-                setText(e.target.value)}
+              onChange={(e) => setText(e.target.value)}
               placeholder={CATEGORY_UI[category].placeholder}
               rows={receipt ? 2 : 4}
               maxLength={inputMax(SUPPORT_MESSAGE_MAX)}
@@ -446,8 +585,7 @@ export function SupportPanel() {
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    setScreenshot(null)}
+                  onClick={() => setScreenshot(null)}
                   disabled={sending}
                   aria-label="Remove screenshot"
                   className="absolute right-2.5 top-2.5 inline-flex size-7 items-center justify-center rounded-full bg-panel-deep/90 text-white/60 shadow-menu transition-colors hover:text-dao-red disabled:opacity-50"
@@ -482,6 +620,7 @@ export function SupportPanel() {
                 {receipt ? "Send request" : "Send"}
               </Button>
             </div>
+            {receipt && <p className="m-0 text-[12px] leading-[1.5] text-muted">{RECEIPT_NOTE}</p>}
             {overCap && (
               <p className="m-0 text-[12.5px] text-[#ffb3b1]" role="alert">
                 {tooLong("The message", SUPPORT_MESSAGE_MAX)}
@@ -526,5 +665,31 @@ export function SupportPanel() {
       </Pop>
     </div>,
     document.body,
+  );
+}
+
+/** aria for a receipt field, pointing at its error line when it has one. */
+function invalid(id: string, error: string | undefined) {
+  return {
+    "aria-invalid": Boolean(error),
+    "aria-describedby": error ? id + "-msg" : undefined,
+    className: cn("py-2.5 text-[13.5px]", error && "has-error"),
+  };
+}
+
+function ReceiptField(
+  { id, label, error, children }: {
+    id: string;
+    label: string;
+    error?: string;
+    children: React.ReactNode;
+  },
+) {
+  return (
+    <>
+      <label htmlFor={id} className={LABEL}>{label}</label>
+      {children}
+      {error && <p id={id + "-msg"} className="fld-msg fld-err -mt-1" role="alert">{error}</p>}
+    </>
   );
 }

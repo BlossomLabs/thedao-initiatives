@@ -141,7 +141,23 @@ describe("SupportPanel receipt requests", () => {
     };
   }
 
-  it("requires an email and transaction link, with no message needed", async () => {
+  /** The receipt details the issue asks for: who it's issued to, legal name, country. */
+  function fillDetails(address = "") {
+    fireEvent.click(screen.getByRole("radio", { name: "Organization" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Legal name" }), {
+      target: { value: " Acme Foundation " },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Country" }), {
+      target: { value: "Switzerland" },
+    });
+    if (address) {
+      fireEvent.change(screen.getByRole("textbox", { name: "Address (optional)" }), {
+        target: { value: address },
+      });
+    }
+  }
+
+  it("requires an email, transaction link and receipt details, with no message needed", async () => {
     const fetchMock = vi.fn(() => Promise.resolve(json(200, { ok: true })));
     vi.stubGlobal("fetch", fetchMock);
     const { email, transaction, send } = openReceipt();
@@ -153,6 +169,16 @@ describe("SupportPanel receipt requests", () => {
     fireEvent.change(email, { target: { value: " donor@example.com " } });
     expect(send).toBeDisabled();
     fireEvent.change(transaction, { target: { value: ` ${transactionUrl} ` } });
+    expect(screen.getByRole("textbox", { name: "Legal name" })).toBeRequired();
+    expect(screen.getByRole("textbox", { name: "Country" })).toBeRequired();
+    expect(screen.getByRole("textbox", { name: "Address (optional)" })).not.toBeRequired();
+    expect(
+      screen.getByText(
+        "We'll email your receipt once the donation is confirmed and the initiative funding goal is reached.",
+      ),
+    ).toBeInTheDocument();
+    expect(send).toBeDisabled();
+    fillDetails("1 Main St, Zug");
     expect(send).toBeEnabled();
     fireEvent.click(send);
     await screen.findByText("Your donation receipt request has been sent.");
@@ -163,6 +189,10 @@ describe("SupportPanel receipt requests", () => {
       category: "receipt",
       email: "donor@example.com",
       transactionUrl,
+      receiptIssuedTo: "organization",
+      receiptName: "Acme Foundation",
+      receiptCountry: "Switzerland",
+      receiptAddress: "1 Main St, Zug",
       message: "",
       page: "/",
     });
@@ -174,6 +204,7 @@ describe("SupportPanel receipt requests", () => {
     const { email, transaction, send } = openReceipt();
     fireEvent.change(email, { target: { value: "not-an-email" } });
     fireEvent.change(transaction, { target: { value: "javascript:alert(1)" } });
+    fillDetails();
     fireEvent.click(send);
     expect(screen.getByText("Enter a valid email for the receipt.")).toBeInTheDocument();
     expect(screen.getByText("Enter a valid https transaction link.")).toBeInTheDocument();
@@ -195,15 +226,20 @@ describe("SupportPanel receipt requests", () => {
     const { email, transaction, send } = openReceipt();
     fireEvent.change(email, { target: { value: "donor@example.com" } });
     fireEvent.change(transaction, { target: { value: transactionUrl } });
+    fillDetails();
     fireEvent.click(send);
     fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(screen.getByRole("textbox", { name: "Email" })).toHaveValue("donor@example.com");
     expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue(transactionUrl);
+    expect(screen.getByRole("textbox", { name: "Legal name" })).toHaveValue(" Acme Foundation ");
+    expect(screen.getByRole("radio", { name: "Organization" })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: /support/i }));
     fireEvent.click(screen.getByRole("button", { name: "Request a donation receipt" }));
     expect(screen.getByRole("textbox", { name: "Email" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Legal name" })).toHaveValue("");
+    expect(screen.getByRole("radio", { name: "Organization" })).not.toBeChecked();
   });
 
   it("does not include a transaction link after switching to another support category", async () => {
@@ -221,6 +257,7 @@ describe("SupportPanel receipt requests", () => {
     await screen.findByText("Thanks for writing. We read every message.");
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(String(init.body))).not.toHaveProperty("transactionUrl");
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("receiptName");
   });
 });
 

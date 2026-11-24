@@ -202,7 +202,13 @@ Deno.test("support: email and screenshot are optional; an off-site page is dropp
   h.close();
 });
 
-Deno.test("support: receipt requests forward the email and transaction through the existing relay", async () => {
+const RECEIPT_DETAILS = {
+  receiptIssuedTo: "organization",
+  receiptName: " Acme Foundation ",
+  receiptCountry: "Switzerland",
+};
+
+Deno.test("support: receipt requests forward the email, transaction and receipt details through the existing relay", async () => {
   const h = await setup({ url: UPSTREAM });
   const transactionUrl = `https://etherscan.io/tx/0x${"ab".repeat(32)}`;
   try {
@@ -213,6 +219,8 @@ Deno.test("support: receipt requests forward the email and transaction through t
           category: "receipt",
           email: " donor@example.com ",
           transactionUrl: ` ${transactionUrl} `,
+          ...RECEIPT_DETAILS,
+          ...(message ? { receiptAddress: "1 Main St\r\n6300 Zug" } : {}),
           page: "/initiative/foo",
           ...(message ? { message } : {}),
         },
@@ -223,10 +231,14 @@ Deno.test("support: receipt requests forward the email and transaction through t
       assertEquals(call.url, UPSTREAM);
       const sent = JSON.parse(String(call.init!.body));
       assertEquals(sent, {
-        name: "",
+        name: "Acme Foundation",
         email: "donor@example.com",
         message: "[TheDAO Initiatives · Request a donation receipt]\n" +
           `Transaction: ${transactionUrl}\n` +
+          "Receipt issued to: Organization\n" +
+          "Legal name: Acme Foundation\n" +
+          "Country: Switzerland\n" +
+          (message ? "Address: 1 Main St, 6300 Zug\n" : "") +
           "Page: http://localhost:5173/initiative/foo\n\n" +
           (message ?? "Please send a receipt for this donation."),
       });
@@ -238,12 +250,13 @@ Deno.test("support: receipt requests forward the email and transaction through t
   }
 });
 
-Deno.test("support: receipt requests require a valid email and an https transaction link", async () => {
+Deno.test("support: receipt requests require a valid email, an https transaction link and receipt details", async () => {
   const h = await setup({ url: UPSTREAM });
   const receipt = {
     category: "receipt",
     email: "donor@example.com",
     transactionUrl: `https://etherscan.io/tx/0x${"ab".repeat(32)}`,
+    ...RECEIPT_DETAILS,
   };
   try {
     for (
@@ -260,6 +273,16 @@ Deno.test("support: receipt requests require a valid email and an https transact
         { transactionUrl: "https://user:password@etherscan.io/tx/123" },
         { transactionUrl: "https://etherscan.io/tx/123\nspoofed-line" },
         { transactionUrl: "https://etherscan.io/" + "x".repeat(SUPPORT_TRANSACTION_URL_MAX) },
+        { receiptIssuedTo: undefined },
+        { receiptIssuedTo: "company" },
+        { receiptIssuedTo: "toString" },
+        { receiptName: undefined },
+        { receiptName: " " },
+        { receiptName: "x".repeat(161) },
+        { receiptCountry: undefined },
+        { receiptCountry: "" },
+        { receiptCountry: "x".repeat(81) },
+        { receiptAddress: "x".repeat(301) },
       ]
     ) {
       const res = await h.req("/api/support", {
@@ -289,6 +312,10 @@ Deno.test("support: other categories reject receipt fields instead of dropping t
       json: { ...good, transactionUrl: "https://etherscan.io/tx/123" },
     });
     assertEquals(res.status, 400);
+    for (const [key, value] of Object.entries({ ...RECEIPT_DETAILS, receiptAddress: "Zug" })) {
+      const res = await h.req("/api/support", { method: "POST", json: { ...good, [key]: value } });
+      assertEquals(res.status, 400, key);
+    }
     assertEquals(h.fetchLog.length, 0);
   } finally {
     h.close();

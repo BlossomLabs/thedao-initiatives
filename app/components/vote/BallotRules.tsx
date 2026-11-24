@@ -4,7 +4,9 @@ export default function BallotRules({ messages }: { messages: string[] }) {
     <section
       aria-label="Ballot rules"
       data-ballot-reason=""
-      className="rounded-xl border border-amber-300/40 bg-amber-300/[.08] p-4"
+      // The marked cards' red (#144): it blocks sending, and it points at them. Light, as
+      // the round box's amber note is.
+      className="rounded-xl border border-dao-red-pale/40 bg-dao-red-pale/[.08] p-4"
     >
       <p className="font-inter-tight text-[14px] font-semibold text-white">
         This ballot can't be sent yet

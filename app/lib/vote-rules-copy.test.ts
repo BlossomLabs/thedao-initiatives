@@ -1,10 +1,8 @@
 import { expect, it } from "vitest";
 import { checkBallot, type RuleError } from "../../shared/vote/rules";
-import { explainBelow, ruleMessage, ruleStatus } from "./vote-rules-copy";
+import { affiliationFlags, explainBelow, ruleMessage, ruleStatus } from "./vote-rules-copy";
 
-const titleOf = (i: number) => ["Seal Audits", "Seal Tooling", "Gamma", "Delta"][i];
-const groupName = (g: number) => ["Seal"][g];
-const say = (e: Parameters<typeof ruleMessage>[0]) => ruleMessage(e, titleOf, groupName);
+const say = ruleMessage;
 
 it("size: what it requests, what it must, and where to add", () => {
   expect(
@@ -27,39 +25,34 @@ it("size: when donations took every ask below 1.5× the pool, the minimum is eve
     );
 });
 
-it("independent: names the affiliated projects that count as one", () => {
+it("independent: the rule, that affiliated projects count as one, and what to add", () => {
   expect(say({
     rule: "independent",
     tier: 0,
     count: 2,
     related: [{ group: 0, projects: [0, 1] }],
   })).toBe(
-    "S-Tier needs at least 3 independent projects. Seal Audits and Seal Tooling are affiliated with Seal, so they count as one.",
+    "S-Tier needs at least 3 independent projects. Projects with the same affiliation count as one, so the marked ones count once. Add projects that share no affiliation with your other S-Tier picks.",
   );
   expect(say({ rule: "independent", tier: 1, count: 0, related: [] })).toBe(
     "A-Tier needs at least 3 independent projects.",
   );
-  expect(say({
-    rule: "independent",
-    tier: 0,
-    count: 1,
-    related: [{ group: 0, projects: [0, 1, 2] }],
-  })).toContain("Seal Audits, Seal Tooling and Gamma are affiliated with Seal");
 });
 
-it("group: what the affiliation takes of the tier", () => {
-  expect(
-    say({
-      rule: "group",
-      tier: 0,
-      group: 0,
-      groupUsd: 310_000_000_000n,
-      tierUsd: 500_000_000_000n,
-    }),
-  )
-    .toBe(
-      "Projects affiliated with Seal have goals totaling $310,000 of S-Tier's $500,000 in goals. One affiliation can hold at most half.",
-    );
+it("group: the rule and the two ways out, no names or amounts (#144)", () => {
+  const e: RuleError = {
+    rule: "group",
+    tier: 0,
+    group: 0,
+    groupUsd: 555_000_000_000n,
+    tierUsd: 1_100_000_000_000n,
+    projects: [0, 1, 2],
+  };
+  expect(say(e)).toBe(
+    "Projects with the same affiliation can hold at most half of S-Tier's goals, and the marked ones hold more. Move some of them out of S-Tier, or add projects not affiliated with them.",
+  );
+  // Another affiliation over half the same tier says the same.
+  expect(say({ ...e, group: 1, projects: [3, 4] })).toBe(say(e));
 });
 
 it("tiers and shape", () => {
@@ -102,9 +95,9 @@ it("only affiliation problems get the box under the tiers", () => {
       related: [{ group: 0, projects: [0, 1] }],
     }),
   ).toBe(true);
-  expect(explainBelow({ rule: "group", tier: 1, group: 0, groupUsd: 3n, tierUsd: 4n })).toBe(
-    true,
-  );
+  expect(
+    explainBelow({ rule: "group", tier: 1, group: 0, groupUsd: 3n, tierUsd: 4n, projects: [0] }),
+  ).toBe(true);
 });
 
 it("the reachable $1,026,100 minimum is displayed exactly and accepts the full ballot", () => {
@@ -134,4 +127,32 @@ it("an empty A-Tier explains the B-Tier encoding restriction and settlement limi
   expect(say(e)).toContain("already settled empty");
   expect(ruleStatus([e]).ok).toBe(false);
   expect(explainBelow(e)).toBe(true);
+});
+
+const colibri: RuleError = {
+  rule: "group",
+  tier: 0,
+  group: 0,
+  groupUsd: 555n,
+  tierUsd: 1_100n,
+  projects: [0, 1, 2],
+};
+
+it("affiliationFlags: the cards each rule blames, a card in two affiliations gets both", () => {
+  const flags = affiliationFlags([
+    colibri,
+    { rule: "independent", tier: 0, count: 2, related: [{ group: 1, projects: [2, 3] }] },
+    { rule: "size", requested: 1n, needed: 2n, pool: 2n },
+  ], (g) => ["colibri", "Argot"][g]);
+  expect([...flags.keys()].sort()).toEqual([0, 1, 2, 3]);
+  expect(flags.get(0)).toEqual({
+    tag: "colibri",
+    reason: "Affiliated with colibri: over half of S-Tier",
+  });
+  expect(flags.get(2)).toEqual({
+    tag: "colibri, Argot",
+    reason:
+      "Affiliated with colibri: over half of S-Tier; Affiliated with Argot: counts as one in S-Tier",
+  });
+  expect(flags.get(3)?.reason).toBe("Affiliated with Argot: counts as one in S-Tier");
 });

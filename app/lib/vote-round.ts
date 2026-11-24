@@ -23,6 +23,14 @@ export function useRound() {
   const env = useVoteEnvironment();
   return useSyncExternalStore(subscribe, () => rounds[env], () => NO_ROUND);
 }
+/** One environment's round whatever page this is (`wanted`: load it if not yet). The vote's
+ * examples borrow the production round's affiliations on /vote-test (#144). */
+export function useRoundOf(env: VoteEnvironment, wanted = true) {
+  useEffect(() => {
+    if (wanted && rounds[env] === NO_ROUND) void loadRound(env);
+  }, [env, wanted]);
+  return useSyncExternalStore(subscribe, () => rounds[env], () => NO_ROUND);
+}
 export const useVoteBase = () => voteBase(useVoteEnvironment());
 export function primeRound(m: VoteManifest, env: VoteEnvironment = voteEnvironment(m)) {
   if (voteEnvironment(m) !== env) throw new Error("Vote environment mismatch");

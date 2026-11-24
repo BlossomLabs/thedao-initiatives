@@ -590,3 +590,28 @@ it("Details on a new initiative shows New too, until it's placed", async () => {
   expect(within(other.parentElement!).queryByText("New")).toBeNull();
   expect(other.querySelector("[data-peek-box]")).not.toHaveClass("border-dao-sky/60");
 });
+
+it("a card an affiliation rule blames is marked red with the affiliation, and says why (#144)", () => {
+  inRouter(
+    <TierBallot
+      items={items}
+      tiers={{ alpha: "S", beta: "S", gamma: "S" }}
+      disabled={false}
+      onChange={vi.fn()}
+      flags={new Map([["beta", {
+        tag: "colibri",
+        reason: "Affiliated with colibri: over half of S-Tier",
+      }]])}
+    />,
+  );
+  const tier = within(screen.getByRole("list", { name: "Must fund" }));
+  const beta = tier.getByRole("button", {
+    name: "BETA. Affiliated with colibri: over half of S-Tier",
+  });
+  expect(beta).toHaveAttribute("title", "BETA. Affiliated with colibri: over half of S-Tier");
+  expect(beta.querySelector("[data-ballot-flag]")).toHaveTextContent("colibri");
+  expect(beta.className).toContain("border-dao-red-pale/70");
+  const alpha = tier.getByRole("button", { name: "ALPHA" });
+  expect(alpha.querySelector("[data-ballot-flag]")).toBeNull();
+  expect(alpha.className).not.toContain("border-dao-red-pale/70");
+});

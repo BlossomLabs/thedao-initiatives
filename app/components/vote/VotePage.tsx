@@ -1,4 +1,4 @@
-import { useRound, useVoteBase, useVoteEnvironment } from "~/lib/vote-round";
+import { useRound, useRoundOf, useVoteBase, useVoteEnvironment } from "~/lib/vote-round";
 import { ballotStorageKey, roundId } from "../../../shared/vote/keys";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
@@ -36,7 +36,7 @@ import { useBallotSubmit } from "~/hooks/use-vote-send";
 import { errorMessage } from "~/lib/api";
 import { countedTiers, lockedLabels } from "~/lib/vote-locks";
 import { prefillFromRatings, ratingsToken, skipsFromRatings } from "~/lib/vote-prefill";
-import { explainBelow, ruleMessage, ruleStatus } from "~/lib/vote-rules-copy";
+import { affiliationFlags, explainBelow, ruleMessage, ruleStatus } from "~/lib/vote-rules-copy";
 import { useReviewIdentity } from "~/hooks/use-admin-ratings";
 import BallotRules from "~/components/vote/BallotRules";
 import BallotMenu from "~/components/vote/BallotMenu";
@@ -167,14 +167,17 @@ export default function VotePage(
     if (mockKind) setVoteClock(MOCK_NOW[mockKind] * 1000);
     return () => setVoteClock(null);
   }, [mockKind]);
+  const ROUND = useRound();
   const mockCards = useMockCards(mock ? board.data?.cards : undefined);
+  // The example borrows the vote's affiliations (the production round's), so its ballot
+  // rules mark the same cards the vote would.
+  const affiliated = useRoundOf("production", Boolean(mockKind));
   const mockData = useMemo(
-    () => mockKind && mockCards ? mockRound(mockKind, mockCards, 1) : undefined,
-    [mockKind, mockCards],
+    () => mockKind && mockCards ? mockRound(mockKind, mockCards, 1, affiliated) : undefined,
+    [mockKind, mockCards, affiliated],
   );
   /** The round on this page: a dev mock's fictional one, or the real one. */
 
-  const ROUND = useRound();
   const voteBase = useVoteBase();
   const R = mockData?.round ?? ROUND;
   // The deadline to qualify for the real ballot (the vote settings); an example has none.
@@ -725,14 +728,13 @@ export default function VotePage(
     );
     const rulesBox = below.length > 0 && (
       <BallotRules
-        messages={below.map((e) =>
-          ruleMessage(
-            e,
-            (i) => titles.get(R.slugs[i]) ?? R.slugs[i],
-            (g) => R.groups[g],
-          )
-        )}
+        // Two affiliations over half a tier say the same: once.
+        messages={[...new Set(below.map(ruleMessage))]}
       />
+    );
+    // The cards an affiliation rule blames: marked red, with the affiliation's name (#144).
+    const flags = new Map(
+      [...affiliationFlags(errors, (g) => R.groups[g])].map(([i, f]) => [R.slugs[i], f]),
     );
     // Where the round is, and what this badge can still do (the stepper box).
     const lastSettled = settledTiers.at(-1);
@@ -952,6 +954,7 @@ export default function VotePage(
           locked={locked}
           head={sharePanel}
           notice={rulesBox || withdrawnNote || undefined}
+          flags={flags}
           listHead={roundBox}
           phone={phone}
           funded={settledTiers.length ? funded : undefined}

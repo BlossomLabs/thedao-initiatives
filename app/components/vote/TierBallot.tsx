@@ -15,6 +15,7 @@ import CategoryDot from "~/components/ui/CategoryDot";
 import NewPill from "./NewPill";
 import StickyAside from "~/components/layout/StickyAside";
 import type { Card } from "~/lib/api-types";
+import type { AffiliationFlag } from "~/lib/vote-rules-copy";
 import type { AiSearchResult } from "../../../shared/ai-search";
 import BoardSearch from "~/components/board/BoardSearch";
 import CategoryFilter from "~/components/board/filters/CategoryFilter";
@@ -94,6 +95,8 @@ const WITHDRAWN = "Withdrawn";
 /** Its tag on a tile, a row or a chip: the admin's withdrawn red. */
 const WITHDRAWN_TAG =
   "flex-none rounded-[5px] border border-dao-red-pale/40 px-1 text-[11px] font-medium leading-[16px] text-dao-red-pale";
+/** A card an affiliation rule blames (#144): the withdrawn red, as a border and a tint. */
+const FLAGGED = "border-dao-red-pale/70 bg-dao-red/[.13]";
 const SKIPPED = "Skipped";
 /** A small button on a list tile's right: Details, Skip. */
 const TILE_ACTION =
@@ -203,6 +206,7 @@ export default function TierBallot(
     onSkip,
     sent,
     withdrawn,
+    flags,
     phone: phoneParts,
   }: {
     items: BallotItem[];
@@ -240,6 +244,9 @@ export default function TierBallot(
      * tier. One in a settled tier stays there (the lock); one in an open tier can leave
      * it, and is left out when the ballot is sent. */
     withdrawn?: ReadonlySet<string>;
+    /** Cards an affiliation rule blames, by slug: marked red with the affiliation's name,
+     * and why in their hover (a phone row says it under its ask). */
+    flags?: ReadonlyMap<string, AffiliationFlag>;
     /** On a phone, the editor is one list (S-Tier, A-Tier, B-Tier, then the rest) under the
      * ballot box, and an initiative's card fills the screen. These are its parts. */
     phone?: PhoneParts;
@@ -805,6 +812,7 @@ export default function TierBallot(
     const settledHere = isLocked(where(i.slug));
     const isFunded = settledHere && Boolean(funded?.has(i.slug));
     const paidText = paidOf(i.slug);
+    const flag = tiers[i.slug] ? flags?.get(i.slug) : undefined;
     return (
       <li key={i.slug} data-ballot-box={i.slug} className="relative">
         {fresh(i) && <NewPill />}
@@ -816,6 +824,8 @@ export default function TierBallot(
             "flex w-full items-center gap-2.5 rounded-[14px] border bg-white/5 py-3 pl-3.5 pr-3 text-left transition-colors active:bg-white/[.09]",
             isFunded
               ? "border-vote/50 bg-vote/[.08]"
+              : flag
+              ? FLAGGED
               : landed?.slug === i.slug
               ? "border-dao-green/60"
               : fresh(i)
@@ -849,6 +859,14 @@ export default function TierBallot(
                 )}
               </span>
             )}
+            {flag && (
+              <span
+                data-ballot-flag=""
+                className="mt-1 block text-[12px] leading-snug text-dao-red-pale"
+              >
+                {flag.reason}
+              </span>
+            )}
           </span>
           <ChevronRight className="size-[18px] flex-none text-white/45" aria-hidden="true" />
         </button>
@@ -863,8 +881,11 @@ export default function TierBallot(
     const isFunded = settledHere && Boolean(funded?.has(i.slug));
     const youPaid = isFunded ? paid?.get(i.slug) : undefined;
     const paidText = youPaid ? `$${Math.round(youPaid).toLocaleString("en-US")}` : undefined;
+    const flag = flags?.get(i.slug);
     const label = isOut(i.slug)
       ? `${i.title}, withdrawn`
+      : flag
+      ? `${i.title}. ${flag.reason}`
       : !settledHere || !funded
       ? i.title
       : isFunded
@@ -892,8 +913,9 @@ export default function TierBallot(
             !disabled && !settledHere && "sm:cursor-grab",
             drag?.slug === i.slug && "opacity-40",
             isFunded && "border-vote/50 bg-vote/[.12]",
+            flag && !isFunded && FLAGGED,
             settledHere && funded && !isFunded && "opacity-55",
-            (paidText || isOut(i.slug)) && "sm:w-[176px]",
+            (paidText || isOut(i.slug) || flag) && "sm:w-[176px]",
           )}
           data-peek-slot={slotOf(i.slug)}
         >
@@ -920,6 +942,17 @@ export default function TierBallot(
           {isOut(i.slug) && (
             <span className={cn(WITHDRAWN_TAG, "ml-auto text-[10px] leading-[14px]")}>
               {WITHDRAWN}
+            </span>
+          )}
+          {flag && !isOut(i.slug) && (
+            <span
+              data-ballot-flag=""
+              className={cn(
+                WITHDRAWN_TAG,
+                "ml-auto hidden max-w-[64px] truncate text-[10px] leading-[14px] sm:inline",
+              )}
+            >
+              {flag.tag}
             </span>
           )}
         </button>

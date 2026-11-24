@@ -33,7 +33,15 @@ export type RuleError =
     count: number;
     related: { group: number; projects: number[] }[];
   }
-  | { rule: "group"; tier: 0 | 1; group: number; groupUsd: bigint; tierUsd: bigint };
+  | {
+    rule: "group";
+    tier: 0 | 1;
+    group: number;
+    groupUsd: bigint;
+    tierUsd: bigint;
+    /** The affiliation's projects in that tier, by project index. */
+    projects: number[];
+  };
 export type RulesResult = { ok: boolean; errors: RuleError[]; proof: number[] };
 
 const WITHHELD = 255;
@@ -133,7 +141,14 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
     for (const g of ids) {
       const groupUsd = sum(byGroup.get(g)!);
       if (2n * groupUsd > tierUsd) {
-        errors.push({ rule: "group", tier: t, group: g, groupUsd, tierUsd });
+        errors.push({
+          rule: "group",
+          tier: t,
+          group: g,
+          groupUsd,
+          tierUsd,
+          projects: byGroup.get(g)!,
+        });
       }
     }
   }

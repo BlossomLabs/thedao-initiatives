@@ -49,7 +49,7 @@ describe("ballot rules", () => {
     expect(r.errors).toEqual([
       { rule: "independent", tier: 0, count: 2, related: [{ group: 0, projects: [0, 1] }] },
       // Seal also holds 200 of S-Tier's 300.
-      { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 300n },
+      { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 300n, projects: [0, 1] },
     ]);
   });
 
@@ -61,7 +61,7 @@ describe("ballot rules", () => {
     const half = checkBallot(ballot({ S: [0, 1, 2, 3] }), round());
     expect(half).toEqual({ ok: true, errors: [], proof: [0, 2, 3] });
     expect(checkBallot(ballot({ S: [0, 1, 2, 5] }), round()).errors).toEqual([
-      { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 350n },
+      { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 350n, projects: [0, 1] },
     ]);
   });
 
@@ -181,7 +181,7 @@ describe("ballot rules", () => {
   it("funding an affiliation does not let its goals exceed half of S-Tier", () => {
     const r = round({ asks: [0n, 0n, 100n, 100n, 50n, 50n], poolUsd: 0n });
     expect(checkBallot(ballot({ S: [0, 1, 2, 5] }), r).errors).toEqual([
-      { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 350n },
+      { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 350n, projects: [0, 1] },
     ]);
   });
 

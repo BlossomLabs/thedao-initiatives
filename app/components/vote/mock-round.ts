@@ -103,7 +103,17 @@ const mockAsk = (c: Card) => Math.max(1, c.initiative.goalUsd - c.summary.total)
 /** The fictional round: the board's proposals, oldest first. As on chain, each project's
  * `goalUsd` is its goal; what the tally charges is its ask (`needs`, `mockAsk`), which the
  * round's view serves as its `asks`, as the server does the chain's. */
-function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, number, number]) {
+function fictionalRound(
+  cards: Card[],
+  opensAt: number,
+  firstTally: [number, number, number],
+  real?: Affiliations,
+) {
+  // Each initiative's affiliations as the real round has them (its groups, by name).
+  const groupsOf = (slug: string) => {
+    const i = real?.slugs.indexOf(slug) ?? -1;
+    return i >= 0 ? [...(real!.projects[i]?.groups ?? [])] : [];
+  };
   const list = [...cards]
     .filter((c) => c.initiative.goalUsd > 0)
     .sort((a, b) => a.initiative.createdAt - b.initiative.createdAt);
@@ -121,9 +131,9 @@ function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, num
     projects: list.map((c) => ({
       goalUsd: micro(c.initiative.goalUsd),
       rfp: c.initiative.type === "rfp",
-      groups: [],
+      groups: groupsOf(c.initiative.slug),
     })),
-    groups: [],
+    groups: real ? [...real.groups] : [],
     independentTiers: 1,
     ballotRules: true,
   };
@@ -315,12 +325,21 @@ export function useMockCards(cards: Card[] | undefined): Card[] | undefined {
   return first.current;
 }
 
+/** The real round's affiliations (its slugs, each project's groups, the group names): an
+ * example borrows them so its ballot rules see the affiliations the vote has (#144). */
+export type Affiliations = Pick<VoteManifest, "slugs" | "projects" | "groups">;
+
 /** Badge `n` in the fictional round, in state `kind`, over the board's `cards`. The
  * tiers and the live result come from the real tally over 40 made-up ballots. */
-export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
+export function mockRound(
+  kind: MockKind,
+  cards: Card[],
+  n: number,
+  real?: Affiliations,
+): Mock {
   const share = POOL_USD / VOTERS;
   const first = FIRST;
-  const { round, needs } = fictionalRound(cards, OPENS, first);
+  const { round, needs } = fictionalRound(cards, OPENS, first, real);
   const base = {
     closed: false,
     share: micro(share),

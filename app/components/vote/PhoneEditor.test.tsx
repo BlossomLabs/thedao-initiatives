@@ -38,9 +38,10 @@ afterEach(() => {
 const items = ["alpha", "beta", "gamma"].map((slug) => ({ slug, title: slug.toUpperCase() }));
 
 function Ballot(
-  { start = {}, parts = {} }: {
+  { start = {}, parts = {}, flags }: {
     start?: Partial<Record<string, Tier>>;
     parts?: Partial<PhoneParts>;
+    flags?: ReadonlyMap<string, { tag: string; reason: string }>;
   },
 ) {
   const [tiers, setTiers] = useState(start);
@@ -58,6 +59,7 @@ function Ballot(
             return next;
           })}
         actions={<p>Send panel</p>}
+        flags={flags}
         phone={{
           head: <p>Ballot box</p>,
           round: <span>S-Tier starts settling</span>,
@@ -230,4 +232,19 @@ it("a withdrawn initiative is marked Withdrawn, and its card can't place it", ()
   const card = screen.getByRole("dialog", { name: "BETA" });
   expect(card).toHaveTextContent("Withdrawn from the vote: it can't be ranked.");
   expect(within(card).getByRole("button", { name: "S-Tier, Must fund" })).toBeDisabled();
+});
+
+it("a row an affiliation rule blames says why under its ask, in red (#144)", () => {
+  const reason = "Affiliated with colibri: over half of S-Tier";
+  render(
+    <Ballot
+      start={{ alpha: "S", beta: "S" }}
+      flags={new Map([["beta", { tag: "colibri", reason }]])}
+    />,
+  );
+  const s = within(screen.getByRole("list", { name: "S-Tier" }));
+  const beta = s.getByRole("button", { name: /BETA/ });
+  expect(beta).toHaveTextContent(reason);
+  expect(beta.className).toContain("border-dao-red-pale/70");
+  expect(s.getByRole("button", { name: /ALPHA/ })).not.toHaveTextContent(reason);
 });

@@ -54,6 +54,12 @@ export function aiRoutes(deps: Deps) {
         throw new HttpError(429, "search is resting until tomorrow");
       }
       deps.log(`ai-search failed: ${String(e)}`);
+      // Jev's status is our own line, never its body: safe to show, and a 402 says who to pay.
+      const jev = e instanceof Error && /^Jev HTTP (\d+)$/.exec(e.message);
+      if (jev) {
+        const why = jev[1] === "402" ? ": payment required" : "";
+        throw new HttpError(502, `search is unavailable right now (${e.message}${why})`);
+      }
       throw new HttpError(502, "search is unavailable right now");
     }
     cache.delete(key);

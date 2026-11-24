@@ -115,3 +115,25 @@ Deno.test("AI budget: concurrent reservations cannot overspend and a new day res
     h.close();
   }
 });
+
+Deno.test("AI search: a Jev error says its status, and a 402 that it wants paying", async () => {
+  let status = 402;
+  const h = await harness({
+    env: { TYPESAFE_API_KEY: "test" },
+    fetch: () => new Response("<html>no credits</html>", { status }),
+  });
+  try {
+    await board(h, 1);
+    const unpaid = await search(h);
+    assertEquals(unpaid.status, 502);
+    assertEquals(
+      (await j(unpaid)).error,
+      "search is unavailable right now (Jev HTTP 402: payment required)",
+    );
+    status = 503;
+    const down = await search(h, "wallet security");
+    assertEquals((await j(down)).error, "search is unavailable right now (Jev HTTP 503)");
+  } finally {
+    h.close();
+  }
+});

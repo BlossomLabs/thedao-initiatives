@@ -70,12 +70,12 @@ Deno.test("vote llms: states the rules with the pool's 1.5× in dollars", () => 
     m.projects.map((p) => BigInt(p.goalUsd)),
   );
   assertStringIncludes(enough, "at least $750,000 in total (1.5× the $500,000 configured pool)");
-  assertStringIncludes(text, "S-Tier needs at least 3 independent projects");
+  assertStringIncludes(text, "S-Tier needs at least 3 independent initiatives");
   assertStringIncludes(text, "Anything you leave unranked gets nothing from you");
   assertStringIncludes(text, "no pair shares any listed affiliation");
   assertStringIncludes(
     text,
-    "a project with several affiliations counts its full registered goal",
+    "an initiative with several affiliations counts its full registered goal",
   );
   assertStringIncludes(text, "Exactly half is allowed");
   assertStringIncludes(
@@ -89,7 +89,7 @@ Deno.test("vote llms: voting eligibility, first-ballot cutoff and revisions", ()
   assertStringIncludes(text, "Each voting badge is one equal voting unit");
   assertStringIncludes(text, "Only its current owner can authorize its ballot");
   assertStringIncludes(text, "Send a first valid ballot before S-Tier actually settles");
-  assertStringIncludes(text, "cannot add, remove or move projects in a settled tier");
+  assertStringIncludes(text, "cannot add, remove or move initiatives in a settled tier");
   assertStringIncludes(text, "A refused revision leaves the previous accepted ballot counting");
   assertStringIncludes(text, "blocks strictly before its cutoff");
   assertStringIncludes(text, "[the current round state](https://x.test/api/vote/round)");
@@ -115,7 +115,7 @@ Deno.test("vote llms: A-Tier enforcement changes both the rules and the drafting
   const both = voteLlms({ ...m, independentTiers: 3 }, entries, "https://x.test");
   assertStringIncludes(both, "A-Tier follows the same two independence and affiliation rules");
   assertStringIncludes(both, "S-Tier and A-Tier must not be empty");
-  assertStringIncludes(both, "three pairwise-independent projects in each of S-Tier and A-Tier");
+  assertStringIncludes(both, "three pairwise-independent initiatives in each of S-Tier and A-Tier");
   assertStringIncludes(both, "B-Tier has no independence minimum or affiliation limit");
   assert(!both.includes("A-Tier has no independence minimum"));
 });
@@ -147,7 +147,7 @@ Deno.test("vote llms: the 15-project minimum agrees with validation and is reach
   assert(!guide.includes("at least $1,087,314"));
   assertStringIncludes(
     guide,
-    "rank every non-withdrawn project with a positive ask to meet the size rule",
+    "rank every non-withdrawn initiative with a positive ask to meet the size rule",
   );
   assertStringIncludes(guide, "Before returning it, check the total asks against the smaller of");
   const round = rulesRound(rehearsal, asks);
@@ -166,7 +166,7 @@ Deno.test("vote llms: donations and withdrawals reduce the minimum, fully funded
   const asks = [250_000_000_000n, 200_000_000_000n, 0n, 400_000_000_000n];
   const guide = voteLlms(m, entries, "https://x.test", asks, new Set(["wallets"]));
   assertStringIncludes(guide, "must ask for at least $450,000 in total");
-  assertStringIncludes(guide, "every non-withdrawn project's current ask");
+  assertStringIncludes(guide, "every non-withdrawn initiative's current ask");
   const covered = voteLlms(m, entries, "https://x.test", [0n, 0n, 0n, 0n]);
   assertStringIncludes(covered, "must ask for at least $0 in total");
 });
@@ -209,8 +209,8 @@ Deno.test("vote llms: the route serves the capped minimum from asks and the repl
 });
 
 Deno.test("vote llms: a draft must use unique known slugs and pass validation", () => {
-  assertStringIncludes(text, "Use only the exact project slugs below");
-  assertStringIncludes(text, "list each project at most once");
+  assertStringIncludes(text, "Use only the exact initiative slugs below");
+  assertStringIncludes(text, "list each initiative at most once");
   assertStringIncludes(text, "Syntax example only; it may not meet the ballot rules");
   assertStringIncludes(text, "Before returning it, check the total asks");
   assertStringIncludes(text, "do not invent preferences or return an invalid ballot");
@@ -265,8 +265,8 @@ Deno.test("vote llms: the route passes the chain asks", async () => {
 Deno.test("vote llms: a round from before the ballot rules states none", () => {
   const old = voteLlms({ ...m, ballotRules: undefined }, entries, "https://x.test");
   assert(!old.includes("1.5×"));
-  assert(!old.includes("needs at least 3 independent projects"));
-  assert(!old.includes("three pairwise-independent projects"));
+  assert(!old.includes("needs at least 3 independent initiatives"));
+  assert(!old.includes("three pairwise-independent initiatives"));
   assertStringIncludes(old, "This round has no ballot rules.");
 });
 
@@ -274,7 +274,7 @@ Deno.test("vote llms: size counts live asks while affiliation shares count regis
   assertStringIncludes(text, "The minimum is the smaller of 1.5× the pool");
   assertStringIncludes(
     text,
-    "A project's ask is its goal less its donations and open pledges, on-chain at the block that records your ballot, so it can change before then",
+    "An initiative's ask is its goal less its donations and open pledges, on-chain at the block that records your ballot, so it can change before then",
   );
   assert(!text.includes("original requested amounts"));
   assertStringIncludes(text, "total registered goals");
@@ -294,7 +294,7 @@ Deno.test("vote llms: each project lists its chain ask", () => {
   assertStringIncludes(text, "asks unknown");
   assertStringIncludes(
     text,
-    "Where a project's ask is unknown, the ballot's size can't be checked here: say so to the voter rather than estimating it.",
+    "Where an initiative's ask is unknown, the ballot's size can't be checked here: say so to the voter rather than estimating it.",
   );
   assert(!text.includes("still needs"));
 });
@@ -318,7 +318,10 @@ Deno.test("vote llms: a withdrawn initiative is marked withdrawn: true, the time
 
 Deno.test("vote llms: withdrawn unknown says so, apart from none withdrawn", () => {
   const unknown = voteLlms(m, entries, "https://x.test", undefined, null);
-  assertStringIncludes(unknown, "Which projects an admin withdrew from the vote couldn't be read");
+  assertStringIncludes(
+    unknown,
+    "Which initiatives an admin withdrew from the vote couldn't be read",
+  );
   assert(!unknown.includes("withdrawn: true"));
   assert(!text.includes("couldn't be read"));
   const some = voteLlms(m, entries, "https://x.test", undefined, new Set(["wallets"]));

@@ -39,21 +39,21 @@ export function voteLlms(
     needed === undefined
       ? "- The current total-ask minimum is unknown because the current asks or withdrawal " +
         "status could not be read. Re-read this feed before checking the ballot's size."
-      : `- The projects you rank must ask for at least ${dollars(needed)} in total (${
+      : `- The initiatives you rank must ask for at least ${dollars(needed)} in total (${
         2n * needed >= 3n * pool
           ? `1.5× the ${dollars(pool)} configured pool`
-          : `every non-withdrawn project's current ask, which is less than 1.5× the ${
+          : `every non-withdrawn initiative's current ask, which is less than 1.5× the ${
             dollars(pool)
           } configured pool`
       }).`,
     "- The minimum is the smaller of 1.5× the pool (rounded up to one micro-USD) and the " +
-    "combined current asks of all non-withdrawn projects. When those asks total less than " +
-    "1.5× the pool, rank every non-withdrawn project with a positive ask to meet the size rule. " +
+    "combined current asks of all non-withdrawn initiatives. When those asks total less than " +
+    "1.5× the pool, rank every non-withdrawn initiative with a positive ask to meet the size rule. " +
     "The independence and affiliation rules still apply.",
-    "- A project's ask is its goal less its donations and open pledges, " +
+    "- An initiative's ask is its goal less its donations and open pledges, " +
     "on-chain at the block that records your ballot, so it can change before then. If the " +
     "live pool or asks differ, recompute this capped minimum from poolUsd, asks and the " +
-    "withdrawn projects in the current round state.",
+    "withdrawn initiatives in the current round state.",
     ...(m.pool && !m.pool.sold
       ? [
         `- The pool is ${m.pool.eth} ETH, sold for USD before ${sTier}'s first tally ` +
@@ -61,17 +61,17 @@ export function voteLlms(
         "sets, so the minimum above can move either way when it is sold: leave room.",
       ]
       : []),
-    "- Where a project's ask is unknown, the ballot's size can't be checked here: say so to the " +
+    "- Where an initiative's ask is unknown, the ballot's size can't be checked here: say so to the " +
     "voter rather than estimating it.",
     "- The asks listed below are the chain's current ones: use them for the ballot-size " +
-    "minimum, and leave room for them to shrink. A project already fully funded asks $0: " +
+    "minimum, and leave room for them to shrink. An initiative already fully funded asks $0: " +
     "it still counts toward S-Tier independence and its full registered goal still counts " +
     "toward affiliation limits, but it adds nothing to the requested total.",
-    `- ${sTier} needs at least 3 independent projects: choose three such that no pair shares ` +
+    `- ${sTier} needs at least 3 independent initiatives: choose three such that no pair shares ` +
     "any listed affiliation. RFPs have no affiliations, so each RFP counts as independent. " +
-    "Additional related projects may be included if the affiliation limit below is kept.",
-    `- In ${sTier}, the projects of one affiliation can hold at most half of the tier's ` +
-    "total registered goals. Check each affiliation separately; a project with several affiliations " +
+    "Additional related initiatives may be included if the affiliation limit below is kept.",
+    `- In ${sTier}, the initiatives of one affiliation can hold at most half of the tier's ` +
+    "total registered goals. Check each affiliation separately; an initiative with several affiliations " +
     "counts its full registered goal toward each. Exactly half is allowed. Donations and " +
     "pledges do not change this share.",
     ...(tierA
@@ -79,7 +79,7 @@ export function voteLlms(
       : [`- ${aTier} has no independence minimum or affiliation limit in this round.`]),
     `- ${enforced} must not be empty. ${bTier} has no independence minimum or affiliation ` +
     "limit; the whole ballot must still meet the total-ask minimum.",
-    "- A ballot that breaks a rule is invalid: it can't be sent. Adding projects or increasing " +
+    "- A ballot that breaks a rule is invalid: it can't be sent. Adding initiatives or increasing " +
     "the pool later does not invalidate an earlier accepted ballot; a new revision must meet " +
     "the rules in force when it is recorded.",
     "",
@@ -119,7 +119,7 @@ export function voteLlms(
     `- Send a first valid ballot before ${sTier} actually settles. A badge that has not voted ` +
     "by then cannot join later, even if the later tiers are still open.",
     "- The latest accepted ballot for a badge replaces its earlier one. You can revise open " +
-    "tiers, but cannot add, remove or move projects in a settled tier. A refused revision " +
+    "tiers, but cannot add, remove or move initiatives in a settled tier. A refused revision " +
     "leaves the previous accepted ballot counting.",
     "- Pasting a draft or signing it is not a counted vote: it must be recorded on-chain and " +
     "accepted. A settlement uses only blocks strictly before its cutoff; do not wait for the " +
@@ -130,7 +130,7 @@ export function voteLlms(
     "poolInitialized, registrationClosesAt, closed, and each tier's status. While poolInitialized is false, " +
     "registrationClosesAt is null and no tier settles; voting still waits for opensAt. API dollar amounts are decimal " +
     "strings in micro-USD (1,000,000 = $1). For a revision, ask the voter for the ballot that " +
-    "currently counts and preserve its settled tiers. Re-read this feed if projects were added.",
+    "currently counts and preserve its settled tiers. Re-read this feed if initiatives were added.",
     "",
     "## Schedule and quiet ending",
     "",
@@ -156,8 +156,8 @@ export function voteLlms(
     `${sTier} (must fund), then ${aTier} (should fund), then ${bTier} (nice to have). Initiatives in ` +
     `the same tier are equal. ${sTier} settles first, then ${aTier}, then ${bTier}; each funds what it ` +
     "can from what is left of your share. Anything you leave unranked gets nothing from you; " +
-    "your share of it returns to TheDAO. Put every project you'd be glad to see funded in " +
-    `${bTier}: it only takes money once ${sTier} and ${aTier} are done. Ranking a project does ` +
+    "your share of it returns to TheDAO. Put every initiative you'd be glad to see funded in " +
+    `${bTier}: it only takes money once ${sTier} and ${aTier} are done. Ranking an initiative does ` +
     `not guarantee funding; ${bTier} may fund nothing if the pool runs out.`,
     "",
     "## Ballot rules",
@@ -166,8 +166,8 @@ export function voteLlms(
     "## Ballot format",
     "",
     `YAML with one key per tier, \`${sTier}\`, \`${aTier}\` and \`${bTier}\`, each a list of ` +
-    "project slugs from the list below; an empty tier is `[]`. No voter id, no names, no " +
-    "costs. Use only the exact project slugs below and list each project at most once. " +
+    "initiative slugs from the list below; an empty tier is `[]`. No voter id, no names, no " +
+    "costs. Use only the exact initiative slugs below and list each initiative at most once. " +
     "A tier must contain a pick before any later tier can be used: B-Tier requires both S-Tier and A-Tier. " +
     "If an earlier tier settled empty on this ballot, later tiers cannot be added in this round. " +
     "Anything not listed is unranked. The voter pastes it into the ballot page. Syntax " +
@@ -177,17 +177,17 @@ export function voteLlms(
     example,
     "```",
     "",
-    "## Projects",
+    "## Initiatives",
     "",
     ...(withdrawn === null
       ? [
-        "Which projects an admin withdrew from the vote couldn't be read right now: none is " +
+        "Which initiatives an admin withdrew from the vote couldn't be read right now: none is " +
         "marked below, but some may be. Re-read this feed in a minute.",
         "",
       ]
       : withdrawn.size
       ? [
-        "A project marked withdrawn: true was withdrawn by an admin: it is not a candidate and " +
+        "An initiative marked withdrawn: true was withdrawn by an admin: it is not a candidate and " +
         "asks $0 toward the total. Leave it unranked; if the ballot that counts has it in a " +
         "settled tier, keep it there as it is.",
         "",
@@ -202,10 +202,10 @@ export function voteLlms(
     ...(m.ballotRules
       ? [
         "Before returning it, check the total asks against the smaller of 1.5× the live pool " +
-        "(rounded up to one micro-USD) and all non-withdrawn projects' current asks, " +
-        `name three pairwise-independent projects in each of ${enforced}, and check every ` +
+        "(rounded up to one micro-USD) and all non-withdrawn initiatives' current asks, " +
+        `name three pairwise-independent initiatives in each of ${enforced}, and check every ` +
         "affiliation's share of each enforced tier's registered goals is at most 50%. If the voter's " +
-        "choices cannot satisfy the rules, explain what is missing and ask which projects " +
+        "choices cannot satisfy the rules, explain what is missing and ask which initiatives " +
         "they want to add; do not invent preferences or return an invalid ballot.",
       ]
       : []),

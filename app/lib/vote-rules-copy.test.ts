@@ -14,14 +14,14 @@ it("size: what it requests, what it must, and where to add", () => {
     }),
   )
     .toBe(
-      "Your ballot requests $1,100,000. It must request at least $1,369,866 (1.5× the $913,244 pool). Add more projects; B-Tier is a good place for them.",
+      "Your ballot requests $1,100,000. It must request at least $1,369,866 (1.5× the $913,244 pool). Add more initiatives; B-Tier is a good place for them.",
     );
 });
 
 it("size: when donations took every ask below 1.5× the pool, the minimum is every ask", () => {
   expect(say({ rule: "size", requested: 230_000_000n, needed: 280_000_000n, pool: 200_000_000n }))
     .toBe(
-      "Your ballot requests $230. It must request at least $280 (every ask in the round, which is less than 1.5× the $200 pool). Add more projects; B-Tier is a good place for them.",
+      "Your ballot requests $230. It must request at least $280 (every ask in the round, which is less than 1.5× the $200 pool). Add more initiatives; B-Tier is a good place for them.",
     );
 });
 
@@ -32,10 +32,10 @@ it("independent: the rule, that affiliated projects count as one, and what to ad
     count: 2,
     related: [{ group: 0, projects: [0, 1] }],
   })).toBe(
-    "S-Tier needs at least 3 independent projects. Projects with the same affiliation count as one, so the marked ones count once. Add projects that share no affiliation with your other S-Tier picks.",
+    "S-Tier needs at least 3 independent initiatives. Initiatives with the same affiliation count as one, so the marked ones count once. Add initiatives that share no affiliation with your other S-Tier picks.",
   );
   expect(say({ rule: "independent", tier: 1, count: 0, related: [] })).toBe(
-    "A-Tier needs at least 3 independent projects.",
+    "A-Tier needs at least 3 independent initiatives.",
   );
 });
 
@@ -49,7 +49,7 @@ it("group: the rule and the two ways out, no names or amounts (#144)", () => {
     projects: [0, 1, 2],
   };
   expect(say(e)).toBe(
-    "Projects with the same affiliation can hold at most half of S-Tier's goals, and the marked ones hold more. Move some of them out of S-Tier, or add projects not affiliated with them.",
+    "Initiatives with the same affiliation can hold at most half of S-Tier's goals, and the marked ones hold more. Move some of them out of S-Tier, or add initiatives not affiliated with them.",
   );
   // Another affiliation over half the same tier says the same.
   expect(say({ ...e, group: 1, projects: [3, 4] })).toBe(say(e));
@@ -78,9 +78,9 @@ it("the ballot box's line: the first rule to meet, size before tiers, else valid
   expect(status(999_000_000n)).toBe("Needs at least $999 to be valid");
   expect(ruleStatus([a, s])).toEqual({
     ok: false,
-    text: "Needs at least 3 independent projects in S-Tier",
+    text: "Needs at least 3 independent initiatives in S-Tier",
   });
-  expect(ruleStatus([a]).text).toBe("Needs at least 3 independent projects in A-Tier");
+  expect(ruleStatus([a]).text).toBe("Needs at least 3 independent initiatives in A-Tier");
   expect(ruleStatus([])).toEqual({ ok: true, text: "You can add as many initiatives as you want" });
 });
 

@@ -14,18 +14,18 @@ export function ruleMessage(e: RuleError): string {
         2n * e.needed >= 3n * e.pool
           ? `1.5× the ${dollars(e.pool)} pool`
           : `every ask in the round, which is less than 1.5× the ${dollars(e.pool)} pool`
-      }). Add more projects; B-Tier is a good place for them.`;
+      }). Add more initiatives; B-Tier is a good place for them.`;
     case "independent": {
       const tier = tierName(TIERS[e.tier]);
-      const said = `${tier} needs at least 3 independent projects.`;
+      const said = `${tier} needs at least 3 independent initiatives.`;
       if (!e.related.length) return said;
-      return `${said} Projects with the same affiliation count as one, so the marked ones ` +
-        `count once. Add projects that share no affiliation with your other ${tier} picks.`;
+      return `${said} Initiatives with the same affiliation count as one, so the marked ones ` +
+        `count once. Add initiatives that share no affiliation with your other ${tier} picks.`;
     }
     case "group": {
       const tier = tierName(TIERS[e.tier]);
-      return `Projects with the same affiliation can hold at most half of ${tier}'s goals, ` +
-        `and the marked ones hold more. Move some of them out of ${tier}, or add projects ` +
+      return `Initiatives with the same affiliation can hold at most half of ${tier}'s goals, ` +
+        `and the marked ones hold more. Move some of them out of ${tier}, or add initiatives ` +
         `not affiliated with them.`;
     }
     case "empty_tier":
@@ -53,7 +53,7 @@ export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
     case "independent":
       return {
         ok: false,
-        text: `Needs at least 3 independent projects in ${tierName(TIERS[e.tier])}`,
+        text: `Needs at least 3 independent initiatives in ${tierName(TIERS[e.tier])}`,
       };
     case "group":
       return {

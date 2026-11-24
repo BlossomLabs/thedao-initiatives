@@ -24,6 +24,7 @@ import {
   sortCards,
   sortFor,
   SORTS,
+  titleHit,
   writeView,
 } from "./board-view";
 
@@ -328,6 +329,19 @@ describe("keyword filter", () => {
     const cards = [card("Fuzzing grant", { team: "Trail of Bits" }), card("Other grant")];
     const v = { ...DEFAULT_VIEW, q: "trail bits" };
     expect(applyView(cards, v).map((c) => c.initiative.title)).toEqual(["Fuzzing grant"]);
+  });
+});
+
+describe("titleHit", () => {
+  const titles = ["Solidity Compiler Fuzzing", "Wallet drainers"];
+  it("is true when every word is in one title, in any case and order", () => {
+    expect(titleHit("fuzzing SOLIDITY", titles)).toBe(true);
+    expect(titleHit("drain", titles)).toBe(true);
+  });
+  it("is false for words spread over titles, missing words, or none", () => {
+    expect(titleHit("solidity wallet", titles)).toBe(false);
+    expect(titleHit("formal verification", titles)).toBe(false);
+    expect(titleHit("  ", titles)).toBe(false);
   });
 });
 

@@ -6,7 +6,7 @@ import { api, errorMessage } from "~/lib/api";
 import { upgradeNow } from "~/lib/app-upgrade";
 import { Button } from "~/components/ui/Button";
 import { usePhone } from "~/hooks/use-media";
-import type { BoardView } from "~/lib/board-view";
+import { type BoardView, titleHit } from "~/lib/board-view";
 import {
   boardQueryText,
   parseBoardQuery,
@@ -34,12 +34,25 @@ export const FILTER_THROTTLE_MS = 200;
  * The icon, a tag in the box and the note under it say which mode is on.
  */
 export default function BoardSearch(
-  { view, onFilter, aiEnabled, aiAuto = false, active, onResults, onAsking, compact = false }: {
+  {
+    view,
+    onFilter,
+    aiEnabled,
+    aiAuto = false,
+    titles = [],
+    active,
+    onResults,
+    onAsking,
+    compact = false,
+  }: {
     view: Filters;
     onFilter: (next: Partial<BoardView>) => void;
     aiEnabled: boolean;
     /** Jev searches automatically after a 500 ms pause in typing. */
     aiAuto?: boolean;
+    /** The listed titles: words found in one of them never start the automatic AI search
+     * (Enter still asks). */
+    titles?: readonly string[];
     /** Whether the board still shows the AI order (a manual sort clears it). */
     active: boolean;
     onResults: (result: AiSearchResult | null) => void;
@@ -58,6 +71,9 @@ export default function BoardSearch(
   const previousView = useRef(view);
   const onFilterRef = useRef(onFilter);
   onFilterRef.current = onFilter;
+  // Read when the words change, so a refreshed list never sends a search by itself.
+  const titlesRef = useRef(titles);
+  titlesRef.current = titles;
   function cancelFilter() {
     if (filterTimer.current !== null) clearTimeout(filterTimer.current);
     filterTimer.current = null;
@@ -217,7 +233,7 @@ export default function BoardSearch(
   }
 
   useEffect(() => {
-    if (!automatic || !isAiSearchQuery(words)) {
+    if (!automatic || !isAiSearchQuery(words) || titleHit(words, titlesRef.current)) {
       setBusy(false);
       return;
     }

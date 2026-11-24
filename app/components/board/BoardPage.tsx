@@ -181,6 +181,7 @@ export default function BoardPage(
     () => (data?.cards ?? []).filter((c) => !only || only.has(c.initiative.slug)),
     [data, only],
   );
+  const allTitles = useMemo(() => all.map((c) => c.initiative.title), [all]);
   // Featured (pins first) exists only while the team pinned something;
   // otherwise the default order is closest to funded.
   const featuredSet = useMemo(() => featuredIds(all), [all]);
@@ -348,6 +349,7 @@ export default function BoardPage(
             onFilter={setView}
             aiEnabled={Boolean(data.flags.aiSearch)}
             aiAuto={Boolean(data.flags.aiSearchAuto)}
+            titles={allTitles}
             active={ai}
             onResults={setAiResult}
             onAsking={setAsking}

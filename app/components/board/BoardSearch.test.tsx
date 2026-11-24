@@ -21,9 +21,10 @@ afterEach(() => vi.useRealTimers());
 // The board around the box: its filters and the AI order.
 const board = { view: DEFAULT_VIEW as BoardView, matches: null as string[] | null };
 function Host(
-  { aiEnabled = true, aiAuto = false, start = {}, compact = false }: {
+  { aiEnabled = true, aiAuto = false, start = {}, compact = false, titles }: {
     aiEnabled?: boolean;
     aiAuto?: boolean;
+    titles?: string[];
     start?: Partial<BoardView>;
     compact?: boolean;
   },
@@ -40,6 +41,7 @@ function Host(
         onFilter={(next) => setView((v) => ({ ...v, ...next }))}
         aiEnabled={aiEnabled}
         aiAuto={aiAuto}
+        titles={titles}
         active={Boolean(result?.scores.length)}
         onResults={setResult}
       />
@@ -269,6 +271,27 @@ it("Jev debounces typing and sends only the latest words", async () => {
   await tick(600);
   expect(api).toHaveBeenCalledTimes(1);
   expect(board.matches).toEqual(["a"]);
+});
+
+it("Jev stays quiet while the words are in a title, and Enter still asks", async () => {
+  vi.useFakeTimers();
+  api.mockResolvedValue(result);
+  render(<Host aiAuto titles={["Solidity Compiler Fuzzing", "Wallet drainers"]} />);
+  type("solidity fuzz");
+  await tick(600);
+  expect(api).not.toHaveBeenCalled();
+  expect(board.view.q).toBe("solidity fuzz");
+  // Words from two different titles are a topic, not one initiative: Jev ranks them.
+  type("solidity wallet");
+  await tick(500);
+  expect(api).toHaveBeenCalledWith("/api/ai-search", { json: { query: "solidity wallet" } });
+  type("Wallet");
+  await tick(600);
+  expect(api).toHaveBeenCalledTimes(1);
+  enter();
+  await tick(0);
+  expect(api).toHaveBeenCalledTimes(2);
+  expect(api).toHaveBeenLastCalledWith("/api/ai-search", { json: { query: "wallet" } });
 });
 
 it("Jev automatically searches a query restored from the URL", async () => {

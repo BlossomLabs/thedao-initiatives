@@ -108,6 +108,16 @@ export const isFiltered = (v: BoardView) =>
 
 const words = (q: string) => q.toLowerCase().split(/\s+/).filter(Boolean);
 
+/** Whether every typed word is in one title: the reader is looking for that initiative,
+ * so the words filter and the automatic AI search, which costs a paid call, stays quiet. */
+export function titleHit(q: string, titles: readonly string[]): boolean {
+  const w = words(q);
+  return w.length > 0 && titles.some((t) => {
+    const title = t.toLowerCase();
+    return w.every((x) => title.includes(x));
+  });
+}
+
 /** The text the keyword filter searches: title, summary, team, category labels. */
 // API initiative objects are immutable: a refreshed row gets a new object. Share
 // this index across keyword filtering and facet counts, releasing old rows with GC.

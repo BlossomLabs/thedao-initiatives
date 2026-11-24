@@ -525,6 +525,7 @@ export default function TierBallot(
     [items, tiers, skipped],
   );
   const ai = Boolean(aiResult?.scores.length);
+  const itemTitles = useMemo(() => items.map((i) => i.title), [items]);
   // While the AI order is on, the model ranked everything: the words stop filtering.
   const shownView = useMemo(
     () => (ai || (search.aiAuto && asking) ? { ...view, q: "" } : view),
@@ -1003,6 +1004,7 @@ export default function TierBallot(
         onFilter={(next) => setView((v) => ({ ...v, ...next }))}
         aiEnabled={Boolean(search.ai)}
         aiAuto={Boolean(search.aiAuto)}
+        titles={itemTitles}
         active={ai}
         onResults={setAiResult}
         onAsking={setAsking}

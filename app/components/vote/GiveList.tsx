@@ -319,6 +319,7 @@ export default function GiveList(
     () => new Map(all.map((r) => [r.card.initiative.slug, r.card.initiative.title])),
     [all],
   );
+  const titleList = useMemo(() => [...titles.values()], [titles]);
   const titleOf = (slug: string) => titles.get(slug) ?? slug;
   const counts = useMemo(() => facetCounts(all.map((r) => r.card), shownView), [all, shownView]);
   const filtered = isFiltered(shownView);
@@ -404,6 +405,7 @@ export default function GiveList(
             onFilter={(next) => setView((v) => ({ ...v, ...next }))}
             aiEnabled={Boolean(search.ai)}
             aiAuto={Boolean(search.aiAuto)}
+            titles={titleList}
             active={ai}
             onResults={setAiResult}
             onAsking={setAsking}

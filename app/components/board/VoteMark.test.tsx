@@ -19,7 +19,11 @@ it("the callout: past the floor, or what is missing within 5 points of it", () =
   expect(voteCallout(60_000, 240_000, { ...vote, show: false })).toBeNull();
   // goal $600k: the floor is the goal less the $200k cap, $400k
   expect(voteCallout(150_000, 600_000, vote)).toBeNull();
-  expect(voteCallout(380_000, 600_000, vote)).toEqual({ kind: "near", missing: 20_000 });
+  expect(voteCallout(380_000, 600_000, vote)).toEqual({
+    kind: "near",
+    missing: 20_000,
+    cap: { usd: 200_000, pct: 67 },
+  });
   expect(voteCallout(400_000, 600_000, vote)).toEqual({ kind: "eligible" });
 });
 
@@ -30,6 +34,22 @@ it("the callout says how much is missing, short and rounded up, or Qualified for
   expect(screen.getByText("$2k to qualify")).toBeInTheDocument();
   rerender(<VoteCallout state={{ kind: "eligible" }} at={25} side="top" />);
   expect(screen.getByText("Qualified for the vote")).toBeInTheDocument();
+});
+
+it("a goal over the cap says why it qualifies further along, and grows leftwards", () => {
+  // $260k is still under the cap's reach: 25% ($65k) is more than $260k − $200k.
+  expect(voteStanding(10_000, 260_000, vote)).toEqual({ kind: "near", missing: 55_000 });
+  // $500k qualifies at $300k, 60% of its goal.
+  const state = voteStanding(180_000, 500_000, vote)!;
+  expect(calloutLabel(state)).toBe("$120k to qualify · $200k max from TheDAO");
+  expect(calloutText(state)).toBe(
+    "$120k to qualify for TheDAO's vote: TheDAO gives at most $200,000 to one initiative, so this one qualifies at 60% of its goal",
+  );
+  const { container } = render(<VoteCallout state={state} at={60} side="top" />);
+  expect(screen.getByText("$120k to qualify · $200k max from TheDAO")).toBeInTheDocument();
+  expect((container.querySelector("[data-vote-callout]") as HTMLElement).style.right).toBe(
+    "calc(40% - 14px)",
+  );
 });
 
 it("on the ballot: the callout shows even below the floor, in its own words", () => {

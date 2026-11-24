@@ -8,7 +8,7 @@ import {
   voteFor,
   voteStanding,
 } from "~/components/board/VoteMark";
-import { voteFloorPct, voteFloorUsd, type VoteSettings } from "@shared/vote";
+import { capSetsFloor, voteFloorPct, voteFloorUsd, type VoteSettings } from "@shared/vote";
 import Money from "~/components/ui/Money";
 import type { Summary } from "~/lib/api-types";
 import { pctText, usd } from "~/lib/format";
@@ -108,7 +108,7 @@ export default function FundingHead(
         <p className="m-0 mt-2.5 text-[12.5px] text-muted">
           {onBallot
             ? "On the ballot for TheDAO's vote: voters can place it in a tier."
-            : goal - vote!.capUsd > (goal * vote!.floorPct) / 100
+            : capSetsFloor(goal, vote!)
             // A large goal: the floor is the goal less what TheDAO distributes at most.
             ? `This initiative qualifies for TheDAO's vote at ${
               usd(voteFloorUsd(goal, vote!))

@@ -53,6 +53,11 @@ export const ballotClosed = (s: VoteSettings, now: number): boolean =>
 export const voteFloorUsd = (goalUsd: number, s: VoteSettings): number =>
   Math.max((goalUsd * s.floorPct) / 100, goalUsd - s.capUsd);
 
+/** Whether the cap, not the floor share, sets where a goal qualifies: a goal above
+ * cap / (1 - floor) ($266,667 at 25% and $200k), whose bar tick sits further along. */
+export const capSetsFloor = (goalUsd: number, s: VoteSettings): boolean =>
+  goalUsd - s.capUsd > (goalUsd * s.floorPct) / 100;
+
 /** The same as a percentage of the goal: where the tick sits on the funding bar. */
 export const voteFloorPct = (goalUsd: number, s: VoteSettings): number =>
   goalUsd > 0 ? (100 * voteFloorUsd(goalUsd, s)) / goalUsd : s.floorPct;

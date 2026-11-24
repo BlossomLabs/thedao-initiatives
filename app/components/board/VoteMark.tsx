@@ -1,7 +1,13 @@
-import { ballotClosed, type VoteSettings, voteState } from "@shared/vote";
+import {
+  ballotClosed,
+  capSetsFloor,
+  voteFloorPct,
+  type VoteSettings,
+  voteState,
+} from "@shared/vote";
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
-import { usdShortUp } from "~/lib/format";
+import { usd, usdShortUp } from "~/lib/format";
 
 import { cn } from "~/lib/utils";
 
@@ -23,8 +29,18 @@ export const voteFor = (
  * deadline to qualify for one not on the ballot. */
 export type CalloutState =
   | { kind: "eligible" }
-  | { kind: "near"; missing: number }
+  | { kind: "near"; missing: number; cap?: Cap }
   | { kind: "ballot" };
+/** A large goal qualifies past the floor share: the most TheDAO gives one initiative, and
+ * the share of the goal that leaves to raise first. */
+type Cap = { usd: number; pct: number };
+
+/** What is missing, with the cap when it set the floor. */
+function near(missing: number, goal: number, v: VoteSettings): CalloutState {
+  return capSetsFloor(goal, v)
+    ? { kind: "near", missing, cap: { usd: v.capUsd, pct: Math.round(voteFloorPct(goal, v)) } }
+    : { kind: "near", missing };
+}
 export function voteCallout(
   raised: number,
   goal: number,
@@ -38,9 +54,7 @@ export function voteCallout(
   if (!goal) return null;
   const s = voteState(raised, goal, v);
   if (s.kind !== "below") return { kind: "eligible" };
-  return (100 * s.toFloorUsd) / goal <= NEAR_POINTS
-    ? { kind: "near", missing: s.toFloorUsd }
-    : null;
+  return (100 * s.toFloorUsd) / goal <= NEAR_POINTS ? near(s.toFloorUsd, goal, v) : null;
 }
 
 /** The callout for any initiative (list rows, on a click): past the floor, or what is
@@ -55,7 +69,7 @@ export function voteStanding(
   if (onBallot) return { kind: "ballot" };
   if (ballotClosed(vote, now)) return null;
   const s = voteState(raised, goal, vote);
-  return s.kind === "below" ? { kind: "near", missing: s.toFloorUsd } : { kind: "eligible" };
+  return s.kind === "below" ? near(s.toFloorUsd, goal, vote) : { kind: "eligible" };
 }
 
 /** The callout's words, as it shows them. */
@@ -64,6 +78,8 @@ export const calloutLabel = (state: CalloutState): string =>
     ? "On the ballot"
     : state.kind === "eligible"
     ? "Qualified for the vote"
+    : state.cap
+    ? `${usdShortUp(state.missing)} to qualify · ${usdShortUp(state.cap.usd)} max from TheDAO`
     : `${usdShortUp(state.missing)} to qualify`;
 
 /** The callout's words for screen readers. */
@@ -72,6 +88,10 @@ export const calloutText = (state: CalloutState): string =>
     ? "On the ballot for TheDAO's vote"
     : state.kind === "eligible"
     ? "Qualified for TheDAO's vote"
+    : state.cap
+    ? `${usdShortUp(state.missing)} to qualify for TheDAO's vote: TheDAO gives at most ${
+      usd(state.cap.usd)
+    } to one initiative, so this one qualifies at ${state.cap.pct}% of its goal`
     : `${usdShortUp(state.missing)} to qualify for TheDAO's vote`;
 
 /**
@@ -161,6 +181,8 @@ export function VoteCallout(
     <Callout
       at={at}
       side={side}
+      // A tick past the middle (a large goal's floor) grows leftwards, so it stays on the bar.
+      align={at > 50 ? "end" : "start"}
       edge={ballot || ok ? "border-[rgba(92,183,90,.6)]" : "border-white/30"}
       className={cn("flex items-center gap-1 whitespace-nowrap", ballot && "text-[#a7e3a5]")}
     >

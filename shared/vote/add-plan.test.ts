@@ -149,3 +149,23 @@ describe("the affiliation a grant's title names (#147)", () => {
     }
   });
 });
+
+describe("adminBatch guards new affiliations (#147)", () => {
+  it("a batch that adds affiliations first requires the revision it was planned at", async () => {
+    const { adminBatch } = await import("./admin-batch.ts");
+    const { decodeFunctionData } = await import("viem");
+    const { SIGNED_BALLOTS_ABI } = await import("./abi.ts");
+    const m = manifest({ groups: ["Seal"], configRevision: "7" });
+    const fns = (b: ReturnType<typeof adminBatch>) =>
+      b.transactions.map((t) => decodeFunctionData({ abi: SIGNED_BALLOTS_ABI, data: t.data }));
+    const guarded = fns(adminBatch(m, "Add", addPlan(m, [card({ title: "Remix: x" })]).calls));
+    expect(guarded.map((c) => c.functionName)).toEqual([
+      "requireConfigRevision",
+      "addGroup",
+      "addInitiative",
+    ]);
+    expect(guarded[0].args).toEqual([7n]);
+    const plain = fns(adminBatch(m, "Add", addPlan(m, [card({ affiliations: ["Seal"] })]).calls));
+    expect(plain.map((c) => c.functionName)).toEqual(["addInitiative"]);
+  });
+});

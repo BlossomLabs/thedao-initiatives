@@ -380,19 +380,58 @@ Deno.test("regroupPlan: new groups, then only the projects whose groups changed"
   const { calls, manifest, changed } = regroupPlan(base, [
     card("a", ["seal"]), // unchanged (case ignored)
     card("b", ["Keys", "Seal"]), // joins two
-    card("c", []), // leaves Seal
+    card("c", []), // leaves Seal, for the affiliation its title (here its slug) names
     card("r", [], "rfp"),
     card("new", ["Other"]), // not in the round: ignored
   ]);
   assertEquals(changed, ["b", "c"]);
-  assertEquals(calls.map((c) => c.fn), ["addGroup", "setInitiativeGroups", "setInitiativeGroups"]);
-  assertEquals(calls[1].args, [1n, 0b11n]);
-  assertEquals(calls[2].args, [2n, 0n]);
-  assertEquals(manifest.groups, ["Seal", "Keys"]);
-  assertEquals(manifest.projects.map((p) => p.groups), [[0], [1, 0], [], [0], []]);
+  assertEquals(calls.map((c) => c.fn), [
+    "addGroup",
+    "addGroup",
+    "setInitiativeGroups",
+    "setInitiativeGroups",
+  ]);
+  assertEquals(calls[2].args, [1n, 0b11n]);
+  assertEquals(calls[3].args, [2n, 0b100n]);
+  assertEquals(manifest.groups, ["Seal", "Keys", "c"]);
+  assertEquals(manifest.projects.map((p) => p.groups), [[0], [1, 0], [2], [0], []]);
   // Nothing to do: no calls.
   assertEquals(regroupPlan(manifest, [card("b", ["Keys", "Seal"])]).calls, []);
   assertThrows(() => regroupPlan(base, [card("r", ["Seal"])]), Error, "RFP");
+});
+
+Deno.test("regroupPlan: a grant the board lists unaffiliated keeps its own affiliation, else its title's (#147)", () => {
+  const base = manifestFor({
+    kind: "test",
+    contract: SAFE as `0x${string}`,
+    deployBlock: 5,
+    schedule: voteSchedule(1_000),
+    poolUsd: 7n,
+    slugs: ["a", "b", "c"],
+    projects: [
+      { goalUsd: "1", rfp: false, groups: [1] }, // its own: Remix
+      { goalUsd: "1", rfp: false, groups: [0] }, // the last of Seal
+      { goalUsd: "1", rfp: false, groups: [2] }, // Keys, now someone else's on the board
+    ],
+    groups: ["Seal", "Remix", "Keys"],
+    independentTiers: 1,
+  });
+  const card = (slug: string, affiliations: string[], title?: string) => ({
+    slug,
+    goalUsd: 1,
+    safeAddress: "",
+    affiliations,
+    ...(title ? { title } : {}),
+  });
+  const { changed, manifest } = regroupPlan(base, [
+    card("a", [], "Something else: x"), // its own Remix, though the title names another
+    card("b", [], "Seal: x"), // the title names Seal: it stays
+    card("c", [], "Acme: x"), // Keys is the board's: Acme, from its title
+    card("d", ["Keys", "Seal"]),
+  ]);
+  assertEquals(changed, ["c"]);
+  assertEquals(manifest.groups, ["Seal", "Remix", "Keys", "Acme"]);
+  assertEquals(manifest.projects.map((p) => p.groups), [[1], [0], [3]]);
 });
 
 // ------------------------------------------------------- currencies and pledges

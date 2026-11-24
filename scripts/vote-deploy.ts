@@ -84,6 +84,7 @@ import {
   planGroups,
   planInitiatives,
   type PlannedInitiative,
+  titleAffiliation,
 } from "../shared/vote/add-plan.ts";
 import { readRoundOnChain } from "../api/services/vote-round-read.ts";
 import { manifestFromChain, slugsByAccount, tierSpan } from "../shared/vote/round-from-chain.ts";
@@ -533,8 +534,11 @@ export function manifestFor(
 /** Bringing a deployed round's affiliations up to the board's: the admin's calls (new
  * groups, then each project whose groups changed) and the manifest with them. Group
  * names never move or go away (an emptied one stays, unused); a project the board no
- * longer lists keeps its groups. `cards` may hold any board initiatives: those not in
- * the round are ignored (add them first). */
+ * longer lists keeps its groups. A grant the board lists without affiliations keeps the
+ * affiliation of its own it has on the ballot (#147: one only it holds, named after no
+ * board affiliation), else gets the one its title names, as Put on the ballot gives it
+ * (`titleAffiliation`). `cards` may hold any board initiatives: those not in the round
+ * are ignored (add them first). */
 export function regroupPlan(
   m: VoteManifest,
   cards: BoardCard[],
@@ -551,7 +555,22 @@ export function regroupPlan(
       throw new Error(`${c.slug}: an RFP can't have affiliations`);
     }
   }
-  const groups = planGroups(inRound, m.groups);
+  const boardNames = new Set(
+    cards.flatMap((c) => c.affiliations ?? []).map((n) => n.toLowerCase()),
+  );
+  const holders = (g: number) => m.projects.filter((p) => p.groups.includes(g)).length;
+  const withOwn = inRound.map((c) => {
+    const p = m.projects[m.slugs.indexOf(c.slug)];
+    if (p.rfp || c.affiliations?.length) return c;
+    const own = p.groups.filter((g) =>
+      holders(g) === 1 && !boardNames.has(m.groups[g].toLowerCase())
+    );
+    return {
+      ...c,
+      affiliations: own.length ? own.map((g) => m.groups[g]) : [titleAffiliation(c)],
+    };
+  });
+  const groups = planGroups(withOwn, m.groups);
   const projects = m.projects.map((p, i) =>
     bySlug.has(m.slugs[i]) ? { ...p, groups: groups.groupsOf(m.slugs[i]) } : p
   );

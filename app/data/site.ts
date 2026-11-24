@@ -19,4 +19,6 @@ export const SOCIAL_LINKS = {
   twitter: "https://x.com/thedaofund",
   paragraph: "https://paragraph.xyz/@thedao.fund",
   farcaster: "https://warpcast.com/thedaofund",
+  /** This site's code. */
+  github: "https://github.com/BlossomLabs/thedao-initiatives",
 };

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SUPPORT_MESSAGE_MAX, SUPPORT_TRANSACTION_URL_MAX } from "@shared/support";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SupportWidget, { SupportPanel } from "./SupportWidget";
@@ -12,6 +12,48 @@ const json = (status: number, body: unknown) =>
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("the floating button and the footer", () => {
+  it("rests right above the legal bar once the bar reaches it, and back down after", () => {
+    let seen: ((entries: { isIntersecting: boolean }[]) => void) | undefined;
+    let margin = "";
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(cb: typeof seen, opts: { rootMargin: string }) {
+          seen = cb;
+          margin = opts.rootMargin;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.stubGlobal("scrollY", 1000);
+    const footer = document.createElement("div");
+    footer.setAttribute("data-site-footer", "");
+    footer.getBoundingClientRect = () => ({ top: 700 } as DOMRect);
+    document.body.append(footer);
+    const page = vi.spyOn(document.documentElement, "scrollHeight", "get").mockReturnValue(1900);
+    try {
+      render(<SupportPanel />);
+      const button = screen.getByRole("button", { name: /support/i });
+      const mover = button.parentElement!;
+      expect(mover.style.bottom).toBe("16px");
+      expect(margin).toBe("0px 0px -60px 0px"); // the strip the button stands in
+      // The legal bar: 1900 − (700 + 1000) = 200px to the page's end.
+      act(() => seen!([{ isIntersecting: true }]));
+      expect(mover.style.bottom).toBe("216px");
+      expect(mover.className).toContain("transition-[bottom]");
+      fireEvent.click(button);
+      expect(screen.getByRole("dialog").style.bottom).toBe("266px");
+      act(() => seen!([{ isIntersecting: false }]));
+      expect(mover.style.bottom).toBe("16px");
+    } finally {
+      page.mockRestore();
+      footer.remove();
+    }
+  });
 });
 
 function openPicker() {

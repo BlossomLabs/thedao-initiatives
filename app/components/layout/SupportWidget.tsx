@@ -66,6 +66,38 @@ const LABEL = "text-[12.5px] text-white/80";
 const ICON_BTN =
   "inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white";
 
+/** Where the floating button sits off the viewport's bottom, in px, and its panel above it. */
+const BUTTON_BOTTOM = 16;
+const PANEL_BOTTOM = 66;
+
+/**
+ * How far the floating button and its panel rise, in px: 0 until the footer's legal bar
+ * (the darker band at the very bottom) reaches the button, then the bar's height, so the
+ * button rests right above it. Two places,
+ * not one per scrolled pixel; the move between them is a CSS transition.
+ */
+export function useFooterLift(): number {
+  const [lift, setLift] = useState(0);
+  useEffect(() => {
+    const footer = document.querySelector("[data-site-footer]");
+    if (!footer || typeof IntersectionObserver === "undefined") return;
+    // From the bar's top to the page's end.
+    const height = () =>
+      Math.round(
+        document.documentElement.scrollHeight -
+          (footer.getBoundingClientRect().top + globalThis.scrollY),
+      );
+    // The bottom strip the button stands in: the footer "reaches it" on entering it.
+    const io = new IntersectionObserver(
+      ([entry]) => setLift(entry.isIntersecting ? height() : 0),
+      { rootMargin: `0px 0px -${BUTTON_BOTTOM + 44}px 0px` },
+    );
+    io.observe(footer);
+    return () => io.disconnect();
+  }, []);
+  return lift;
+}
+
 /**
  * Floating "Support" button (bottom right), only once the site settings say
  * SUPPORT_URL is configured: without a destination there is nothing to show.
@@ -86,6 +118,7 @@ export default function SupportWidget() {
 export function SupportPanel() {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
+  const lift = useFooterLift();
   const [view, setView] = useState<View>("picker");
   const [category, setCategory] = useState<SupportCategory | null>(null);
   const [email, setEmail] = useState("");
@@ -337,20 +370,26 @@ export function SupportPanel() {
 
   return createPortal(
     <div data-support-widget>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => (open ? close() : setOpen(true))}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className={cn(
-          "btn btn-sm fixed bottom-4 right-4 z-[100] border-edge2 bg-panel shadow-menu",
-          "max-[760px]:size-11 max-[760px]:rounded-full max-[760px]:px-0",
-        )}
+      {/* The wrapper rises above the footer; the button keeps .btn's own transitions. */}
+      <div
+        className="fixed right-4 z-[100] flex transition-[bottom] duration-500 ease-out motion-reduce:transition-none"
+        style={{ bottom: BUTTON_BOTTOM + lift }}
       >
-        <MessageSquare className="size-4" />
-        <span className="max-[760px]:hidden">Support</span>
-      </button>
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => (open ? close() : setOpen(true))}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className={cn(
+            "btn btn-sm border-edge2 bg-panel shadow-menu",
+            "max-[760px]:size-11 max-[760px]:rounded-full max-[760px]:px-0",
+          )}
+        >
+          <MessageSquare className="size-4" />
+          <span className="max-[760px]:hidden">Support</span>
+        </button>
+      </div>
 
       <Pop
         show={open}
@@ -360,7 +399,8 @@ export function SupportPanel() {
         role="dialog"
         aria-modal="false"
         aria-labelledby={headingId}
-        className="fixed bottom-[66px] right-4 z-[100] w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[18px] border border-edge2 bg-panel-modal shadow-modal"
+        style={{ bottom: PANEL_BOTTOM + lift }}
+        className="fixed right-4 transition-[bottom] duration-500 ease-out motion-reduce:transition-none z-[100] w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[18px] border border-edge2 bg-panel-modal shadow-modal"
       >
         <div className="flex items-center gap-1.5 border-b border-white/[.08] px-3 py-2.5">
           {view === "form"

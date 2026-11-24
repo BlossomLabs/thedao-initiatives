@@ -30,7 +30,11 @@ export default function Footer() {
           <Link className="text-white/35" to="/donation-terms">Donation Terms</Link>
         </p>
       </footer>
-      <div className="flex min-h-[88px] flex-wrap items-center justify-between gap-5 border-t border-white/[.08] bg-dao-blue-legal px-12 py-4 max-[620px]:justify-center max-[620px]:px-5 max-[620px]:text-center">
+      {/* The floating Support button rises above this bar (SupportWidget's useFooterLift). */}
+      <div
+        data-site-footer
+        className="flex min-h-[88px] flex-wrap items-center justify-between gap-5 border-t border-white/[.08] bg-dao-blue-legal px-12 py-4 max-[620px]:justify-center max-[620px]:px-5 max-[620px]:text-center"
+      >
         <p className="m-0 text-[12.5px] text-soft">
           © {copyrightYears()} TheDAO LLC. All rights reserved.
         </p>
@@ -39,13 +43,14 @@ export default function Footer() {
             [SOCIAL_LINKS.paragraph, "/paragraph-icon.svg", "Paragraph"],
             [SOCIAL_LINKS.twitter, "/x-icon.svg", "X"],
             [SOCIAL_LINKS.farcaster, "/farcaster-icon.svg", "Farcaster"],
+            [SOCIAL_LINKS.github, "/github-icon.svg", "GitHub"],
           ].map(([href, src, label]) => (
             <a
               key={label}
               href={href}
               target="_blank"
               rel="noopener"
-              aria-label={`TheDAO on ${label}`}
+              aria-label={label === "GitHub" ? "This site's code on GitHub" : `TheDAO on ${label}`}
               className="block leading-none opacity-90 transition-[opacity,transform] duration-150 hover:-translate-y-px hover:opacity-100"
             >
               <img src={src} alt={label} width={40} height={40} className="block h-10 w-10" />

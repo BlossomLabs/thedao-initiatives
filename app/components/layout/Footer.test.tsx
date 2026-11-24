@@ -43,3 +43,15 @@ test("the copyright starts in 2026, when TheDAO LLC was founded", () => {
   expect(copyrightYears(new Date(2026, 10, 18))).toBe("2026");
   expect(copyrightYears(new Date(2027, 0, 1))).toBe("2026–2027");
 });
+
+test("a GitHub icon links to this site's code, beside the other social icons", () => {
+  render(
+    <MemoryRouter>
+      <Footer />
+    </MemoryRouter>,
+  );
+  const github = screen.getByRole("link", { name: "This site's code on GitHub" });
+  expect(github).toHaveAttribute("href", "https://github.com/BlossomLabs/thedao-initiatives");
+  expect(github.querySelector("img")).toHaveAttribute("src", "/github-icon.svg");
+  expect(screen.getByRole("link", { name: "TheDAO on Farcaster" })).toBeInTheDocument();
+});

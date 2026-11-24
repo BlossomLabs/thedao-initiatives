@@ -18,6 +18,7 @@ Deno.test("sensitive admin changes reject stale authentication before any side e
         ["/sync-content", "POST", { files: [syntheticContentFiles()[0]] }],
         ["/maintenance/enter", "POST", {}],
         ["/maintenance/exit", "POST", {}],
+        ["/ai-budget/reset", "POST", {}],
         ["/restore", "POST", { backup: {} }],
       ] as const
     ) {

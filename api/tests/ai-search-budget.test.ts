@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { AI_DAILY_CALL_CAP } from "../config.ts";
 import { K } from "../db/keys.ts";
-import { type Harness, harness, j } from "./app-helpers.ts";
+import { ADMIN, type Harness, harness, j, PLAIN } from "./app-helpers.ts";
 
 const budgetKey = (h: Harness) =>
   K.aiBudget(new Date(h.clock.now * 1000).toISOString().slice(0, 10));
@@ -133,6 +133,58 @@ Deno.test("AI search: a Jev error says its status, and a 402 that it wants payin
     status = 503;
     const down = await search(h, "wallet security");
     assertEquals((await j(down)).error, "search is unavailable right now (Jev HTTP 503)");
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("AI search budget: a Jev 402 gives its calls back; other failures keep them", async () => {
+  let status = 402;
+  const h = await harness({
+    env: { TYPESAFE_API_KEY: "test" },
+    fetch: () => new Response("no credits", { status }),
+  });
+  try {
+    await board(h, 60);
+    await h.kv.set(budgetKey(h), 10);
+    // Retrying a search Jev will not run never uses up the day.
+    for (const q of ["wallet security", "wallet security", "formal methods"]) {
+      assertEquals((await search(h, q)).status, 502);
+    }
+    assertEquals(await spent(h), 10);
+    status = 503;
+    assertEquals((await search(h, "wallet security")).status, 502);
+    assertEquals(await spent(h), 13);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("AI budget: an admin reads today's use and resets it", async () => {
+  const h = await harness();
+  try {
+    await h.kv.set(budgetKey(h), AI_DAILY_CALL_CAP);
+    const supportKey = K.aiSupportBudget(new Date(h.clock.now * 1000).toISOString().slice(0, 10));
+    await h.kv.set(supportKey, 7);
+    const plain = await h.mint(PLAIN);
+    assertEquals((await h.req("/api/admin/ai-budget", { token: plain })).status, 403);
+    const admin = await h.mint(ADMIN, true);
+    const read = await j(await h.req("/api/admin/ai-budget", { token: admin }));
+    assertEquals([read.used, read.cap, read.supportUsed], [
+      AI_DAILY_CALL_CAP,
+      AI_DAILY_CALL_CAP,
+      7,
+    ]);
+    assertEquals(await h.db.meta.aiBudgetOk(), false);
+    const reset = await h.req("/api/admin/ai-budget/reset", {
+      method: "POST",
+      token: admin,
+      json: {},
+    });
+    assertEquals(reset.status, 200);
+    assertEquals([(await j(reset)).used, await spent(h)], [0, 0]);
+    assertEquals((await h.kv.get(supportKey)).value, null);
+    assertEquals(await h.db.meta.aiBudgetOk(), true);
   } finally {
     h.close();
   }

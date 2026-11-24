@@ -1,6 +1,7 @@
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import Maintenance from "~/components/admin/Maintenance";
+import AiBudget from "~/components/admin/AiBudget";
 import { generateMeta } from "~/utils/meta";
 
 export function meta() {
@@ -20,9 +21,11 @@ export default function MaintenancePage() {
         Maintenance and backups
       </h1>
       <p className="small dim mt-2.5">
-        Pause every write on the site, take the database home as one file, and put a file back.
+        Pause every write on the site, take the database home as one file, put a file back, and give
+        back the day's AI calls.
       </p>
       <Maintenance />
+      <AiBudget />
     </PageMain>
   );
 }

@@ -858,6 +858,13 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     return c.json(await deps.maintenance.exit(c.var.user!.address));
   });
 
+  // Today's AI calls against the daily caps, and a way to give them back.
+  r.get("/ai-budget", async (c) => c.json(await db.meta.aiBudgetToday()));
+  r.post("/ai-budget/reset", requireRecentAuth(deps.now), async (c) => {
+    await jsonBody(c, []);
+    return c.json(await db.meta.aiBudgetReset());
+  });
+
   // The whole database as one file, and the way back (services/backup.ts).
   r.get("/backup", requireRecentAuth(deps.now), async (c) => {
     const backup = await exportBackup(db, deps.now);

@@ -31,11 +31,13 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
   }
   const unlock = (name: string) => kv.delete(K.lock(name));
 
+  /** The caps count per UTC day. */
+  const today = () => new Date(now() * 1000).toISOString().slice(0, 10);
+
   /** Atomically reserve upstream AI calls, including every batch in a search. */
   async function aiBudgetOk(calls = 1): Promise<boolean> {
     if (!Number.isSafeInteger(calls) || calls < 1) return false;
-    const day = new Date(now() * 1000).toISOString().slice(0, 10);
-    const key = K.aiBudget(day);
+    const key = K.aiBudget(today());
     for (let attempt = 0; attempt < 8; attempt++) {
       const cur = await kv.get<number>(key);
       const next = (cur.value ?? 0) + calls;
@@ -50,11 +52,47 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
     return false;
   }
 
+  /** Give back calls the provider refused before doing any work (Jev's 402):
+   * they cost nothing, so they must not use up the day. Never below zero. */
+  async function aiBudgetRefund(calls: number): Promise<void> {
+    if (!Number.isSafeInteger(calls) || calls < 1) return;
+    const key = K.aiBudget(today());
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const cur = await kv.get<number>(key);
+      if (!cur.value) return;
+      const next = Math.max(0, cur.value - calls);
+      if (
+        (await kv.atomic().check(cur).set(key, next, { expireIn: 2 * 86400 * 1000 }).commit()).ok
+      ) {
+        return;
+      }
+    }
+  }
+
+  /** Today's AI calls against the caps, for Admin → Maintenance. */
+  async function aiBudgetToday() {
+    const day = today();
+    const [all, support] = await kv.getMany<number[]>([K.aiBudget(day), K.aiSupportBudget(day)]);
+    return {
+      day,
+      used: all.value ?? 0,
+      cap: AI_DAILY_CALL_CAP,
+      supportUsed: support.value ?? 0,
+      supportCap: AI_SUPPORT_DAILY_CALL_CAP,
+    };
+  }
+
+  /** An admin gives today's caps back in full (after an outage burned them). */
+  async function aiBudgetReset() {
+    const day = today();
+    await kv.atomic().delete(K.aiBudget(day)).delete(K.aiSupportBudget(day)).commit();
+    return aiBudgetToday();
+  }
+
   /** The support screen's share of today's cap: its own smaller counter first,
    * so anonymous support messages cannot use up what comment moderation needs. */
   async function aiSupportBudgetOk(): Promise<boolean> {
-    const day = new Date(now() * 1000).toISOString().slice(0, 10);
-    const key = K.aiSupportBudget(day);
+    const key = K.aiSupportBudget(today());
     const cur = (await kv.get<number>(key)).value ?? 0;
     if (cur >= AI_SUPPORT_DAILY_CALL_CAP) return false;
     if (!(await aiBudgetOk())) return false;
@@ -83,6 +121,9 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
     lock,
     unlock,
     aiBudgetOk,
+    aiBudgetRefund,
+    aiBudgetToday,
+    aiBudgetReset,
     aiSupportBudgetOk,
     safeSync,
     safeSyncs,

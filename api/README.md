@@ -54,15 +54,15 @@ egress policy and request/resource limits.
   does not check the chain. The removed `SAFE_SYNC_CRON` setting is ignored. Set `SAFE_API_KEY` for
   authenticated indexer access. Empty/known indexer results need no ledger RPC calls. Donation
   verification shares one lazy block-number lookup per refresh batch; receipt and price reads still
-  use RPC. Failed head lookups never bypass the confirmation requirement.
-  Pending rechecks scan at most 100 saved rows and verify at most 20 transactions per Safe per
-  refresh, resuming after the last inspected hash and wrapping at the end. No new check starts
-  after a 20-second retry budget; an in-flight call retains its RPC timeout. Repeated pending
-  checks and transport failures back off from one minute to one hour. Status polling respects
-  that per-row backoff; an admin's forced sync may bypass it but keeps the batch limits. A hash
-  never observed on-chain is marked failed after seven days of unsuccessful verification; it
-  stays in the ledger for diagnosis and can still be confirmed if submitted again after appearing
-  on-chain. Previously observed transactions are not expired on age alone.
+  use RPC. Failed head lookups never bypass the confirmation requirement. Pending rechecks scan at
+  most 100 saved rows and verify at most 20 transactions per Safe per refresh, resuming after the
+  last inspected hash and wrapping at the end. No new check starts after a 20-second retry budget;
+  an in-flight call retains its RPC timeout. Repeated pending checks and transport failures back off
+  from one minute to one hour. Status polling respects that per-row backoff; an admin's forced sync
+  may bypass it but keeps the batch limits. A hash never observed on-chain is marked failed after
+  seven days of unsuccessful verification; it stays in the ledger for diagnosis and can still be
+  confirmed if submitted again after appearing on-chain. Previously observed transactions are not
+  expired on age alone.
 - **A daily production fallback keeps quiet-day snapshots recent.** `server.ts` registers
   `refresh-public-cache-daily` at module scope for 03:00 UTC. Its handler checks the runtime
   `DENO_TIMELINE` before reading KV or calling any upstream service; only the exact value
@@ -190,12 +190,12 @@ message, email?, transactionUrl?, page?, screenshot?}`, tagged and
 forwarded to `SUPPORT_URL`; 503 until it is set, 5 per hour per IP). The `receipt` category requires
 `email` and an https `transactionUrl` (at most 500 characters); its `message` is an optional note.
 The transaction link is included in the forwarded message, so the support relay's contract stays
-unchanged. Other categories require a message and do not accept `transactionUrl`.
-The `pledge` category also requires `initiativeId`, `pledgeAmount` (USD, positive and at most
-$100,000,000, to the cent), `pledgeOrg`, `pledgeContact` and `email`. The API resolves an approved
-initiative and includes its title, canonical link, Grant/RFP type, funding goal and Safe address
-alongside the pledge details in the forwarded message. It sends an enquiry; it does not create
-a public pledge record. Other categories reject pledge fields.
+unchanged. Other categories require a message and do not accept `transactionUrl`. The `pledge`
+category also requires `initiativeId`, `pledgeAmount` (USD, positive and at most $100,000,000, to
+the cent), `pledgeOrg`, `pledgeContact` and `email`. The API resolves an approved initiative and
+includes its title, canonical link, Grant/RFP type, funding goal and Safe address alongside the
+pledge details in the forwarded message. It sends an enquiry; it does not create a public pledge
+record. Other categories reject pledge fields.
 
 Signed in: `GET /api/auth/me` (includes `hasWatchlist`), `POST /api/auth/logout`,
 `POST /api/auth/logout-all`, `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`,
@@ -273,6 +273,15 @@ is public. Each isolate re-reads the flag every 3 seconds, so other instances fo
 that window. A refused write is audited as the attempted action with outcome `failure`, not as a
 server fault.
 
+**AI caps**: every upstream AI call (search batches, category suggestions, comment and support
+screens, vote briefs) reserves one call from `AI_DAILY_CALL_CAP` per UTC day under
+`["ai_budget", day]`; support messages also count against their own `AI_SUPPORT_DAILY_CALL_CAP`.
+Past the cap, search answers `429 "search is resting until tomorrow"`. A failed call keeps its
+reservation, except a Jev `402`, which is given back: an unpaid account does no work.
+`GET /api/admin/ai-budget` reads today's use, and `POST /api/admin/ai-budget/reset` (recent
+authentication, audited as `ai.budget_reset`) gives today's caps back in full, from
+`/admin/maintenance`.
+
 **Backup**: `GET /api/admin/backup` (recent authentication, audited as `backup.export`) downloads
 `thedao-kv-backup-<stamp>.json`:
 
@@ -290,11 +299,10 @@ three retired `terms_accept*` shapes, and the maintenance flag itself. The file 
 field (contacts, funders, comment emails): keep it as safely as the database. A stored value the
 format cannot carry (there is none today) fails the export with 500 rather than dropping data.
 
-Within `vote`, exports omit the relayer lease, pending ballot receipts, pledge outcome receipts,
-and derived round/ballot caches, whose expirations cannot be carried by this format. Restores skip
-those keys in older files too, without overwriting or deleting a destination's active lease.
-Comment votes, relayer nonce journals, relay counts, gas grants and unsettled pledge records remain
-durable.
+Within `vote`, exports omit the relayer lease, pending ballot receipts, pledge outcome receipts, and
+derived round/ballot caches, whose expirations cannot be carried by this format. Restores skip those
+keys in older files too, without overwriting or deleting a destination's active lease. Comment
+votes, relayer nonce journals, relay counts, gas grants and unsettled pledge records remain durable.
 
 **Restore**: `POST /api/admin/restore` `{mode?: "merge" | "replace", backup}` (recent
 authentication, up to 32 MB, audited as `backup.restore` with the mode as detail) only while
@@ -303,10 +311,10 @@ yet; `replace` overwrites existing keys with the file's values. Neither deletes 
 maintenance flag inside a file is ignored. The whole file is validated first and refused as a whole
 (`400` naming the first bad entry) before any write; a `200 {written, skipped, claimsRebuilt}` means
 every entry was either written or skipped. All writes are staged and published with a single
-head/revision CAS: a failed batch or concurrent durable write leaves the active dataset unchanged.
-A lost publication acknowledgement may return an error after complete activation; re-running the
-restore is safe. All held comments get their claim index back with the remaining lifetime. The `/admin/maintenance` page wraps all of this: enter maintenance, download, restore a file,
-exit.
+head/revision CAS: a failed batch or concurrent durable write leaves the active dataset unchanged. A
+lost publication acknowledgement may return an error after complete activation; re-running the
+restore is safe. All held comments get their claim index back with the remaining lifetime. The
+`/admin/maintenance` page wraps all of this: enter maintenance, download, restore a file, exit.
 
 ## SIWE from the frontend
 
@@ -356,13 +364,13 @@ platform; each timeline gets its own database. If two deployments must share one
 each its own `DB_PREFIX`: every key is stored under that first part, so the two never see each
 other's rows (changing it on a live deployment starts from empty).
 
-Application records use strong reads and a request-pinned dataset generation. Large restores,
-bulk moderation/status changes and content sync stage their changes before one atomic publication.
-Concurrent durable writes abort publication; requests pinned to the previous generation cannot write.
-One additional KV read pins the generation per request. Sessions, rate counters, private autosaves
-and live leases stay outside restored datasets. Retired/abandoned generations are collected by the
-production daily cron after a one-hour grace period; request and staging scopes expire after ten
-minutes. A failed or interrupted staging job never becomes visible.
+Application records use strong reads and a request-pinned dataset generation. Large restores, bulk
+moderation/status changes and content sync stage their changes before one atomic publication.
+Concurrent durable writes abort publication; requests pinned to the previous generation cannot
+write. One additional KV read pins the generation per request. Sessions, rate counters, private
+autosaves and live leases stay outside restored datasets. Retired/abandoned generations are
+collected by the production daily cron after a one-hour grace period; request and staging scopes
+expire after ten minutes. A failed or interrupted staging job never becomes visible.
 
 `BOARD_CACHE_SECS` (default 5, `0` = off) is how long an isolate serves `GET /api/board` from its
 own memory instead of reading KV: the board is public, polled every 30 s by every open tab, and

@@ -274,6 +274,7 @@ export function createAi(config: Config, f: typeof fetch, opts: AiOptions = {}) 
     query: string,
     items: { id: string; title: string; summary: string }[],
     budgetOk: (calls: number) => Promise<boolean>,
+    refund: (calls: number) => Promise<void> = async () => {},
   ): Promise<AiSearchResult["scores"]> {
     if (!items.length) return [];
     const reserve = async (calls: number) => {
@@ -312,9 +313,18 @@ export function createAi(config: Config, f: typeof fetch, opts: AiOptions = {}) 
       batches.push(items.slice(i, i + JEV_BATCH_SIZE));
     }
     // Reserve the entire fan-out before starting any paid request. Failed
-    // requests keep their reservation because the provider may still bill them.
+    // requests keep their reservation because the provider may still bill them,
+    // except a 402: Jev refused to work unpaid, so those calls are given back.
     await reserve(batches.length);
-    return (await Promise.all(batches.map((batch) => rankJevBatch(query, batch)))).flat()
+    const settled = await Promise.allSettled(batches.map((batch) => rankJevBatch(query, batch)));
+    const refused =
+      settled.filter((r) =>
+        r.status === "rejected" && r.reason instanceof Error && r.reason.message === "Jev HTTP 402"
+      ).length;
+    if (refused) await refund(refused);
+    const failed = settled.find((r) => r.status === "rejected");
+    if (failed) throw failed.reason;
+    return settled.flatMap((r) => r.status === "fulfilled" ? r.value : [])
       .sort((x, y) => y.score - x.score);
   }
 

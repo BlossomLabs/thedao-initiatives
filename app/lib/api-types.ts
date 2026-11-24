@@ -606,6 +606,16 @@ export interface MaintenanceState {
   note: string;
 }
 
+/** Today's AI calls against the daily caps (GET /api/admin/ai-budget). */
+export interface AiBudgetState {
+  /** The UTC day the counters belong to, "2026-11-24". */
+  day: string;
+  used: number;
+  cap: number;
+  supportUsed: number;
+  supportCap: number;
+}
+
 /** GET /api/board/settings: configuration the global UI needs without the board. */
 export interface SiteSettings {
   uploads: boolean;

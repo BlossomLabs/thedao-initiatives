@@ -48,7 +48,12 @@ export function aiRoutes(deps: Deps) {
     }
     let scores: AiSearchResult["scores"];
     try {
-      scores = await deps.ai.rank(query, items, (calls) => db.meta.aiBudgetOk(calls));
+      scores = await deps.ai.rank(
+        query,
+        items,
+        (calls) => db.meta.aiBudgetOk(calls),
+        (calls) => db.meta.aiBudgetRefund(calls),
+      );
     } catch (e) {
       if (e instanceof AiBudgetError) {
         throw new HttpError(429, "search is resting until tomorrow");

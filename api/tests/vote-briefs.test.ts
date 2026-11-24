@@ -37,13 +37,18 @@ const MILESTONES = [
   },
 ];
 
+/** The error page a proxy in front of the provider sends (#143). */
+const CLOUDFLARE_502 =
+  '<!DOCTYPE html>\n<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> ' +
+  "<![endif]-->\n<head><title>502: Bad gateway</title></head><body>Bad gateway</body></html>";
+
 type BriefState = { brief: VoteBrief | null; current: boolean; at: number | null };
 
 /** A harness whose model answers with bullets numbered by call (`state.fail`: nothing
  * usable). */
 async function setup(opts: { delayMs?: number; refuseJsonMode?: boolean } = {}) {
   const inputs: string[] = [];
-  const state = { fail: false };
+  const state = { fail: false, down: 0 };
   const h = await harness({
     env: { AI_SEARCH_API_KEY: "k" },
     fetch: async (url, init) => {
@@ -54,6 +59,13 @@ async function setup(opts: { delayMs?: number; refuseJsonMode?: boolean } = {}) 
       if (opts.refuseJsonMode && body.response_format) {
         return new Response("structured output (response_format) is not supported", {
           status: 400,
+        });
+      }
+      if (state.down > 0) {
+        state.down--;
+        return new Response(CLOUDFLARE_502, {
+          status: 502,
+          headers: { "Content-Type": "text/html" },
         });
       }
       inputs.push(String(body.messages?.[1]?.content ?? ""));
@@ -297,5 +309,33 @@ Deno.test("vote briefs: an old record of 150 briefs moves in batches (100 checks
   assertEquals(Object.keys(await fresh.voteBriefs.all()).length, 150);
   assertEquals((await h.kv.get(["meta", "vote_briefs"])).value, null);
   assertEquals((await view())[r.slug].what?.length, 3);
+  h.close();
+});
+
+Deno.test("vote briefs: a provider 502 is retried, then said in a short line without its HTML", async () => {
+  const { h, inputs, state, rewrite } = await setup();
+  const r = await h.db.initiatives.insert({
+    title: "Verified EVM",
+    status: "approved",
+    goalUsd: 200_000,
+    proposer: PLAIN,
+    milestones: MILESTONES,
+  });
+  const chats = () => h.fetchLog.filter((x) => x.url.includes("/chat/completions")).length;
+
+  // Down twice, then up: the third call writes them.
+  state.down = 2;
+  assertEquals((await rewrite(r.id)).status, 200);
+  assertEquals([chats(), inputs.length], [3, 1]);
+
+  // Down for good: three calls in all, and a short reason.
+  state.down = 10;
+  const failed = await rewrite(r.id);
+  assertEquals(failed.status, 503);
+  assertEquals(chats(), 6);
+  const error = String((await j(failed)).error);
+  assertStringIncludes(error, "provider HTTP 502");
+  assertStringIncludes(error, "temporarily unavailable");
+  assert(!error.includes("<"), error);
   h.close();
 });

@@ -86,7 +86,10 @@ export async function writeBrief(
   const r = await db.initiatives.get(id);
   if (!r || r.status !== "approved") throw new AiError("only an approved initiative has one");
   if (!(await db.meta.aiBudgetOk())) throw new AiError("today's AI call cap is reached");
-  const [lines, hash] = await Promise.all([ai.voteBrief(briefInput(r)), inputHash(r)]);
+  const [lines, hash] = await Promise.all([
+    ai.voteBrief(briefInput(r), () => db.meta.aiBudgetOk()),
+    inputHash(r),
+  ]);
   const brief: StoredBrief = { hash, ...lines, at: deps.now() };
   try {
     await db.voteBriefs.set(id, brief);

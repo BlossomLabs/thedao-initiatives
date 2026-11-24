@@ -147,7 +147,7 @@ export async function createServer(siteOptions?: SiteOptions) {
     fetch,
     now,
     funding: createFunding({ db, chain, now, log }),
-    ai: createAi(config, fetch),
+    ai: createAi(config, fetch, { log }),
     admins: createAdmins(db, config, now),
     maintenance: createMaintenance(db, now),
     ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),

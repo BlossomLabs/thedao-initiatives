@@ -91,9 +91,29 @@ export type Verdict = "published" | "held" | "discarded";
 
 /** A model call that gave no answer, with the reason an admin reads. */
 export class AiError extends Error {
-  constructor(readonly reason: string) {
+  /** `status`: the provider's HTTP status, when it answered with an error. */
+  constructor(readonly reason: string, readonly status?: number) {
     super(reason);
   }
+}
+
+/** A provider answer worth asking again: overloaded (429) or down (5xx). */
+function transient(e: unknown): boolean {
+  return e instanceof AiError && e.status !== undefined && (e.status === 429 || e.status >= 500);
+}
+
+/** The reason an admin reads for a provider's error answer: the status and, when the
+ * body is a short plain-text message, that message. An HTML error page (a proxy's 502)
+ * is left out; the caller logs it. */
+export function providerErrorReason(status: number, body: string): string {
+  const html = /^\s*<(?:!doctype|html|\?xml|!--|head|body)/i.test(body);
+  const detail = html ? "" : body.replace(/\s+/g, " ").trim().slice(0, 160);
+  const head = `provider HTTP ${status}`;
+  if (status === 429 || status >= 500) {
+    return `${head}: the AI provider is temporarily unavailable` +
+      (detail ? ` (${detail})` : "") + ". Try again in a minute.";
+  }
+  return detail ? `${head}: ${detail}` : head;
 }
 
 /** The JSON object in a reply: bare, in a ```json fence, or with words around it. */
@@ -149,7 +169,16 @@ export function screenFields(s: Screen, at: number): { aiSummary: string; aiScre
   return { aiSummary: s.summary || reason, aiScreen: { verdict, nameFlag, reason, error, at } };
 }
 
-export function createAi(config: Config, f: typeof fetch) {
+export interface AiOptions {
+  /** Server-side log line, for what an admin is not shown (a provider's error page). */
+  log?: (msg: string) => void;
+  /** Waits before each retry of a 429/5xx, where a call retries (the vote brief). */
+  retryDelaysMs?: number[];
+}
+
+export function createAi(config: Config, f: typeof fetch, opts: AiOptions = {}) {
+  const log = opts.log ?? (() => {});
+  const retryDelaysMs = opts.retryDelaysMs ?? [1_000, 3_000];
   const enabled = Boolean(config.aiSearchApiKey);
   const searchEnabled = config.typesafeEnabled ? Boolean(config.typesafeApiKey) : enabled;
   // Some engines (Nexus's Qwen) refuse response_format with a 400. After the
@@ -180,8 +209,9 @@ export function createAi(config: Config, f: typeof fetch) {
       throw new AiError(failureReason(e));
     }
     if (!res.ok) {
-      const detail = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
-      throw new AiError(`provider HTTP ${res.status}${detail ? ": " + detail : ""}`);
+      const body = await res.text().catch(() => "");
+      log(`AI provider HTTP ${res.status}: ${body.replace(/\s+/g, " ").slice(0, 2_000)}`);
+      throw new AiError(providerErrorReason(res.status, body), res.status);
     }
     let data: { choices?: { message?: { content?: unknown } }[] };
     try {
@@ -433,12 +463,26 @@ export function createAi(config: Config, f: typeof fetch) {
   }
 
   /** The two written bullets of an initiative's vote card (#96): "What" and "Adoption".
-   * One call per initiative revision, when an admin asks; throws an AiError. */
+   * One call per initiative revision, when an admin asks (up to 3 while the provider is
+   * down); throws an AiError. */
   async function voteBrief(
     initiative: unknown,
+    budgetOk?: () => Promise<boolean>,
   ): Promise<{ what: WhatBullet[]; adoption: string[] }> {
     if (!enabled) throw new AiError("AI is not configured");
-    const out = await chatJson(VOTE_BRIEF_PROMPT, JSON.stringify(initiative));
+    // An admin waits on this: a provider that is down or overloaded is asked again after
+    // a short wait, each retry counted against the daily cap.
+    let out: Record<string, unknown>;
+    for (let attempt = 0;; attempt++) {
+      try {
+        out = await chatJson(VOTE_BRIEF_PROMPT, JSON.stringify(initiative));
+        break;
+      } catch (e) {
+        if (!transient(e) || attempt >= retryDelaysMs.length) throw e;
+        if (budgetOk && !(await budgetOk())) throw e;
+        await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
+      }
+    }
     const clean = cleanBriefText(out);
     if (!clean) throw new AiError("bad reply: missing or overlong what/adoption");
     return clean;

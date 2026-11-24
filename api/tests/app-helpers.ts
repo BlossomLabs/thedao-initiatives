@@ -279,7 +279,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     fetch: f,
     now,
     funding: createFunding({ db, chain, now }),
-    ai: createAi(cfg, f),
+    ai: createAi(cfg, f, { retryDelaysMs: [0, 0] }),
     admins: createAdmins(db, cfg, now),
     maintenance: createMaintenance(db, now),
     ens: createEns(f, now),

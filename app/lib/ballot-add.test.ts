@@ -7,6 +7,7 @@ import {
   isDuplicateInitiative,
   prepareInRound,
   putOnBallot,
+  remapGroups,
 } from "./ballot-add";
 import type { ReadyJson } from "./api-types";
 import { dayTime } from "./format";
@@ -44,9 +45,10 @@ function deps(over: Partial<BallotAddDeps> = {}): BallotAddDeps & { log: string[
       return Promise.resolve();
     }),
     plan: () => [
-      { fn: "addGroup", args: ["0x00"] },
+      { fn: "addGroup", args: ["0x00"], group: 0 },
       { fn: "addInitiative", args: [ready.safeAddress, 10_000_000_000n, false, 1n] },
     ],
+    addedGroup: vi.fn(() => Promise.resolve(0)),
     send: vi.fn((call) => {
       log.push(`send ${call.fn}`);
       return Promise.resolve(HASH);
@@ -372,5 +374,43 @@ describe("prepareInRound", () => {
     const prepare = vi.fn(() => Promise.reject(new Error("409")));
     await expect(prepareInRound(prepare, sleep, notInRound)).rejects.toThrow("409");
     expect(prepare).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a new affiliation's id comes from its receipt (#147)", () => {
+  it("another admin's affiliation landed first: the initiative gets the id ours really got", async () => {
+    const d = deps({
+      plan: () => [
+        { fn: "addGroup", args: ["0x01"], group: 8 },
+        { fn: "addInitiative", args: [ready.safeAddress, 1n, false, (1n << 8n) | 1n] },
+      ],
+      addedGroup: vi.fn(() => Promise.resolve(9)),
+    });
+    expect(await putOnBallot(d, ready, () => {})).toEqual({ kind: "done" });
+    const sent = vi.mocked(d.send).mock.calls.map(([c]) => c);
+    // Bit 8 (planned) moves to bit 9 (real); the existing affiliation 0 stays.
+    expect(sent[1].args[3]).toBe((1n << 9n) | 1n);
+  });
+
+  it("the id as planned: the initiative is sent unchanged", async () => {
+    const d = deps();
+    await putOnBallot(d, ready, () => {});
+    expect(vi.mocked(d.send).mock.calls[1][0].args[3]).toBe(1n);
+    expect(d.addedGroup).toHaveBeenCalledWith(HASH);
+  });
+
+  it("an id that can't be read stops before the initiative is sent", async () => {
+    const d = deps({ addedGroup: vi.fn(() => Promise.reject(new Error("no receipt"))) });
+    const end = await putOnBallot(d, ready, () => {});
+    expect(end).toMatchObject({ kind: "failed", added: false });
+    expect((end as { reason: string }).reason).toContain("affiliation was added");
+    expect(vi.mocked(d.send).mock.calls.map(([c]) => c.fn)).toEqual(["addGroup"]);
+  });
+
+  it("remapGroups: two new affiliations swapping ids stay distinct", () => {
+    const call = { fn: "addInitiative" as const, args: ["0x", 1n, false, 0b11000n] };
+    const out = remapGroups(call, new Map([[3, 4], [4, 3]]));
+    expect(out.args[3]).toBe(0b11000n);
+    expect(remapGroups(call, new Map([[3, 5]])).args[3]).toBe(0b110000n);
   });
 });

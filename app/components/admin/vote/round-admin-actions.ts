@@ -3,7 +3,7 @@
  * the components render in (RoundAdminQueue provides it). */
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Hex } from "viem";
+import { type Hex, parseEventLogs } from "viem";
 import { writeContract } from "wagmi/actions";
 import { api, ApiError } from "~/lib/api";
 import { shortAddr } from "~/lib/format";
@@ -224,6 +224,7 @@ export function useQueueSign() {
 /** The card's fields the round's add plan needs. */
 export const cardOf = (r: ReadyJson) => ({
   slug: r.slug,
+  title: r.title,
   goalUsd: r.goalUsd,
   safeAddress: r.safeAddress,
   type: r.type,
@@ -292,7 +293,12 @@ export function usePutOnBallot(ready: ReadyJson) {
           throw new Error("The round couldn't be read. Reload the page and try again.");
         }
         primeRound(m, env);
-        return m.slugs.includes(ready.slug) ? [] : addPlan(m, [cardOf(ready)]).calls;
+        if (m.slugs.includes(ready.slug)) return [];
+        // Each new affiliation's planned id: the round's count, then one more each.
+        let next = m.groups.length;
+        return addPlan(m, [cardOf(ready)]).calls.map((c) =>
+          c.fn === "addGroup" ? { ...c, group: next++ } : c
+        );
       },
       send: async (call) => {
         if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
@@ -324,6 +330,18 @@ export function usePutOnBallot(ready: ReadyJson) {
           if (isDuplicateInitiative(why)) throw why;
         }
         return receipt.status;
+      },
+      addedGroup: async (hash) => {
+        const receipt = await voteClient(ROUND).getTransactionReceipt({ hash });
+        const [added] = parseEventLogs({
+          abi: SIGNED_BALLOTS_ABI,
+          eventName: "GroupAdded",
+          logs: receipt.logs.filter((l) =>
+            l.address.toLowerCase() === ROUND.contract.toLowerCase()
+          ),
+        }) as unknown as { args: { id: number } }[];
+        if (!added) throw new Error("No GroupAdded in the receipt.");
+        return Number(added.args.id);
       },
       inRound: async () => {
         // A fresh read each time: the browser may hold the manifest for 10 s.

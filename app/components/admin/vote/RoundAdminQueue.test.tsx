@@ -28,7 +28,24 @@ vi.mock("~/hooks/use-vote-chain", () => ({ useEnsureVoteChain: () => () => Promi
 vi.mock("wagmi/actions", () => ({ signTypedData: vi.fn(), writeContract: vi.fn() }));
 const waitReceipt = vi.hoisted(() => vi.fn());
 vi.mock("~/hooks/use-vote-send", () => ({
-  voteClient: () => ({ waitForTransactionReceipt: waitReceipt }),
+  voteClient: () => ({
+    waitForTransactionReceipt: waitReceipt,
+    // An addGroup's receipt: the round's first affiliation (id 0), as planned.
+    getTransactionReceipt: () =>
+      import("viem").then(({ encodeAbiParameters, encodeEventTopics }) =>
+        import("../../../../shared/vote/abi").then(({ SIGNED_BALLOTS_ABI }) => ({
+          logs: [{
+            address: "0x2000000000000000000000000000000000000002",
+            topics: encodeEventTopics({
+              abi: SIGNED_BALLOTS_ABI,
+              eventName: "GroupAdded",
+              args: { id: 0 },
+            } as never),
+            data: encodeAbiParameters([{ type: "bytes32" }], ["0x" + "00".repeat(32) as never]),
+          }],
+        }))
+      ),
+  }),
 }));
 vi.mock("~/lib/api", async (original) => ({
   ...await original<typeof import("~/lib/api")>(),
@@ -240,8 +257,12 @@ it("RoundAdminQueue: Put on the ballot adds it with the wallet, waits for the ro
   render(<RoundAdminQueue env="test" title="Ready for the test ballot" />);
   fireEvent.click(await screen.findByRole("button", { name: "Put on the ballot" }));
   expect(await screen.findByText("On the ballot.")).toBeInTheDocument();
-  expect(writeContract).toHaveBeenCalledTimes(1);
-  expect(writeContract).toHaveBeenCalledWith(
+  // A grant without affiliations gets one of its own first (#147).
+  expect(vi.mocked(writeContract).mock.calls.map(([, c]) => c.functionName)).toEqual([
+    "addGroup",
+    "addInitiative",
+  ]);
+  expect(writeContract).toHaveBeenLastCalledWith(
     {},
     expect.objectContaining({ address: CONTRACT, functionName: "addInitiative" }),
   );
@@ -535,8 +556,15 @@ it("RoundAdminQueue: an add another admin landed first goes on to sign, and says
   const TEST_QUEUE = "/api/admin/vote-test-round/queue";
   const round = { ...NO_ROUND, contract: CONTRACT } as typeof NO_ROUND;
   primeRound(round, "test");
-  vi.mocked(writeContract).mockReset().mockRejectedValue(
-    new Error('The contract function "addInitiative" reverted.\n\nError: DuplicateInitiative()'),
+  // Its own affiliation is added; the initiative is refused as a duplicate.
+  vi.mocked(writeContract).mockReset().mockImplementation((_, c) =>
+    c.functionName === "addGroup"
+      ? Promise.resolve(("0x" + "12".repeat(32)) as `0x${string}`)
+      : Promise.reject(
+        new Error(
+          'The contract function "addInitiative" reverted.\n\nError: DuplicateInitiative()',
+        ),
+      )
   );
   const r = {
     ...claimedRow(ADMIN),

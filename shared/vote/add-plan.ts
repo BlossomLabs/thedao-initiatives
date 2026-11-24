@@ -11,6 +11,8 @@ export type BoardCard = {
   goalUsd: number;
   safeAddress: string;
   type?: "rfp" | "grant";
+  /** Names the affiliation of its own when it has none ("Remix: AI-Guided…" → "Remix"). */
+  title?: string;
   /** The board's raised total (pledges and donations): what qualifies it for the vote. */
   raisedUsd?: number;
   /** From /api/initiatives/affiliations (the board doesn't carry them). */
@@ -111,8 +113,48 @@ export function planInitiatives(
   });
 }
 
+const bytes = (s: string) => new TextEncoder().encode(s).length;
+/** The longest start of `s` that fits in `max` UTF-8 bytes. */
+const fit = (s: string, max: number) => {
+  let out = "";
+  for (const ch of s) {
+    if (bytes(out + ch) > max) break;
+    out += ch;
+  }
+  return out.trim();
+};
+
+/** The affiliation a grant without one gets on the ballot (#147), so that one project
+ * alone can't hold over half of a tier, as an affiliation can't: the team its title
+ * starts with ("Remix: AI-Guided…" → "Remix"), else the title, else the slug, at most 32
+ * bytes (a bytes32 on-chain). An affiliation of that name already in the round (compared
+ * ignoring case) is the same one: an admin who accepted "SEAL: …" accepted a SEAL
+ * grant, and two "Remix: …" grants are one team. */
+export function titleAffiliation(card: Pick<BoardCard, "slug" | "title">): string {
+  const title = card.title?.trim() ?? "";
+  const base = (title.includes(":") ? title.slice(0, title.indexOf(":")) : title).trim();
+  return fit(base, 32) || fit(card.slug, 32);
+}
+
+/** A title's team that names more than one ("Kleros x Seer", "A & B", "A, B"): its
+ * affiliations should be set on the initiative ("Kleros", "Seer") instead. */
+export const looksJoint = (name: string): boolean => /\s(x|×|&|and|\+)\s|,|\//i.test(name);
+
+/** The affiliation a grant without one gets in this round, and whether the round has it
+ * already (it then joins it rather than adding one). */
+export function titleAffiliationIn(
+  m: Pick<VoteManifest, "groups">,
+  card: Pick<BoardCard, "slug" | "title">,
+): { name: string; existing: boolean } {
+  const name = titleAffiliation(card);
+  const found = m.groups.find((g) => g.toLowerCase() === name.toLowerCase());
+  return { name: found ?? name, existing: found !== undefined };
+}
+
 /** Adding projects to a deployed round: the admin's calls (new groups, then each
- * project) and the manifest with them appended (indexes never move). */
+ * project) and the manifest with them appended (indexes never move). A grant without
+ * affiliations gets the one its title names (`titleAffiliation`), joining it when the
+ * round has it; an RFP can't have any. */
 export function addPlan(
   m: VoteManifest,
   cards: BoardCard[],
@@ -123,8 +165,11 @@ export function addPlan(
   for (const c of cards) {
     if (m.slugs.includes(c.slug)) throw new Error(`${c.slug} is already in the round`);
   }
-  const groups = planGroups(cards, m.groups);
-  const plan = planInitiatives(cards, { real: m.kind === "real", groups });
+  const affiliated = cards.map((c) =>
+    c.type === "rfp" || c.affiliations?.length ? c : { ...c, affiliations: [titleAffiliation(c)] }
+  );
+  const groups = planGroups(affiliated, m.groups);
+  const plan = planInitiatives(affiliated, { real: m.kind === "real", groups });
   const calls = [
     ...groups.names.slice(m.groups.length).map((n) => ({
       fn: "addGroup" as const,

@@ -14,7 +14,7 @@ import { clock, plural, shortAddr, usd } from "~/lib/format";
 import { useWallet } from "~/context/wallet";
 import { useRound } from "~/lib/vote-round";
 import { cn } from "~/lib/utils";
-import { addPlan } from "../../../../shared/vote/add-plan";
+import { addPlan, looksJoint, titleAffiliationIn } from "../../../../shared/vote/add-plan";
 import { cardOf, useLocked, usePutOnBallot } from "./round-admin-actions";
 
 /** The filled green of On the ballot, with its dark text. */
@@ -150,6 +150,10 @@ export function PutOnBallotAction(
   const phase = run?.phase;
   // Once it is added, the round lists it: what blocks it now is its being there.
   const reason = run ? null : blockerText(ready.blocker);
+  // The title's team names two or more ("Kleros x Seer"): each should be its own affiliation.
+  const joint = !run && !ready.affiliations.length && ready.type !== "rfp"
+    ? titleAffiliationIn(ROUND, cardOf(ready)).name
+    : null;
   // Another round admin is putting it on the ballot (their own claim, e.g. after a reload,
   // leaves the button to them).
   const claim = ready.claim;
@@ -174,6 +178,12 @@ export function PutOnBallotAction(
         {reason && <span className="small dim">{reason}</span>}
         {!reason && claimedBy && <span className="small dim">{claimedBy}</span>}
       </div>
+      {joint && looksJoint(joint) && (
+        <p className="small m-0 mt-2.5">
+          "{joint}" looks like more than one affiliation. Set each on the initiative (for example
+          "Kleros" and "Seer" for "Kleros x Seer") before putting it on the ballot.
+        </p>
+      )}
       {asks && !reason && !claimedBy && !phase && (
         <p className="small dim m-0 mt-2.5">
           {asksText(txCount(ROUND, ready), ready.pledges.length)}
@@ -194,7 +204,17 @@ export function PutOnBallotAction(
 
 /** The admin initiative page's card, for an initiative Ready for the ballot. */
 export default function PutOnBallotCard({ ready }: { ready: ReadyJson }) {
+  const ROUND = useRound();
   const pledged = pledgedOf(ready);
+  // A grant without affiliations gets the one its title names on the ballot (#147).
+  const own = !ready.affiliations.length && ready.type !== "rfp"
+    ? titleAffiliationIn(ROUND, cardOf(ready))
+    : null;
+  const affiliations = ready.affiliations.length
+    ? ready.affiliations.join(", ")
+    : !own
+    ? "None"
+    : `${own.name} (from its title${own.existing ? ", in the round already" : ""})`;
   const rows: [string, React.ReactNode][] = [
     [
       "Safe",
@@ -208,7 +228,7 @@ export default function PutOnBallotCard({ ready }: { ready: ReadyJson }) {
       ready.pledges.length ? `${plural(ready.pledges.length, "pledge")}, ${usd(pledged)}` : "None",
     ],
     ["Asks the pool", usd(Math.max(0, ready.goalUsd - pledged))],
-    ["Affiliations", ready.affiliations.length ? ready.affiliations.join(", ") : "None"],
+    ["Affiliations", affiliations],
     ["RFP", ready.type === "rfp" ? "Yes" : "No"],
   ];
   return (

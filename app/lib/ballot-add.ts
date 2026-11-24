@@ -1,5 +1,8 @@
 /** Put on the ballot, in the round admin's browser: their wallet sends the round's
- * `addGroup` (new affiliations) and `addInitiative` transactions, the page waits until
+ * `addGroup` (new affiliations) and `addInitiative` transactions, one at a time (any
+ * wallet, Privy's included). A new affiliation's id is read from its receipt, never
+ * assumed: another admin's affiliation landing first can't misdirect the initiative
+ * (#147). The page waits until
  * the site's round includes the initiative, then each open pledge is signed (relayed by
  * the API, as in Pledges to sign). Every wallet, chain and API call is injected so the
  * sequence can be tested on its own, like pledge-flow.ts. */
@@ -8,7 +11,13 @@ import type { AddBlocker } from "../../shared/vote/add-plan";
 import type { ReadyJson } from "./api-types";
 import { dayTime } from "./format";
 
-export type BallotCall = { fn: "addGroup" | "addInitiative"; args: readonly unknown[] };
+export type BallotCall = {
+  fn: "addGroup" | "addInitiative";
+  args: readonly unknown[];
+  /** addGroup: the id the plan gave it (the round's count when planned, plus its place).
+   * The initiative's mask uses it until the receipt says which id it really got. */
+  group?: number;
+};
 
 export interface BallotAddDeps {
   /** Claims the initiative for this admin's run, first of all: "ok", or who holds it (as
@@ -26,6 +35,8 @@ export interface BallotAddDeps {
   /** The mined receipt's status; rejects on timeout. A reverted `addInitiative` may reject
    * with the revert's reason instead (DuplicateInitiative: another admin added it first). */
   waitReceipt(hash: Hex, call: BallotCall): Promise<"success" | "reverted">;
+  /** The id an `addGroup` transaction's GroupAdded event names; rejects when it can't. */
+  addedGroup(hash: Hex): Promise<number>;
   /** Whether the site's round lists the initiative yet (one look). */
   inRound(): Promise<boolean>;
   /** Signs one of its pledges as it stands (Pledges to sign's flow). */
@@ -136,7 +147,10 @@ async function run(
   let already = false;
   const duplicate = (call: BallotCall, e: unknown) =>
     call.fn === "addInitiative" && isDuplicateInitiative(e);
-  for (const [i, call] of calls.entries()) {
+  /** Planned affiliation id → the id it got, where they differ. */
+  const moved = new Map<number, number>();
+  for (const [i, planned] of calls.entries()) {
+    const call = remapGroups(planned, moved);
     const at = { kind: "adding" as const, step: i + 1, of: calls.length };
     onPhase(at);
     const by = await lost();
@@ -164,6 +178,17 @@ async function run(
     }
     if (status === "reverted") return failAdd(REVERTED);
     landed++;
+    if (call.fn === "addGroup" && call.group !== undefined) {
+      let id: number;
+      try {
+        id = await d.addedGroup(hash);
+      } catch {
+        // Landed, but its id is unknown: stop before the initiative could be misdirected.
+        // The retry plans on the round as it is, and joins this affiliation by its name.
+        return failAdd(TOO_LONG);
+      }
+      if (id !== call.group) moved.set(call.group, id);
+    }
   }
 
   onPhase(already ? { kind: "waiting-round", already: true } : { kind: "waiting-round" });
@@ -185,6 +210,21 @@ async function run(
     }
   }
   return end({ kind: "done" });
+}
+
+/** `call` with each planned affiliation id in its mask (an addInitiative's 4th argument)
+ * replaced by the id the affiliation got. */
+export function remapGroups(call: BallotCall, moved: ReadonlyMap<number, number>): BallotCall {
+  if (call.fn !== "addInitiative" || !moved.size) return call;
+  const mask = call.args[3] as bigint;
+  let out = mask;
+  for (const from of moved.keys()) {
+    if ((mask >> BigInt(from)) & 1n) out &= ~(1n << BigInt(from));
+  }
+  for (const [from, to] of moved) {
+    if ((mask >> BigInt(from)) & 1n) out |= 1n << BigInt(to);
+  }
+  return { ...call, args: [...call.args.slice(0, 3), out, ...call.args.slice(4)] };
 }
 
 /** Right after the add, the API may still read the round without the initiative (an

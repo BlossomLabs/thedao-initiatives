@@ -35,6 +35,7 @@ import {
   applyView,
   type BoardSort,
   type BoardView,
+  cardSearchRank,
   facetCounts,
   featuredIds,
   groupByFunding,
@@ -42,6 +43,7 @@ import {
   groupByRating,
   isFiltered,
   LAYOUT_KEY,
+  rankBySearch,
   readView,
   resultLabel,
   sortFor,
@@ -208,11 +210,15 @@ export default function BoardPage(
   // Equal scores retain the ordinary order; new proposals follow scored ones.
   const cards = useMemo(() => {
     const list = applyView(all, shownView, watchlist.ids, ratings);
-    if (!ai) return list;
-    return list.sort((a, b) =>
-      (scores.get(b.initiative.id) ?? -1) - (scores.get(a.initiative.id) ?? -1)
+    // Title matches for the typed words first (#145); within them the model's order, or
+    // the chosen sort (equal ones keep the order applyView gave them).
+    return rankBySearch(
+      list,
+      view.q,
+      (c) => cardSearchRank(view.q, c),
+      ai ? (c) => scores.get(c.initiative.id) ?? -1 : undefined,
     );
-  }, [all, shownView, watchlist.ids, ratings, ai, scores]);
+  }, [all, shownView, view.q, watchlist.ids, ratings, ai, scores]);
   const picks = useMemo(
     () => ai && aiResult ? aiPicks(cards, scores, aiResult.pickThreshold) : [],
     [ai, aiResult, cards, scores],
@@ -277,8 +283,11 @@ export default function BoardPage(
       .filter((g) => g.rows.length > 0)
       .map(({ key, rows, heading }) => ({ key, cards: rows.map((r) => r.card), heading }))
     : null;
+  // Typed words (or the AI order) give one list in match order: sections would split the
+  // title matches apart (#145).
+  const searching = ai || view.q.trim() !== "";
   const groups: { key: string; cards: Card[]; heading?: React.ReactNode }[] = resultGroups ??
-    (ai ? [{ key: "all", cards }] : sort === "category"
+    (searching ? [{ key: "all", cards }] : sort === "category"
       ? groupByPrimary(cards).map((g) => ({
         key: g.slug ?? "untagged",
         cards: g.cards,

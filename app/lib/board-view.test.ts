@@ -17,9 +17,11 @@ import {
   groupByRating,
   hasFeatured,
   isFiltered,
+  rankBySearch,
   readView,
   redrawCategoryOrder,
   resultLabel,
+  searchRank,
   shuffleCategories,
   sortCards,
   sortFor,
@@ -589,4 +591,50 @@ it("fullyFunded: the vote's exact rest completes a goal the rounded % shows shor
   expect(fullyFunded(c, rest)).toBe(true);
   expect(fullyFunded(c, rest - 0.01)).toBe(false);
   expect(groupByFunding([c], new Map([[c.initiative.id, rest]]))[0].key).toBe("funded");
+});
+
+describe("search order (#145)", () => {
+  it("ranks the title starting with the words, then holding them, then all words, then the text", () => {
+    expect(searchRank("safe lock", "Safe lockdown")).toBe(0);
+    expect(searchRank("wallet audit", "Hardware wallet audit kit")).toBe(1);
+    expect(searchRank("audit wallet", "Hardware wallet audit kit")).toBe(2);
+    expect(searchRank("wallet fuzzing", "Hardware wallet", "hardware wallet with fuzzing")).toBe(3);
+    expect(searchRank("help me with wallets", "Hardware wallets")).toBe(4);
+    expect(searchRank("help me with a key", "Hardware wallets")).toBe(5);
+    expect(searchRank("", "Anything")).toBe(0);
+  });
+
+  it("puts title matches first among the keyword matches, the list order among equals", () => {
+    const cs = [
+      card("Echidna fuzzing"),
+      card("Fuzzing at scale"),
+      card("Directory of fuzzers"),
+      card("Fuzzing tools"),
+    ];
+    // "Echidna fuzzing" and "Directory of fuzzers" hold "fuzz" later in the title.
+    const ranked = rankBySearch(cs, "fuzz", (c) => searchRank("fuzz", c.initiative.title));
+    expect(titles(ranked)).toEqual([
+      "Fuzzing at scale",
+      "Fuzzing tools",
+      "Echidna fuzzing",
+      "Directory of fuzzers",
+    ]);
+  });
+
+  it("with the AI order on, title matches lead and the model orders within each group", () => {
+    const cs = [card("Gas profiler"), card("Opcode fuzzer"), card("Fuzzer harness"), card("Misc")];
+    const score = new Map([["Gas profiler", 0.9], ["Opcode fuzzer", 0.2], ["Fuzzer harness", 0.5]]);
+    const ranked = rankBySearch(
+      cs,
+      "fuzzer",
+      (c) => searchRank("fuzzer", c.initiative.title),
+      (c) => score.get(c.initiative.title) ?? -1,
+    );
+    expect(titles(ranked)).toEqual(["Fuzzer harness", "Opcode fuzzer", "Gas profiler", "Misc"]);
+  });
+
+  it("without words the list keeps its order", () => {
+    const cs = [card("B"), card("A")];
+    expect(rankBySearch(cs, " ", () => 9)).toBe(cs);
+  });
 });

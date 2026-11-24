@@ -135,6 +135,46 @@ const haystack = (c: Card) => {
   return text;
 };
 
+/**
+ * How well a title answers the typed words, best first:
+ * 0 the title starts with them, 1 the title holds them as typed, 2 every word is in the
+ * title, 3 every word is in the card's text, 4 some longer word is in the title, 5 none.
+ * 0-3 are the keyword matches; 4-5 only come up while the AI order is on.
+ */
+export function searchRank(q: string, title: string, text = title.toLowerCase()): number {
+  const ws = words(q);
+  if (!ws.length) return 0;
+  const t = title.toLowerCase();
+  const phrase = ws.join(" ");
+  if (t.startsWith(phrase)) return 0;
+  if (t.includes(phrase)) return 1;
+  if (ws.every((w) => t.includes(w))) return 2;
+  if (ws.every((w) => t.includes(w) || text.includes(w))) return 3;
+  // Short words ("a", "for") would lift almost every title.
+  if (ws.some((w) => w.length >= 4 && t.includes(w))) return 4;
+  return 5;
+}
+
+/** A card's `searchRank`, its text being what the keyword filter searches. */
+export const cardSearchRank = (q: string, c: Card) =>
+  searchRank(q, c.initiative.title, haystack(c));
+
+/**
+ * The list in search order: title matches first (`searchRank`), then by the AI score when
+ * there is one; equal ones keep the order they came in. Without words, unchanged.
+ */
+export function rankBySearch<T>(
+  list: T[],
+  q: string,
+  rank: (x: T) => number,
+  score?: (x: T) => number,
+): T[] {
+  if (!words(q).length && !score) return list;
+  return list.map((x, i) => [x, words(q).length ? rank(x) : 0, score?.(x) ?? 0, i] as const)
+    .sort((a, b) => a[1] - b[1] || b[2] - a[2] || a[3] - b[3])
+    .map(([x]) => x);
+}
+
 type Facet = "type" | "status" | "cats" | "q";
 
 /** One card against the view; `skip` leaves one facet out (for that facet's counts).

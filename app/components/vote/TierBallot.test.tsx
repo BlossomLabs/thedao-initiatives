@@ -615,3 +615,26 @@ it("a card an affiliation rule blames is marked red with the affiliation, and sa
   expect(alpha.querySelector("[data-ballot-flag]")).toBeNull();
   expect(alpha.className).not.toContain("border-dao-red-pale/70");
 });
+
+it("the search puts the titles that start with the words first (#145)", async () => {
+  inRouter(
+    <TierBallot
+      items={[
+        { slug: "echidna", title: "Echidna fuzzing" },
+        { slug: "gas", title: "Gas profiler" },
+        { slug: "tools", title: "Fuzzing tools" },
+      ]}
+      tiers={{}}
+      disabled={false}
+      locked={new Set<Tier>()}
+      onChange={vi.fn()}
+      onReplace={vi.fn()}
+    />,
+  );
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "fuzz" } });
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: /^Details for / })).toHaveLength(2)
+  );
+  expect(screen.getAllByRole("button", { name: /^Details for / }).map((b) => b.ariaLabel))
+    .toEqual(["Details for Fuzzing tools", "Details for Echidna fuzzing"]);
+});

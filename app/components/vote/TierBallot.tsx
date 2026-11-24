@@ -19,7 +19,16 @@ import type { AffiliationFlag } from "~/lib/vote-rules-copy";
 import type { AiSearchResult } from "../../../shared/ai-search";
 import BoardSearch from "~/components/board/BoardSearch";
 import CategoryFilter from "~/components/board/filters/CategoryFilter";
-import { type BoardView, DEFAULT_VIEW, facetCounts, isFiltered, matches } from "~/lib/board-view";
+import {
+  type BoardView,
+  cardSearchRank,
+  DEFAULT_VIEW,
+  facetCounts,
+  isFiltered,
+  matches,
+  rankBySearch,
+  searchRank,
+} from "~/lib/board-view";
 import { categoryOf } from "~/lib/categories";
 import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
@@ -526,7 +535,8 @@ export default function TierBallot(
   );
   const ai = Boolean(aiResult?.scores.length);
   const itemTitles = useMemo(() => items.map((i) => i.title), [items]);
-  // While the AI order is on, the model ranked everything: the words stop filtering.
+  // While the AI order is on, the model ranked everything: the words stop filtering, but
+  // the initiatives they match still come first, title matches first (#145).
   const shownView = useMemo(
     () => (ai || (search.aiAuto && asking) ? { ...view, q: "" } : view),
     [view, ai, asking, search.aiAuto],
@@ -544,11 +554,14 @@ export default function TierBallot(
     const list = unranked.filter((i) =>
       i.card ? matches(i.card, shownView) : words.every((w) => i.title.toLowerCase().includes(w))
     );
-    if (!ai || !aiResult) return list;
-    const score = new Map(aiResult.scores.map(({ id, score }) => [id, score]));
-    const of = (i: BallotItem) => (i.card && score.get(i.card.initiative.id)) ?? -1;
-    return list.sort((a, b) => of(b) - of(a));
-  }, [unranked, shownView, ai, aiResult]);
+    const score = new Map(aiResult?.scores.map(({ id, score }) => [id, score]));
+    return rankBySearch(
+      list,
+      view.q,
+      (i) => i.card ? cardSearchRank(view.q, i.card) : searchRank(view.q, i.title),
+      ai ? (i) => (i.card && score.get(i.card.initiative.id)) ?? -1 : undefined,
+    );
+  }, [unranked, shownView, view.q, ai, aiResult]);
   const filtered = isFiltered(shownView);
 
   /** A tier (or the list) that would take the initiative being dragged or tapped. */

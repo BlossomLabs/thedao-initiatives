@@ -4,7 +4,15 @@ import BoardSearch from "~/components/board/BoardSearch";
 import CategoryFilter from "~/components/board/filters/CategoryFilter";
 import { DonateStandIn } from "~/components/board/InitiativeCard";
 import type { Suggestion } from "~/components/donate/DonateWidget";
-import { type BoardView, DEFAULT_VIEW, facetCounts, isFiltered, matches } from "~/lib/board-view";
+import {
+  type BoardView,
+  cardSearchRank,
+  DEFAULT_VIEW,
+  facetCounts,
+  isFiltered,
+  matches,
+  rankBySearch,
+} from "~/lib/board-view";
 import CategoryDot from "~/components/ui/CategoryDot";
 import Reveal from "~/components/ui/Reveal";
 import type { NextTierEntry } from "~/hooks/use-vote";
@@ -309,7 +317,8 @@ export default function GiveList(
   const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
   const [asking, setAsking] = useState(false);
   const ai = Boolean(aiResult?.scores.length);
-  // While the AI order is on, the model ranked everything: the words stop filtering.
+  // While the AI order is on, the model ranked everything: the words stop filtering, but
+  // the rows they match still come first, title matches first (#145).
   const shownView = useMemo(
     () => (ai || (search.aiAuto && asking) ? { ...view, q: "" } : view),
     [view, ai, asking, search.aiAuto],
@@ -329,10 +338,14 @@ export default function GiveList(
   // Closest first; with the AI order on, the best matches first.
   const score = new Map(aiResult?.scores.map(({ id, score }) => [id, score]) ?? []);
   const of = (r: GiveRow) => score.get(r.card.initiative.id) ?? -1;
+  /** Each group in search order once words are typed; its own order among equals. */
+  const searched = (rows: GiveRow[]) =>
+    rankBySearch(rows, view.q, (r) => cardSearchRank(view.q, r.card), ai ? of : undefined);
   // In the tier settling now: smallest checked threat first, then none found, then
   // (below them) those closest to coming in.
-  const ahead = found.filter((r) => !r.entry)
-    .sort((a, b) => ai ? of(b) - of(a) : threatRank(a) - threatRank(b) || 0);
+  const ahead = searched(
+    found.filter((r) => !r.entry).sort((a, b) => ai ? 0 : threatRank(a) - threatRank(b) || 0),
+  );
   const searching = filtered || ai || aiAsking;
   const expanded = showAll || searching;
   // A completed search with no amount stays folded. Pending figures keep their place
@@ -351,12 +364,13 @@ export default function GiveList(
     const split = (k: string) => (k ? k.split("\n") : []);
     onGreenOrderRef.current?.(split(visibleKey), split(restKey));
   }, [visibleKey, restKey]);
-  const near = found.filter((r) => rowGap(r) !== null)
-    .sort((a, b) => ai ? of(b) - of(a) : rowGap(a)! - rowGap(b)!);
-  const far = found.filter((r) => r.entry && r.entry.gap === null)
-    .sort((a, b) =>
-      ai ? of(b) - of(a) : a.card.initiative.title.localeCompare(b.card.initiative.title)
-    );
+  const near = searched(
+    found.filter((r) => rowGap(r) !== null).sort((a, b) => ai ? 0 : rowGap(a)! - rowGap(b)!),
+  );
+  const far = searched(
+    found.filter((r) => r.entry && r.entry.gap === null)
+      .sort((a, b) => ai ? 0 : a.card.initiative.title.localeCompare(b.card.initiative.title)),
+  );
   const closedFar = far.filter((r) => r.card.initiative.slug !== open);
   const moreCount = ahead.filter((r) => !keepGreen(r)).length + closedFar.length;
   const shown = [

@@ -102,6 +102,28 @@ function transient(e: unknown): boolean {
   return e instanceof AiError && e.status !== undefined && (e.status === 429 || e.status >= 500);
 }
 
+/** `once` until it answers: a failure `again` accepts is tried once more after each wait in
+ * `waits`, while `budgetOk` allows that call. Throws the last failure, or an AiError when
+ * the budget refuses a retry. */
+async function retrying<T>(
+  once: () => Promise<T>,
+  { waits, again, budgetOk }: {
+    waits: number[];
+    again: (e: unknown) => boolean;
+    budgetOk?: () => Promise<boolean>;
+  },
+): Promise<T> {
+  for (let i = 0;; i++) {
+    try {
+      return await once();
+    } catch (e) {
+      if (i >= waits.length || !again(e)) throw e;
+      if (budgetOk && !(await budgetOk())) throw new AiError("daily budget used up");
+      if (waits[i] > 0) await new Promise((r) => setTimeout(r, waits[i]));
+    }
+  }
+}
+
 /** The reason an admin reads for a provider's error answer: the status and, when the
  * body is a short plain-text message, that message. An HTML error page (a proxy's 502)
  * is left out; the caller logs it. */
@@ -414,21 +436,19 @@ export function createAi(config: Config, f: typeof fetch, opts: AiOptions = {}) 
     budgetOk: () => Promise<boolean>,
     attempts = 2,
   ): Promise<{ out: Record<string, unknown>; summary: string } | { error: string }> {
-    let error = "";
-    for (let attempt = 0; attempt < attempts; attempt++) {
-      if (!(await budgetOk())) return { error: "daily budget used up" };
-      try {
+    if (!(await budgetOk())) return { error: "daily budget used up" };
+    try {
+      return await retrying(async () => {
         const out = await chatJson(system, user);
         if (typeof out.verdict === "string" && verdicts.includes(out.verdict)) {
           const summary = String(out.summary ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
           return { out, summary };
         }
-        error = "invalid verdict: " + JSON.stringify(out.verdict ?? null).slice(0, 40);
-      } catch (e) {
-        error = failureReason(e);
-      }
+        throw new AiError("invalid verdict: " + JSON.stringify(out.verdict ?? null).slice(0, 40));
+      }, { waits: Array(attempts - 1).fill(0), again: () => true, budgetOk });
+    } catch (e) {
+      return { error: failureReason(e) };
     }
-    return { error };
   }
 
   /** A tag for a support message, or null without an AI key. It never stops
@@ -472,17 +492,11 @@ export function createAi(config: Config, f: typeof fetch, opts: AiOptions = {}) 
     if (!enabled) throw new AiError("AI is not configured");
     // An admin waits on this: a provider that is down or overloaded is asked again after
     // a short wait, each retry counted against the daily cap.
-    let out: Record<string, unknown>;
-    for (let attempt = 0;; attempt++) {
-      try {
-        out = await chatJson(VOTE_BRIEF_PROMPT, JSON.stringify(initiative));
-        break;
-      } catch (e) {
-        if (!transient(e) || attempt >= retryDelaysMs.length) throw e;
-        if (budgetOk && !(await budgetOk())) throw e;
-        await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
-      }
-    }
+    const out = await retrying(() => chatJson(VOTE_BRIEF_PROMPT, JSON.stringify(initiative)), {
+      waits: retryDelaysMs,
+      again: transient,
+      budgetOk,
+    });
     const clean = cleanBriefText(out);
     if (!clean) throw new AiError("bad reply: missing or overlong what/adoption");
     return clean;

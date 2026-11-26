@@ -576,3 +576,19 @@ describe("past the deadline to qualify for the ballot", () => {
     }
   });
 });
+
+it("a goal awaiting signature shows by the funding, and any admin can discard it (#149)", async () => {
+  current = {
+    ...page({ status: "approved" }),
+    onBallot: true,
+    goalRequest: { goalUsd: 78_000, by: ADMIN, at: 1_795_521_533 },
+  };
+  renderPage();
+  expect(await screen.findByText(/Awaiting signature: \$78,000/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Discard the goal change" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1/goal-request", {
+      method: "DELETE",
+    })
+  );
+});

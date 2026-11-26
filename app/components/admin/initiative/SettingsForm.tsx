@@ -4,6 +4,7 @@ import { Field, Input } from "~/components/ui/Field";
 import { useAdminApi } from "~/hooks/use-admin-api";
 import type { AdminInitiative } from "~/lib/api-types";
 import type { Run } from "./run";
+import { ON_BALLOT } from "../../../../shared/vote/ballot-facts";
 
 /** Two fields side by side on shared grid rows, so the inputs line up when one hint wraps
  * (the pairs of the initiative form's PageFields do the same). */
@@ -22,7 +23,14 @@ const settingsOf = (r: AdminInitiative) => ({
  * that changed are sent, so the wallet is asked to sign again only for the
  * two that need it (owner, paid out).
  */
-export default function SettingsForm({ r, run }: { r: AdminInitiative; run: Run }) {
+export default function SettingsForm(
+  { r, run, onBallot = false }: {
+    r: AdminInitiative;
+    run: Run;
+    /** On the production ballot (#149): the affiliations are the round's. */
+    onBallot?: boolean;
+  },
+) {
   const adminApi = useAdminApi();
   const [saved, setSaved] = useState(() => settingsOf(r));
   const [form, setForm] = useState(saved);
@@ -102,10 +110,13 @@ export default function SettingsForm({ r, run }: { r: AdminInitiative; run: Run 
         <Field
           label="Affiliations"
           htmlFor="s-affiliations"
-          hint="Comma-separated, e.g. Seal. Projects that share one count as one for the vote's S-Tier rules. Never shown on the site."
+          hint={onBallot
+            ? ON_BALLOT
+            : "Comma-separated, e.g. Seal. Projects that share one count as one for the vote's S-Tier rules. Never shown on the site."}
         >
           <Input
             id="s-affiliations"
+            disabled={onBallot}
             maxLength={400}
             placeholder="None"
             value={form.affiliations}

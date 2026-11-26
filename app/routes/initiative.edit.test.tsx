@@ -513,3 +513,35 @@ it("an admin proposer is told categories alone change at once unless an edit wai
   unmount();
   qc.clear();
 });
+
+it("on the ballot the type is set on the round, and a goal awaiting signature shows (#149)", () => {
+  vi.mocked(useInitiative).mockReturnValue({
+    data: {
+      initiative: { ...structuredRow(), slug: "same-url", status: "approved" as const },
+      onBallot: true,
+      goalRequest: { goalUsd: 78_000, by: SOMEONE, at: 1 },
+    } as InitiativePage,
+    isLoading: false,
+    isPlaceholderData: false,
+    error: null,
+  } as ReturnType<typeof useInitiative>);
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByLabelText("Facts")).toHaveTextContent("open private");
+  expect(screen.getByLabelText("Facts")).not.toHaveTextContent("type");
+  expect(screen.getByText("Awaiting signature: $78,000")).toBeInTheDocument();
+  expect(screen.getByText(/On the ballot: a round admin changes this on the round\./))
+    .toBeInTheDocument();
+  unmount();
+  qc.clear();
+});
+
+it("off the ballot nothing about the round shows", () => {
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const });
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByLabelText("Facts")).toHaveTextContent("type");
+  expect(screen.queryByText(/Awaiting signature/)).toBeNull();
+  unmount();
+  qc.clear();
+});

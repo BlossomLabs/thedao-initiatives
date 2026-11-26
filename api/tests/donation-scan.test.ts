@@ -215,3 +215,53 @@ Deno.test("donation scan: DONATION_DISCOVERY=safe-api leaves the scanner off", a
     h.close();
   }
 });
+
+Deno.test("donation scan: a Safe paying itself, in ETH or tokens, is not a donation", async () => {
+  const { h, initiative } = await setup();
+  try {
+    const SELF_ETH = "0x" + "c1".repeat(32);
+    const SELF_USDC = "0x" + "c2".repeat(32);
+    const eth = safeReceived(SAFE_ADDR, SAFE_ADDR, 10n ** 18n);
+    const usdc = transferLog(USDC, SAFE_ADDR, SAFE_ADDR, 9_000_000n);
+    for (const [tx, log] of [[SELF_ETH, eth], [SELF_USDC, usdc]] as const) {
+      h.script.logs.push({ ...log, blockNumber: hex(HEAD - 100), transactionHash: tx });
+      h.script.receipts[tx] = { status: "0x1", blockNumber: hex(HEAD - 100), logs: [log] };
+      h.script.txs[tx] = { to: SAFE_ADDR, from: DONOR, value: "0x0" };
+    }
+    await scanDonations(h.deps);
+    for (const tx of [SELF_ETH, SELF_USDC]) {
+      assertFalse((await h.db.donations.get(initiative.id, tx))?.status === "confirmed", tx);
+    }
+    assertEquals((await h.db.donations.get(initiative.id, TX_ETH))?.status, "confirmed");
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("donation scan: a run out of time mid-range keeps the cursor before it", async () => {
+  const { h, initiative } = await setup();
+  try {
+    const first = await scanDonations(h.deps);
+    const NEW1 = "0x" + "d1".repeat(32);
+    const NEW2 = "0x" + "d2".repeat(32);
+    usdcTo(h, SAFE_ADDR, NEW1, HEAD + 10);
+    usdcTo(h, SAFE_ADDR, NEW2, HEAD + 20);
+    h.script.head += 100;
+    const verify = h.deps.chain.verifyDonation;
+    h.deps.chain.verifyDonation = async (...args) => {
+      await new Promise((r) => setTimeout(r, 40));
+      return await verify(...args);
+    };
+    const cut = await scanDonations(h.deps, { force: true, budgetMs: 20 });
+    assertEquals(cut.state?.cursor, first.state?.cursor, "the unfinished range is not passed");
+    assertEquals(cut.state?.behind, 100);
+    h.deps.chain.verifyDonation = verify;
+    const done = await scanDonations(h.deps, { force: true });
+    assertEquals(done.state?.cursor, HEAD + 98);
+    for (const tx of [NEW1, NEW2]) {
+      assertEquals((await h.db.donations.get(initiative.id, tx))?.status, "confirmed");
+    }
+  } finally {
+    h.close();
+  }
+});

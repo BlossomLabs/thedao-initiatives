@@ -134,6 +134,8 @@ export async function verifyDonationTx(
     if (!tok || topics.length < 3) continue;
     if (topics[0].toLowerCase() !== TRANSFER_TOPIC) continue;
     if (topics[2].toLowerCase() !== wantTo) continue;
+    // The Safe paying itself is not a donation.
+    if (topics[1].toLowerCase() === wantTo) continue;
     const raw = decodeHexInt(log.data);
     if (raw <= 0n) continue;
     matchingLogs++;
@@ -217,7 +219,9 @@ export async function verifyDonationTx(
     const received = (receipt.logs ?? []).filter((log) =>
       (log.address ?? "").toLowerCase() === recipient.toLowerCase() &&
       (log.topics?.[0] ?? "").toLowerCase() === SAFE_RECEIVED_TOPIC &&
-      (log.topics?.length ?? 0) >= 2
+      (log.topics?.length ?? 0) >= 2 &&
+      // The Safe sending ETH to itself (a signed self-call with value) is not a donation.
+      log.topics![1].toLowerCase() !== wantTo
     );
     const wei = received.reduce((s, log) => s + decodeHexInt(log.data), 0n);
     if (tx && wei > 0n) {

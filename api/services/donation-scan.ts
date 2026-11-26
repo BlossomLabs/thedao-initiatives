@@ -17,7 +17,8 @@ import type { SafeApiDeps, SafeRow } from "./safe-api.ts";
 
 export const SCAN_STATE_KEY = "donation_scan";
 const SCAN_LOCK = "donation_scan";
-const SCAN_LOCK_SECS = 60;
+/** Outlasts the run's budget plus the RPC calls in flight when it ends (10 s timeouts). */
+const SCAN_LOCK_SECS = 90;
 /** Blocks per eth_getLogs range; halved on a refusal down to MIN_SPAN, regrown on success. */
 export const MAX_SPAN = 10_000;
 export const MIN_SPAN = 50;
@@ -95,12 +96,18 @@ export async function scanDonations(
   deps: SafeApiDeps,
   opts: { force?: boolean; budgetMs?: number } = {},
 ): Promise<ScanResult> {
-  const prev = await deps.db.meta.get<DonationScanState>(SCAN_STATE_KEY);
-  if (!opts.force && prev?.ok && prev.behind === 0 && deps.now() - prev.at < SCAN_FRESH_SECS) {
-    return { state: prev, touched: [], skipped: "fresh" };
-  }
+  const isFresh = (s: DonationScanState | null) =>
+    !opts.force && s?.ok && s.behind === 0 && deps.now() - s.at < SCAN_FRESH_SECS;
+  const seen = await deps.db.meta.get<DonationScanState>(SCAN_STATE_KEY);
+  if (isFresh(seen)) return { state: seen, touched: [], skipped: "fresh" };
   if (!await deps.db.meta.lock(SCAN_LOCK, SCAN_LOCK_SECS)) {
-    return { state: prev, touched: [], skipped: "locked" };
+    return { state: seen, touched: [], skipped: "locked" };
+  }
+  // Read again under the lock: a run that just finished may have moved the cursor.
+  const prev = await deps.db.meta.get<DonationScanState>(SCAN_STATE_KEY);
+  if (isFresh(prev)) {
+    await deps.db.meta.unlock(SCAN_LOCK);
+    return { state: prev, touched: [], skipped: "fresh" };
   }
   const started = Date.now();
   const overBudget = () => Date.now() - started > (opts.budgetMs ?? SCAN_BUDGET_MS);
@@ -145,7 +152,14 @@ export async function scanDonations(
           span = Math.max(MIN_SPAN, Math.floor(span / 2));
           continue;
         }
+        let cut = false;
         for (const { txHash, safe } of found) {
+          // Out of time mid-range: stop without passing it, the next run redoes it
+          // (confirmed rows are skipped with one read each).
+          if (overBudget()) {
+            cut = true;
+            break;
+          }
           const initiative = bySafe.get(safe)!;
           const known = await deps.db.donations.get(initiative.id, txHash);
           if (known?.status === "confirmed") continue;
@@ -158,6 +172,7 @@ export async function scanDonations(
             state.credited++;
           }
         }
+        if (cut) break;
         done = end;
         span = Math.min(MAX_SPAN, span * 2);
       }

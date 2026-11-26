@@ -30,7 +30,7 @@ import { CategoryTag } from "~/components/ui/CategoryTag";
 import { api, ApiError, apiText, errorMessage } from "~/lib/api";
 import type { AdminInitiativePage } from "~/lib/api-types";
 import { walletErrorMessage } from "~/lib/donate";
-import { dt } from "~/lib/format";
+import { dayTime, dt, shortAddr, usd } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
 import { withReauthentication } from "~/lib/reauthenticate";
 import { roundLoader, useRound } from "~/lib/vote-round";
@@ -190,6 +190,25 @@ export default function ManageInitiative() {
             pct={pct}
             funded={r.goalUsd > 0 && data.summary.total >= r.goalUsd}
           />
+          {data.goalRequest && (
+            <p className="m-0 mt-2 small">
+              Awaiting signature: {usd(data.goalRequest.goalUsd)}{" "}
+              <span className="dim">
+                (asked by {shortAddr(data.goalRequest.by)},{" "}
+                {dayTime(data.goalRequest.at)}; a round admin signs it in the queue)
+              </span>{" "}
+              <Button
+                sm
+                variant="ghost"
+                aria-label="Discard the goal change"
+                onClick={() =>
+                  void api(`/api/admin/initiatives/${r.id}/goal-request`, { method: "DELETE" })
+                    .finally(() => qc.invalidateQueries({ queryKey: ["admin"] }))}
+              >
+                Discard
+              </Button>
+            </p>
+          )}
 
           <PendingEdit r={r} run={runAt("edit")} />
           {said("edit")}
@@ -208,7 +227,7 @@ export default function ManageInitiative() {
           {r.contact === undefined && (
             <ConfirmPrivateFields onConfirm={() => qc.invalidateQueries({ queryKey: key })} />
           )}
-          <SettingsForm r={r} run={runAt("settings")} />
+          <SettingsForm r={r} run={runAt("settings")} onBallot={Boolean(data.onBallot)} />
           {said("settings")}
 
           <SectionHeading count={data.pledges.length}>Backer pledges</SectionHeading>

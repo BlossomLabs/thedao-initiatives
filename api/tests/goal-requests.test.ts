@@ -391,3 +391,40 @@ Deno.test("settling a request that was replaced meanwhile returns the newer one"
     h.close();
   }
 });
+
+Deno.test("accepting an edit that isn't waiting leaves another goal request as it was", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const held = await j(
+      await x.edit({ ...revisionBody(minimalSubmission(78000)), goal: 78000 }),
+    );
+    const n = (held.revision as { n: number }).n;
+    assertEquals((await x.accept(n)).status, 200);
+    // A newer request, then the same (no longer waiting) edit accepted again.
+    assertEquals((await x.patch({ goal: 60000 })).status, 202);
+    assertEquals((await x.accept(n)).status, 409);
+    assertEquals((await goalOf(h, x.slug))?.goalUsd, 60000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("a failed accept puts back the request that was waiting before it", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    assertEquals((await x.patch({ goal: 60000 })).status, 202);
+    const held = await j(
+      await x.edit({ ...revisionBody(minimalSubmission(78000)), goal: 78000 }),
+    );
+    const review = h.db.initiatives.review;
+    h.db.initiatives.review = () => Promise.reject(new Error("update conflict"));
+    const res = await x.accept((held.revision as { n: number }).n);
+    h.db.initiatives.review = review;
+    assertEquals(res.status >= 500, true);
+    assertEquals((await goalOf(h, x.slug))?.goalUsd, 60000);
+  } finally {
+    h.close();
+  }
+});

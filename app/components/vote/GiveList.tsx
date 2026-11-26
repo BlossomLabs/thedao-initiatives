@@ -17,7 +17,7 @@ import CategoryDot from "~/components/ui/CategoryDot";
 import Reveal from "~/components/ui/Reveal";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import type { Card } from "~/lib/api-types";
-import { usd, usd2, usdK, usdShortUp } from "~/lib/format";
+import { usd, usdGap, usdK, usdShortUp } from "~/lib/format";
 import { lazyPart } from "~/lib/lazy-part";
 import { openPledgeRequest } from "~/lib/support";
 import { cn } from "~/lib/utils";
@@ -167,7 +167,8 @@ export function RowFigure(
     setView({ kind, value });
   }, [kind, value]);
   const n = useCountTo(view.value ?? 0, view.kind === "gap" ? COUNT_MS : 0);
-  const money = (up: boolean) => (n > 0.5 ? usd2(n, up) : "$0");
+  // A gap is what someone may donate: rounded up, three digits from $100k (#151).
+  const gap = n > 0.5 ? usdGap(n) : "$0";
   return (
     <span
       data-figure={view.kind}
@@ -188,7 +189,7 @@ export function RowFigure(
                 flip > 0 && "motion-safe:animate-figure-flip",
               )}
             >
-              −{money(true)}
+              −{gap}
             </b>
             <small className="w-[46px] text-[12px] text-white/65">to {to ?? lastTo.current}</small>
           </>
@@ -792,7 +793,7 @@ export function ClosestBox(
                         {i.title}
                       </span>
                       <b className="flex-none rounded-md bg-[#c22d2b] px-1.5 py-[2px] font-inter-tight text-[13.5px] font-bold text-white tnum">
-                        −{usd2(rowGap(r)!, true)}
+                        −{usdGap(rowGap(r)!)}
                       </b>
                     </button>
                   </li>

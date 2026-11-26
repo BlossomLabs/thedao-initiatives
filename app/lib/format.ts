@@ -26,27 +26,30 @@ export function usdK(n: number): string {
   }k`;
 }
 
-/** Money to two significant digits, always in thousands (or millions), so a list reads
- * at a glance: "$0.3k", "$1.5k", "$11k", "$120k", "$1.2M". `up` rounds a missing amount
- * up, so it never reads as less than it is; otherwise it rounds down (a lead never reads
- * as more). */
-export function usd2(n: number, up: boolean): string {
+/** Money to `digits` significant digits, always in thousands (or millions), so a list
+ * reads at a glance. `up` rounds a missing amount up, so it never reads as less than it
+ * is; otherwise it rounds down (a lead never reads as more). */
+function usdSig(n: number, up: boolean, digits: number): string {
   if (!Number.isFinite(n) || n <= 0) return "$0k";
-  const unit = n < 100
-    ? 10
-    : n < 10_000
-    ? 100
-    : n < 100_000
-    ? 1000
-    : n < 1_000_000
-    ? 10_000
-    : 100_000;
+  // The last digit kept; from $100 to $1k, whole hundreds ("$0.3k"); never under $10.
+  const floor = n >= 100 && n < 1000 ? 100 : 10;
+  const unit = Math.max(floor, 10 ** (Math.floor(Math.log10(n)) - digits + 1));
   // A hair of slack against float noise ($4,000 / 100 is not quite 40).
   const steps = up ? Math.ceil(n / unit - 1e-9) : Math.floor(n / unit + 1e-9);
   const v = (steps || 1) * unit;
-  const short = (x: number) => String(Number(x.toFixed(2)));
+  const short = (x: number) => String(Number(x.toFixed(3)));
   return v < 1_000_000 ? `$${short(v / 1000)}k` : `$${short(v / 1_000_000)}M`;
 }
+
+/** Two significant digits: "$0.3k", "$1.5k", "$11k", "$120k", "$1.2M". */
+export const usd2 = (n: number, up: boolean): string => usdSig(n, up, 2);
+
+/** Three significant digits: "$1.53k", "$11.3k", "$142k", "$1.24M". */
+export const usd3 = (n: number, up: boolean): string => usdSig(n, up, 3);
+
+/** A gap someone may donate to close, rounded up: two digits in the tens of thousands
+ * ("$7.3k", "$12k"), three from $100k, so $141,460 is "$142k", not "$150k" (#151). */
+export const usdGap = (n: number): string => n < 100_000 ? usd2(n, true) : usd3(n, true);
 
 /** A missing amount, short and rounded up so it never reads as less than it is. */
 export const usdShortUp = (n: number): string =>

@@ -8,6 +8,8 @@ import {
   shortDay,
   usd,
   usd2,
+  usd3,
+  usdGap,
   usdK,
   usdShort,
   usdShortUp,
@@ -137,5 +139,32 @@ describe("usd2", () => {
     expect(usd2(12_345, false)).toBe("$12k");
     expect(usd2(736_999, false)).toBe("$730k");
     expect(usd2(0, true)).toBe("$0k");
+  });
+});
+
+describe("usd3", () => {
+  it("says money to three digits, always in thousands or millions", () => {
+    expect(usd3(290, true)).toBe("$0.3k");
+    expect(usd3(1_523, true)).toBe("$1.53k");
+    expect(usd3(11_210, true)).toBe("$11.3k");
+    expect(usd3(1_234_567, true)).toBe("$1.24M");
+  });
+
+  it("rounds to the $1k between $100k and $1M, up or down", () => {
+    expect(usd3(141_460, true)).toBe("$142k");
+    expect(usd3(999_001, true)).toBe("$1M");
+    expect(usd3(141_460, false)).toBe("$141k");
+    expect(usd3(0, true)).toBe("$0k");
+  });
+});
+
+describe("usdGap", () => {
+  it("rounds a gap up: two digits under $100k, three from there (#151)", () => {
+    expect(usdGap(7_210)).toBe("$7.3k");
+    expect(usdGap(11_210)).toBe("$12k");
+    expect(usdGap(99_400)).toBe("$100k");
+    expect(usdGap(141_460)).toBe("$142k");
+    expect(usdGap(150_000)).toBe("$150k");
+    expect(usdGap(1_234_567)).toBe("$1.24M");
   });
 });

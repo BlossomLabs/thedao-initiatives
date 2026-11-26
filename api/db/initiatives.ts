@@ -564,6 +564,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     verdict: "accept" | "reject",
     by: string,
     note = "",
+    /** On the ballot (#149): the text goes live, the goal waits for a round admin. */
+    opts: { keepGoal?: boolean } = {},
   ): Promise<{ initiative: Initiative; revision: Revision } | null> {
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Initiative>(K.initiative(id));
@@ -585,6 +587,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
         const m = moved ? Math.max(initiative.revision, initiative.lastRevision ?? 0) + 1 : n;
         revision = {
           ...held.value,
+          // Kept for the round (#149): this version of the page doesn't set a goal.
+          ...(opts.keepGoal ? { goalUsd: undefined } : {}),
           n: m,
           state: "live",
           reviewedBy: by,
@@ -595,7 +599,9 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           ...initiative,
           ...pickText(held.value),
           categories: held.value.categories ?? initiative.categories ?? [],
-          ...(held.value.goalUsd !== undefined ? { goalUsd: held.value.goalUsd } : {}),
+          ...(held.value.goalUsd !== undefined && !opts.keepGoal
+            ? { goalUsd: held.value.goalUsd }
+            : {}),
           revision: m,
           pendingRevision: null,
           lastRevision: Math.max(m, initiative.lastRevision ?? 0),

@@ -18,7 +18,9 @@ import { useSession } from "~/context/session";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
 import { api, ApiError, errorMessage } from "~/lib/api";
-import type { Initiative, InitiativePage, Pledge } from "~/lib/api-types";
+import type { GoalRequestJson, Initiative, InitiativePage, Pledge } from "~/lib/api-types";
+import { usd } from "~/lib/format";
+import { ON_BALLOT } from "../../shared/vote/ballot-facts";
 import { pageFactsPatch, rowFacts, textBody, textChanged } from "~/lib/edit-initiative";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SITE_NAME } from "~/data/site";
 import { generateMeta } from "~/utils/meta";
@@ -181,6 +183,8 @@ export default function EditInitiative() {
             team={team}
             mine={mine}
             hold={hold}
+            onBallot={Boolean(page.onBallot)}
+            goalRequest={page.goalRequest}
           />
         )
         : (
@@ -232,6 +236,23 @@ function WhatYouCanChange(
   );
 }
 
+/** On the ballot the round leads (#149): what that means for this form, and a new goal
+ * that is waiting for a round admin to sign it. */
+function OnTheBallot({ goalRequest }: { goalRequest?: GoalRequestJson }) {
+  return (
+    <div className="panel">
+      <span className="k">On the ballot</span>
+      <p className="m-0 small dim">
+        Type and affiliations: {ON_BALLOT}{" "}
+        A new goal waits for a round admin to sign it before the page shows it.
+      </p>
+      {goalRequest && (
+        <p className="m-0 mt-2 small">Awaiting signature: {usd(goalRequest.goalUsd)}</p>
+      )}
+    </div>
+  );
+}
+
 function RevisionsCard({ hold }: { hold: boolean }) {
   return (
     <div className="panel">
@@ -249,7 +270,15 @@ function RevisionsCard({ hold }: { hold: boolean }) {
 /** The form snapshots its initial fields. Background polls must not replace
  * an in-progress draft when the five-minute private-read window ends. */
 function PrivateEditor(
-  props: { r: Initiative; pledges: Pledge[]; team: boolean; mine: boolean; hold: boolean },
+  props: {
+    r: Initiative;
+    pledges: Pledge[];
+    team: boolean;
+    mine: boolean;
+    hold: boolean;
+    onBallot: boolean;
+    goalRequest?: GoalRequestJson;
+  },
 ) {
   const [initial, setInitial] = useState<Initiative | null>(() =>
     props.r.contact !== undefined && props.r.funders !== undefined ? props.r : null
@@ -272,7 +301,7 @@ function PrivateEditor(
 }
 
 function EditForm(
-  { r, pledges, team, mine, hold }: {
+  { r, pledges, team, mine, hold, onBallot, goalRequest }: {
     /** The row with the text the form starts from (the edit in review, if any). */
     r: Initiative;
     pledges: Pledge[];
@@ -280,6 +309,9 @@ function EditForm(
     mine: boolean;
     /** Saving sends the edit for review instead of publishing it. */
     hold: boolean;
+    /** On the production ballot (#149): the round leads the type, affiliations and goal. */
+    onBallot: boolean;
+    goalRequest?: GoalRequestJson;
   },
 ) {
   const navigate = useNavigate();
@@ -344,16 +376,19 @@ function EditForm(
       submitLabel={hold ? "Send edit for review" : "Save as a new revision"}
       showBackers={false}
       showPrivate={open}
-      showTypePicker={open}
+      showTypePicker={open && !onBallot}
       showRules={false}
       autosaveKey={null}
       previewAs={r}
       asideTop={
-        <WhatYouCanChange
-          status={r.status}
-          manage={team ? `/admin/initiatives/${r.slug}` : undefined}
-          hold={hold}
-        />
+        <>
+          {onBallot && <OnTheBallot goalRequest={goalRequest} />}
+          <WhatYouCanChange
+            status={r.status}
+            manage={team ? `/admin/initiatives/${r.slug}` : undefined}
+            hold={hold}
+          />
+        </>
       }
       asideBottom={<RevisionsCard hold={hold} />}
       footer={

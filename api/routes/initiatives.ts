@@ -7,7 +7,7 @@ import {
   ballotFor,
   goalRequestJson,
   requestGoal,
-  settleIfOnChain,
+  settleOnRead,
 } from "../services/goal-requests.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
@@ -208,7 +208,13 @@ export function initiativeRoutes(deps: Deps) {
         ballotFor(db, initiative),
       ]);
     // A goal the round has now: the page takes it (#149).
-    const settled = await settleIfOnChain(db, ballot.manifest, initiative, ballot.goalRequest);
+    const settled = await settleOnRead(
+      db,
+      () => deps.maintenance.on(),
+      ballot.manifest,
+      initiative,
+      ballot.goalRequest,
+    );
     initiative = settled.row;
     // While the Safe API is rate limiting us, the ledger is not due (ledgerStatus).
     if (ledger && pausedUntil > deps.now()) ledger.refreshDue = false;

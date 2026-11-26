@@ -12,12 +12,11 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { assertOffBallot, ballotSlot, productionManifest } from "../services/ballot-lock.ts";
 import {
-  assertGoalOpen,
   ballotFor,
   dropGoalRequest,
   goalRequestJson,
   requestGoal,
-  settleIfOnChain,
+  settleOnRead,
 } from "../services/goal-requests.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
 import { briefFor, rewriteBriefSoon, writeBrief } from "../services/vote-briefs.ts";
@@ -684,7 +683,12 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       ...q,
       goals: q.goals.map((g) => ({
         ...g,
-        blocked: goalBlock(g.slug, w?.initiatives ?? null, d.manifest.schedule, deps.now()),
+        blocked: goalBlock(
+          Number(g.call.id),
+          w?.initiatives ?? null,
+          d.manifest.schedule,
+          deps.now(),
+        ),
       })),
     });
   });
@@ -958,7 +962,13 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     const found = await initiativeOr404(c.req.param("id"));
     // A goal the round has now: the page takes it (#149).
     const round = await ballotFor(db, found);
-    const settled = await settleIfOnChain(db, round.manifest, found, round.goalRequest);
+    const settled = await settleOnRead(
+      db,
+      () => deps.maintenance.on(),
+      round.manifest,
+      found,
+      round.goalRequest,
+    );
     const initiative = settled.row;
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     // Pledge changes that landed on-chain since are applied before the list is read.
@@ -1098,15 +1108,14 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       const note = s((await jsonBody(c, ["note"])).note, 500);
       auditContext(c, { target: `${initiative.id}:${n}`, detail: verdict });
       // On the ballot (#149) accepting puts the text live and leaves the goal it carries
-      // waiting for a round admin to sign; refused once the vote has closed.
+      // waiting for a round admin to sign. Once the vote has closed the round's goal is
+      // final: the text still goes live, the goal is dropped.
       const round = await ballotFor(db, initiative);
       const keepGoal = verdict === "accept" && round.slot >= 0;
-      const goal = keepGoal && Number.isInteger(n) && n > 0
+      const closed = !!round.manifest && deps.now() >= round.manifest.closesAt;
+      const goal = keepGoal && !closed && Number.isInteger(n) && n > 0
         ? (await db.revisions.get(initiative.id, n))?.goalUsd
         : undefined;
-      if (goal !== undefined && goal !== initiative.goalUsd) {
-        assertGoalOpen(round.manifest, deps.now());
-      }
       const done = Number.isInteger(n) && n > 0
         ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note, {
           keepGoal,

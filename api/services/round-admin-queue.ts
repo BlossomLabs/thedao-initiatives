@@ -34,7 +34,7 @@ import type { Tier } from "../../shared/vote/ballot.ts";
 import type { Schedule } from "../../shared/vote/quiet-ending.ts";
 import { adminBatch } from "../../shared/vote/admin-batch.ts";
 import { ballotSlot } from "./ballot-lock.ts";
-import { goalRequests, roundGoalUsd, settleIfOnChain } from "./goal-requests.ts";
+import { goalRequests, roundGoalUsd, settleOnRead } from "./goal-requests.ts";
 import {
   adminPledges,
   onChainAmount,
@@ -123,18 +123,19 @@ export type GoalBlock =
 
 /** Why a goal change can't be signed now: the initiative settled (its award is final) or
  * was withdrawn, a tier is settling (the round takes no changes until `until`), or the
- * round's state couldn't be read (`initiatives` null): never signed blind. */
+ * round's state couldn't be read: never signed blind. `initiatives` is the replay's list
+ * in the round's slot order, read by `slot` (its slugs may be older than the site's). */
 export function goalBlock(
-  slug: string,
-  initiatives: { slug: string; withdrawn: boolean; settledIn: Tier | null }[] | null,
+  slot: number,
+  initiatives: { withdrawn: boolean; settledIn: Tier | null }[] | null,
   s: Schedule,
   now: number,
 ): GoalBlock | null {
   if (!addingOpen(s, now)) return { kind: "settling", until: nextAddingOpen(s, now) };
-  if (!initiatives) return { kind: "unknown" };
-  const x = initiatives.find((y) => y.slug === slug);
-  if (x?.settledIn) return { kind: "settled", tier: x.settledIn };
-  if (x?.withdrawn) return { kind: "withdrawn" };
+  const x = initiatives?.[slot];
+  if (!x) return { kind: "unknown" };
+  if (x.settledIn) return { kind: "settled", tier: x.settledIn };
+  if (x.withdrawn) return { kind: "withdrawn" };
   return null;
 }
 
@@ -368,7 +369,13 @@ export function roundAdminQueue(deps: Deps) {
       if (i < 0) continue;
       const roundUsd = roundGoalUsd(m, i);
       // The row as it is after settling: a request the round has gives the row its goal.
-      const settled = await settleIfOnChain(db, m, row, byId.get(row.id) ?? null);
+      const settled = await settleOnRead(
+        db,
+        () => deps.maintenance.on(),
+        m,
+        row,
+        byId.get(row.id) ?? null,
+      );
       const r = settled.request;
       const toUsd = r ? r.goalUsd : settled.row.goalUsd;
       if (toUsd === roundUsd) continue;
@@ -394,7 +401,8 @@ export function roundAdminQueue(deps: Deps) {
           groups: groups.toString(),
         },
         configRevision: m.configRevision ?? null,
-        blocked: null,
+        // Not signable until the round's state says so (the queue route checks it).
+        blocked: { kind: "unknown" },
         batch: adminBatch(m, `Set ${row.slug}'s goal`, [
           ...(m.configRevision === undefined
             ? []

@@ -114,6 +114,26 @@ export async function settleIfOnChain(
   return { row: next, request: null };
 }
 
+/** `settleIfOnChain` from a page read: best-effort, never during maintenance, and a
+ * failure (a write conflict, a dataset swap) leaves the row and the request as they were
+ * instead of failing the read. */
+export async function settleOnRead(
+  db: Db,
+  maintenanceOn: () => Promise<boolean>,
+  m: VoteManifest | undefined,
+  row: Initiative,
+  r: GoalRequest | null,
+): Promise<{ row: Initiative; request: GoalRequest | null }> {
+  if (!r) return { row, request: r };
+  try {
+    if (await maintenanceOn()) return { row, request: r };
+    return await settleIfOnChain(db, m, row, r);
+  } catch (e) {
+    console.error("goal request settle failed", row.id, e);
+    return { row, request: r };
+  }
+}
+
 export async function dropGoalRequest(db: Db, rfpId: string): Promise<void> {
   await db.kv.delete(key(rfpId));
 }

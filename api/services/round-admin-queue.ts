@@ -19,11 +19,22 @@ import type { Deps } from "../middleware/context.ts";
 import type { Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import { HttpError } from "../lib/errors.ts";
 import { ballotClosed, voteState } from "../../shared/vote.ts";
-import { type AddBlocker, addBlocker } from "../../shared/vote/add-plan.ts";
+import {
+  type AddBlocker,
+  addBlocker,
+  addingOpen,
+  nextAddingOpen,
+} from "../../shared/vote/add-plan.ts";
 import { pledgeChainId } from "../../shared/vote/typed-data.ts";
 import { roundKey } from "../../shared/vote/keys.ts";
 import { voteSettings } from "../routes/board.ts";
 import type { VoteRound } from "./vote-chain.ts";
+import type { VoteManifest } from "../../shared/vote/manifest.ts";
+import type { Tier } from "../../shared/vote/ballot.ts";
+import type { Schedule } from "../../shared/vote/quiet-ending.ts";
+import { adminBatch } from "../../shared/vote/admin-batch.ts";
+import { ballotSlot } from "./ballot-lock.ts";
+import { goalRequests, roundGoalUsd, settleIfOnChain } from "./goal-requests.ts";
 import {
   adminPledges,
   onChainAmount,
@@ -82,10 +93,56 @@ export type ToSignJson = {
   /** A change already relayed and not settled yet. */
   inFlight: { hash: Hex | null } | null;
 };
+/** A ballot initiative's goal for a round admin to put on the round (#149): its goal
+ * request, or (`record`) a site goal the round doesn't have. */
+export type GoalToSignJson = {
+  kind: "request" | "record";
+  rfpId: string;
+  slug: string;
+  title: string;
+  /** The goal the round has now, and the one to set (dollars). */
+  fromUsd: number;
+  toUsd: number;
+  /** Who asked and when; null for a record item. */
+  by: string | null;
+  at: number | null;
+  /** `setInitiative`'s arguments, numbers as decimal strings. */
+  call: { id: string; account: string; goalUsd: string; rfp: boolean; groups: string };
+  /** The same call for an admin Safe (Transaction Builder JSON). */
+  batch: ReturnType<typeof adminBatch>;
+  /** The round's configuration revision the call was built at: a wallet send checks it. */
+  configRevision: string | null;
+  /** Why it can't be signed now; null when it can. */
+  blocked: GoalBlock | null;
+};
+export type GoalBlock =
+  | { kind: "settled"; tier: Tier }
+  | { kind: "withdrawn" }
+  | { kind: "settling"; until: number | null }
+  | { kind: "unknown" };
+
+/** Why a goal change can't be signed now: the initiative settled (its award is final) or
+ * was withdrawn, a tier is settling (the round takes no changes until `until`), or the
+ * round's state couldn't be read (`initiatives` null): never signed blind. */
+export function goalBlock(
+  slug: string,
+  initiatives: { slug: string; withdrawn: boolean; settledIn: Tier | null }[] | null,
+  s: Schedule,
+  now: number,
+): GoalBlock | null {
+  if (!addingOpen(s, now)) return { kind: "settling", until: nextAddingOpen(s, now) };
+  if (!initiatives) return { kind: "unknown" };
+  const x = initiatives.find((y) => y.slug === slug);
+  if (x?.settledIn) return { kind: "settled", tier: x.settledIn };
+  if (x?.withdrawn) return { kind: "withdrawn" };
+  return null;
+}
+
 export type RoundAdminQueueJson = {
   kind: "real" | "test";
   ready: ReadyJson[];
   toSign: ToSignJson[];
+  goals: GoalToSignJson[];
 };
 
 /** "Record it as it stands": the row's amount put on-chain, the row left as it is. */
@@ -289,9 +346,64 @@ export function roundAdminQueue(deps: Deps) {
   /** The whole list; empty once the round has closed. */
   async function queue(d: VoteRound): Promise<RoundAdminQueueJson> {
     const kind = d.manifest.kind;
-    if (deps.now() >= d.manifest.closesAt) return { kind, ready: [], toSign: [] };
-    const [r, t] = await Promise.all([ready(d), toSign(d)]);
-    return { kind, ready: r, toSign: t };
+    if (deps.now() >= d.manifest.closesAt) return { kind, ready: [], toSign: [], goals: [] };
+    const [r, t, g] = await Promise.all([ready(d), toSign(d), goalsToSign(d.manifest)]);
+    return { kind, ready: r, toSign: t, goals: g };
+  }
+
+  /** The real round's goal changes to sign (#149), matched by Safe: each initiative with a
+   * request (one the round has already is settled here and left out), and each without
+   * one whose site goal the round doesn't have. The call keeps the round's account, RFP
+   * flag and groups. */
+  async function goalsToSign(m: VoteManifest): Promise<GoalToSignJson[]> {
+    if (m.kind !== "real") return [];
+    const [rows, requests] = await Promise.all([
+      db.initiatives.list(["approved", "archived", "pending", "rejected"]),
+      goalRequests(db, m),
+    ]);
+    const byId = new Map(requests.map((r) => [r.rfpId, r]));
+    const out: GoalToSignJson[] = [];
+    for (const row of rows) {
+      const i = ballotSlot(m, row);
+      if (i < 0) continue;
+      const roundUsd = roundGoalUsd(m, i);
+      // The row as it is after settling: a request the round has gives the row its goal.
+      const settled = await settleIfOnChain(db, m, row, byId.get(row.id) ?? null);
+      const r = settled.request;
+      const toUsd = r ? r.goalUsd : settled.row.goalUsd;
+      if (toUsd === roundUsd) continue;
+      const p = m.projects[i];
+      const goal = BigInt(Math.round(toUsd * 100)) * 10_000n;
+      const groups = p.groups.reduce((a, g) => a | (1n << BigInt(g)), 0n);
+      const account = m.accounts![i];
+      const args = [BigInt(i), account, goal, p.rfp, groups] as const;
+      out.push({
+        kind: r ? "request" : "record",
+        rfpId: row.id,
+        slug: row.slug,
+        title: row.title,
+        fromUsd: roundUsd,
+        toUsd,
+        by: r?.by ?? null,
+        at: r?.at ?? null,
+        call: {
+          id: String(i),
+          account,
+          goalUsd: goal.toString(),
+          rfp: p.rfp,
+          groups: groups.toString(),
+        },
+        configRevision: m.configRevision ?? null,
+        blocked: null,
+        batch: adminBatch(m, `Set ${row.slug}'s goal`, [
+          ...(m.configRevision === undefined
+            ? []
+            : [{ fn: "requireConfigRevision", args: [BigInt(m.configRevision)] }]),
+          { fn: "setInitiative", args },
+        ]),
+      });
+    }
+    return out;
   }
 
   /**

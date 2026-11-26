@@ -94,7 +94,7 @@ import {
 
 import { awaitingPledgesJson, pledgeRequests } from "../services/pledge-requests.ts";
 import { PLEDGE_ROLE_ID } from "../../shared/vote/roles.ts";
-import { roundAdminQueue } from "../services/round-admin-queue.ts";
+import { goalBlock, roundAdminQueue } from "../services/round-admin-queue.ts";
 
 export { pledgeOnChain } from "../services/admin-pledges.ts";
 
@@ -673,7 +673,21 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
    * `/pledges/:pid/settle` on the real round, `/vote-round/test-pledges/:slug/pledges/:pid/
    * settle` on a test round (where nothing touches the site's rows).
    */
-  r.get("/vote-round/queue", async (c) => c.json(await queue.queue(await roundNow())));
+  r.get("/vote-round/queue", async (c) => {
+    const d = await roundNow();
+    const q = await queue.queue(d);
+    if (!q.goals.length) return c.json(q);
+    // A goal change of a settled or withdrawn initiative, or while a tier settles, waits
+    // (#149). If the round's state can't be read, every Sign waits: never signed blind.
+    const w = await withdrawals(d).catch(() => null);
+    return c.json({
+      ...q,
+      goals: q.goals.map((g) => ({
+        ...g,
+        blocked: goalBlock(g.slug, w?.initiatives ?? null, d.manifest.schedule, deps.now()),
+      })),
+    });
+  });
   /** Put on the ballot, one round admin at a time (services/round-admin-queue.ts): the
    * browser claims the initiative before its run and releases it after, whatever the
    * outcome. A claim lapses after five minutes. */

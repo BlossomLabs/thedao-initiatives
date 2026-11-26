@@ -29,7 +29,7 @@ type Ready = {
   pledges: { pid: string; company: string; amountUsd: number }[];
   blocker: unknown;
 } & Record<string, unknown>;
-type Queue = { kind: string; ready: Ready[]; toSign: ToSign[] };
+type Queue = { kind: string; ready: Ready[]; toSign: ToSign[]; goals?: unknown[] };
 
 async function setup(kind: "real" | "test" = "real") {
   const h = await harness();
@@ -364,7 +364,7 @@ Deno.test("queue: after the round closes nothing is listed and nothing is signed
   const s = await setup();
   const row = await s.pledge(s.ballot.id, "Zed", 300);
   s.h.clock.now = s.m.closesAt;
-  assertEquals(await s.queue(), { kind: "real", ready: [], toSign: [] });
+  assertEquals(await s.queue(), { kind: "real", ready: [], toSign: [], goals: [] });
   const prep = await s.h.req(`${s.base}/${s.ballot.id}/${row.id}/prepare`, {
     method: "POST",
     token: s.token,

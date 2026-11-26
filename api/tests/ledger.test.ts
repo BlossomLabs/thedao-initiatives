@@ -411,12 +411,14 @@ Deno.test("ledger: a 429 pauses every Safe and quiets their refresh flags, doubl
 Deno.test("ledger: 429s from parallel lanes count as one pause", async () => {
   // Three syncs already past the pause check; their 429s land one after another.
   const gates = [deferred<void>(), deferred<void>(), deferred<void>()];
-  let calls = 0;
+  // The lanes reach fetch in no fixed order: note which Safe holds each gate.
+  const holders: string[] = [];
   const allIn = deferred<void>();
   const h = await harness({
-    fetch: async () => {
-      const gate = gates[calls++];
-      if (calls === 3) allIn.resolve();
+    fetch: async (url) => {
+      const gate = gates[holders.length];
+      holders.push(url.match(/\/safes\/(0x[0-9a-fA-F]{40})\//)![1].toLowerCase());
+      if (holders.length === 3) allIn.resolve();
       await gate.promise;
       return new Response("{}", { status: 429 });
     },
@@ -436,7 +438,7 @@ Deno.test("ledger: 429s from parallel lanes count as one pause", async () => {
     await allIn.promise;
     for (let i = 0; i < 3; i++) {
       gates[i].resolve();
-      await runs[i];
+      await runs[rows.findIndex((r) => r.safeAddress.toLowerCase() === holders[i])];
     }
     assertEquals(await safeApiPausedUntil(h.deps), h.clock.now + LEDGER_RETRY_SECS);
   } finally {

@@ -2,8 +2,8 @@
  * Goal changes to sign (#149): a ballot initiative's new goal waits here until a round
  * admin sets it on the round, and so does a site goal the round doesn't have (a record
  * item). The round has no signed form of `setInitiative`, so a wallet holding the admin
- * role sends it; otherwise the admin Safe runs the downloaded batch. The page takes a
- * requested goal once the round has it.
+ * role sends it; a site admin without the role sees the list without Sign. The page takes
+ * a requested goal once the round has it.
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,7 +29,7 @@ import { settledGoalText, WITHDRAWN_GOAL } from "../../../../shared/vote/ballot-
 const POLL_MS = 3_000;
 const POLL_FOR_MS = 2 * 60_000;
 
-/** Why Sign (or the Safe batch) is off for a goal change, or null. */
+/** Why Sign is off for a goal change, or null. */
 export function blockedReason(g: GoalToSignJson): string | null {
   const b = g.blocked;
   if (!b) return null;
@@ -115,17 +115,6 @@ export default function GoalsToSign({ items }: { items: GoalToSignJson[] }) {
     }
   };
 
-  const download = (g: GoalToSignJson) => {
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(g.batch, null, 2)], { type: "application/json" }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `goal-${g.slug}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
   const discard = async (g: GoalToSignJson) => {
     try {
       await api(`/api/admin/initiatives/${g.rfpId}/goal-request`, { method: "DELETE" });
@@ -181,38 +170,24 @@ export default function GoalsToSign({ items }: { items: GoalToSignJson[] }) {
                 Discard
               </Button>
             )}
-            {/* A disabled button shows no tooltip in every browser: the wrapper carries it. */}
-            <span title={reason ?? undefined}>
-              {canSign
-                ? (
-                  <Button
-                    sm
-                    disabled={busy || done || reason !== null}
-                    loading={phase.kind === "sending" && phase.rfpId === g.rfpId}
-                    aria-label={`Sign ${g.title}'s goal change`}
-                    onClick={() => void sign(g)}
-                  >
-                    {done ? "Signed" : "Sign"}
-                  </Button>
-                )
-                : (
-                  <Button
-                    sm
-                    disabled={reason !== null}
-                    aria-label={`Download ${g.title}'s goal change for the Safe`}
-                    onClick={() => download(g)}
-                  >
-                    Download for the Safe
-                  </Button>
-                )}
-            </span>
+            {canSign && (
+              // A disabled button shows no tooltip in every browser: the wrapper carries it.
+              <span title={reason ?? undefined}>
+                <Button
+                  sm
+                  disabled={busy || done || reason !== null}
+                  loading={phase.kind === "sending" && phase.rfpId === g.rfpId}
+                  aria-label={`Sign ${g.title}'s goal change`}
+                  onClick={() => void sign(g)}
+                >
+                  {done ? "Signed" : "Sign"}
+                </Button>
+              </span>
+            )}
           </TodoRow>
         );
       })}
       <div className="px-4 pb-3 empty:hidden">
-        {!canSign && items.length > 0 && (
-          <p className="small dim m-0 pt-2">The page follows once the Safe runs it.</p>
-        )}
         {phase.kind === "failed" && <Status kind="err" className="mt-2">{phase.reason}</Status>}
       </div>
     </div>

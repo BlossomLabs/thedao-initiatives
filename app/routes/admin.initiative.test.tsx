@@ -584,7 +584,9 @@ it("a goal awaiting signature shows by the funding, and any admin can discard it
     goalRequest: { goalUsd: 78_000, by: ADMIN, at: 1_795_521_533 },
   };
   renderPage();
-  expect(await screen.findByText(/Awaiting signature: \$78,000/)).toBeInTheDocument();
+  const card = await screen.findByRole("group", { name: "New goal awaiting signature" });
+  expect(card).toHaveTextContent("$78,000");
+  expect(card).toHaveTextContent(/Asked by/);
   fireEvent.click(screen.getByRole("button", { name: "Discard the goal change" }));
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1/goal-request", {

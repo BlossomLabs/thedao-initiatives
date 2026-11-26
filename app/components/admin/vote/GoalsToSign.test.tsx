@@ -45,7 +45,6 @@ const goal: GoalToSignJson = {
   by: ADMIN,
   at: 1_795_521_533,
   call: { id: "23", account: SAFE, goalUsd: "78000000000", rfp: false, groups: "2097152" },
-  batch: { version: "1.0", transactions: [] },
   configRevision: "130",
 };
 
@@ -82,17 +81,12 @@ it("shows the change, who asked for it, and signs setInitiative from an admin wa
   );
 });
 
-it("without the admin role it offers the Safe batch instead of Sign", () => {
+it("without the admin role the list shows no Sign and nothing to download", () => {
   role.admin = false;
-  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-  globalThis.URL.createObjectURL ??= () => "blob:x";
   mount();
   expect(screen.queryByRole("button", { name: "Sign ValOS's goal change" })).toBeNull();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Download ValOS's goal change for the Safe" }),
-  );
-  expect(click).toHaveBeenCalledOnce();
-  expect(screen.getByText("The page follows once the Safe runs it.")).toBeTruthy();
+  expect(screen.queryByText(/Download/)).toBeNull();
+  expect(screen.queryByText(/Safe/)).toBeNull();
 });
 
 it("Discard drops the request", async () => {

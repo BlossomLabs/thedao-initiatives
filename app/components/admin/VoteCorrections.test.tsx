@@ -77,7 +77,6 @@ it("reviews exact correction values before downloading and clears a review when 
       action: "initiative",
       revision: "7",
       id: "0",
-      account: ACCOUNT,
       goalUsd: "12.345678",
       rfp: false,
       groups: [],

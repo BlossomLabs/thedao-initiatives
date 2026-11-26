@@ -55,6 +55,22 @@ const decoded = (body: Record<string, unknown>, v = correctionView) =>
   );
 
 describe("correction batches", () => {
+  it("an initiative correction keeps the account the round has", () => {
+    const { account: _, ...withoutAccount } = edit;
+    expect(decoded(withoutAccount)[1].args?.[1]).toBe(ACCOUNT);
+    expect(decoded({ ...edit, account: ACCOUNT.toUpperCase().replace("0X", "0x") })[1].args?.[1])
+      .toBe(ACCOUNT);
+  });
+
+  it("an initiative correction refuses another account", () => {
+    expect(() =>
+      prepareCorrection(
+        { ...edit, account: "0x3000000000000000000000000000000000000003" },
+        correctionView,
+      )
+    ).toThrow("The account can't change here: it is the initiative's Safe.");
+  });
+
   it("guards the reviewed configuration and encodes exact dollars, the same ID and affiliation bits", () => {
     const calls = decoded(edit);
     expect(calls[0]).toMatchObject({ functionName: "requireConfigRevision", args: [7n] });

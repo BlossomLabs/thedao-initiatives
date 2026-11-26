@@ -392,9 +392,10 @@ function InitiativeFields({ view: v, id, disabled, submit, button }: {
         groups: rfp ? [] : f.getAll("group").map(Number),
       }))}
     >
-      <Field label="Account used to count donations">
-        <input className={FIELD} name="account" defaultValue={m.accounts?.[id]} required />
-      </Field>
+      <p className="text-[12px] text-muted">
+        Safe (counts donations, never changed here):{" "}
+        <span className="font-mono text-white">{m.accounts?.[id]}</span>
+      </p>
       <Field label="Dollar goal">
         <input
           className={FIELD}

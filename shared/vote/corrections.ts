@@ -72,12 +72,12 @@ export function prepareCorrection(body: Record<string, unknown>, v: CorrectionVi
       }
       const i = id(m.slugs.length);
       if (v.settled.includes(i)) reject("This initiative has already settled.");
-      const account = address("account");
-      if (/^0x0{40}$/i.test(account) || account.toLowerCase() === m.contract.toLowerCase()) {
-        reject("Invalid initiative account.");
-      }
-      if (m.accounts?.some((a, j) => j !== i && a.toLowerCase() === account.toLowerCase())) {
-        reject("Another initiative uses that account.");
+      // The account is the initiative's Safe, set once from its id: never changed here.
+      const current = m.accounts?.[i];
+      if (!current) return reject("This round doesn't list the initiative's account.");
+      const account = getAddress(current);
+      if (body.account !== undefined && address("account") !== account) {
+        reject("The account can't change here: it is the initiative's Safe.");
       }
       const goal = dollars("goalUsd");
       const rfp = bool("rfp");
@@ -90,9 +90,9 @@ export function prepareCorrection(body: Record<string, unknown>, v: CorrectionVi
       if (rfp && ids.length) reject("An RFP cannot have affiliations.");
       fn = "setInitiative";
       args = [BigInt(i), account, goal, rfp, ids.reduce((a, g) => a | (1n << BigInt(g)), 0n)];
-      summary = `${m.slugs[i]}: account ${m.accounts?.[i]} → ${account}; goal $${
-        text("goalUsd")
-      }; ${rfp ? "RFP" : "initiative"}; affiliations: ${
+      summary = `${m.slugs[i]}: goal $${text("goalUsd")}; ${
+        rfp ? "RFP" : "initiative"
+      }; affiliations: ${
         ids.map((g) => m.groups[g]).join(", ") || "none"
       }. Earlier ballots and settled awards are unchanged.`;
       break;

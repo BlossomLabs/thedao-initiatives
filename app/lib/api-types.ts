@@ -569,10 +569,38 @@ export interface ToSignJson {
   inFlight: { hash: `0x${string}` | null } | null;
 }
 /** GET /api/admin/vote-round/queue (and /vote-test-round/queue). */
+/** A ballot initiative's goal for a round admin to put on the round (#149): its goal
+ * request, or (`record`) a site goal the round doesn't have. */
+export interface GoalToSignJson {
+  kind: "request" | "record";
+  rfpId: string;
+  slug: string;
+  title: string;
+  /** The goal the round has now, and the one to set (dollars). */
+  fromUsd: number;
+  toUsd: number;
+  by: string | null;
+  at: number | null;
+  /** `setInitiative`'s arguments, numbers as decimal strings. */
+  call: { id: string; account: `0x${string}`; goalUsd: string; rfp: boolean; groups: string };
+  /** The same call as Safe Transaction Builder JSON. */
+  batch: unknown;
+  /** The round's configuration revision the call was built at (null: a round without it). */
+  configRevision: string | null;
+  /** Why it can't be signed now; null when it can. */
+  blocked?:
+    | { kind: "settled"; tier: "S" | "A" | "B" }
+    | { kind: "withdrawn" }
+    | { kind: "settling"; until: number | null }
+    | { kind: "unknown" }
+    | null;
+}
+
 export interface RoundAdminQueueJson {
   kind: "real" | "test";
   ready: ReadyJson[];
   toSign: ToSignJson[];
+  goals?: GoalToSignJson[];
 }
 
 export interface AdminInitiativePage {

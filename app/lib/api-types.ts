@@ -265,6 +265,13 @@ export interface Donation {
   confirmedAt: number | null;
 }
 
+/** A goal change on a ballot initiative waiting for a round admin to sign it (#149). */
+export interface GoalRequestJson {
+  goalUsd: number;
+  by: string;
+  at: number;
+}
+
 export interface InitiativePage {
   /** The server's token verification needs a background refresh. */
   refreshDue?: boolean;
@@ -272,6 +279,9 @@ export interface InitiativePage {
   /** Public history, oldest first (archived entries only for admins). */
   revisions: RevisionMeta[];
   summary: Summary;
+  /** On the production ballot: goal, type and affiliations change only on the round (#149). */
+  onBallot?: boolean;
+  goalRequest?: GoalRequestJson;
   pct: number;
   pledges: Pledge[];
   donations: Donation[];
@@ -546,10 +556,34 @@ export interface ToSignJson {
   inFlight: { hash: `0x${string}` | null } | null;
 }
 /** GET /api/admin/vote-round/queue (and /vote-test-round/queue). */
+/** A ballot initiative's goal change waiting for a round admin (#149). */
+export interface GoalToSignJson {
+  rfpId: string;
+  slug: string;
+  title: string;
+  fromUsd: number;
+  toUsd: number;
+  by: string;
+  at: number;
+  /** `setInitiative`'s arguments, numbers as decimal strings. */
+  call: { id: string; account: `0x${string}`; goalUsd: string; rfp: boolean; groups: string };
+  /** The same call as Safe Transaction Builder JSON. */
+  batch: unknown;
+  /** The round's configuration revision the call was built at (null: a round without it). */
+  configRevision: string | null;
+  /** Why it can't be signed now; null when it can. */
+  blocked?:
+    | { kind: "settled"; tier: "S" | "A" | "B" }
+    | { kind: "withdrawn" }
+    | { kind: "settling"; until: number | null }
+    | null;
+}
+
 export interface RoundAdminQueueJson {
   kind: "real" | "test";
   ready: ReadyJson[];
   toSign: ToSignJson[];
+  goals?: GoalToSignJson[];
 }
 
 export interface AdminInitiativePage {
@@ -564,6 +598,9 @@ export interface AdminInitiativePage {
   /** The real vote has closed: awaiting pledges can't be signed any more, only saved as
    * they are or discarded. */
   awaitingClosed?: boolean;
+  /** On the production ballot (#149). */
+  onBallot?: boolean;
+  goalRequest?: GoalRequestJson;
   donations: Donation[];
   safeSync: SafeSyncState | null;
   signers: { ok: boolean; detail: string; list: string[]; threshold: number };

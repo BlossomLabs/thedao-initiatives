@@ -1,4 +1,11 @@
 import { Hono } from "hono";
+import { assertOffBallot } from "../services/ballot-lock.ts";
+import {
+  assertGoalOpen,
+  ballotFor,
+  goalRequestJson,
+  requestGoal,
+} from "../services/goal-requests.ts";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
@@ -189,14 +196,16 @@ export function initiativeRoutes(deps: Deps) {
     const paused = asked && await deps.maintenance.on();
     const refresh = asked && !paused;
     if (refresh) await refreshLedger(deps, initiative);
-    const [pledges, donations, chainState, revisions, ledger, pausedUntil] = await Promise.all([
-      db.pledges.list(initiative.id),
-      db.donations.list(initiative.id),
-      sharedChainState(deps, refresh),
-      db.revisions.list(initiative.id, Boolean(user?.isAdmin)),
-      ledgerStatus(deps, initiative),
-      safeApiPausedUntil(deps),
-    ]);
+    const [pledges, donations, chainState, revisions, ledger, pausedUntil, ballot] = await Promise
+      .all([
+        db.pledges.list(initiative.id),
+        db.donations.list(initiative.id),
+        sharedChainState(deps, refresh),
+        db.revisions.list(initiative.id, Boolean(user?.isAdmin)),
+        ledgerStatus(deps, initiative),
+        safeApiPausedUntil(deps),
+        ballotFor(db, initiative.id),
+      ]);
     // While the Safe API is rate limiting us, the ledger is not due (ledgerStatus).
     if (ledger && pausedUntil > deps.now()) ledger.refreshDue = false;
     const summary = await deps.funding.summaryFrom(initiative, pledges, donations, refresh);
@@ -211,6 +220,8 @@ export function initiativeRoutes(deps: Deps) {
         : publicInitiative(initiative),
       revisions: revisions.map(revisionMeta),
       summary,
+      onBallot: ballot.ballot.has(initiative.slug),
+      goalRequest: goalRequestJson(ballot.goalRequest),
       pct: pctOf(summary.total, initiative.goalUsd),
       pledges: pledges.map((p) => pledgeJson(config, p)),
       donations: donations.map((d) => donationJson(d, decimalsOf)),
@@ -351,6 +362,16 @@ export function initiativeRoutes(deps: Deps) {
       if (err) throw new HttpError(400, err);
       goalUsd = goal!;
     }
+    // On the ballot a new goal waits for a round admin (#149): a held edit carries it to
+    // its review; an edit that goes live now leaves the goal as it is and asks for it.
+    const round = await ballotFor(db, initiative.id);
+    const askGoal = body.goal !== undefined && goalUsd !== initiative.goalUsd &&
+      round.ballot.has(initiative.slug) && !holdWhen(initiative);
+    if (
+      body.goal !== undefined && goalUsd !== initiative.goalUsd && round.ballot.has(initiative.slug)
+    ) {
+      assertGoalOpen(round.manifest, deps.now());
+    }
     const backers = pledgeBackers(await db.pledges.list(initiative.id));
     const findings = mergeFindings(
       caps,
@@ -365,12 +386,13 @@ export function initiativeRoutes(deps: Deps) {
         ...base,
         ...structured,
         categories: categories ?? undefined,
-        goalUsd: body.goal === undefined ? undefined : goalUsd,
+        goalUsd: body.goal === undefined || askGoal ? undefined : goalUsd,
       },
       origin,
       holdWhen,
     );
     if (!revision) throw new HttpError(400, "Nothing changed.");
+    if (askGoal) await requestGoal(db, round.manifest!, next, goalUsd, user.address);
     return saved(next, revision, warnings);
   });
 
@@ -396,13 +418,31 @@ export function initiativeRoutes(deps: Deps) {
       }
     };
     assertUnlocked(initiative);
-    const patch = await readPageFacts(body, initiative, deps);
+    const { goalUsd, ...facts } = await readPageFacts(body, initiative, deps);
+    const patch: Partial<Initiative> = facts;
+    // On the ballot the round leads (#149): the type is set there; a new goal waits for
+    // a round admin to sign it (asking for the current one drops a waiting request).
+    const round = await ballotFor(db, initiative.id);
+    const onBallot = round.ballot.has(initiative.slug);
+    assertOffBallot(
+      round.ballot,
+      initiative.slug,
+      patch.type !== undefined && patch.type !== initiative.type,
+    );
+    if (goalUsd !== undefined && !onBallot) patch.goalUsd = goalUsd;
+    if (goalUsd !== undefined && onBallot && goalUsd !== initiative.goalUsd) {
+      assertGoalOpen(round.manifest, deps.now());
+    }
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch, assertUnlocked)
       : initiative;
+    const goalRequest = goalUsd !== undefined && onBallot
+      ? await requestGoal(db, round.manifest!, next, goalUsd, user.address)
+      : null;
     return c.json({
       initiative: adminInitiative(next, canReadPrivateFields(next, user, deps.now())),
-    });
+      goalRequest: goalRequestJson(goalRequest),
+    }, goalRequest ? 202 : 200);
   });
 
   /**

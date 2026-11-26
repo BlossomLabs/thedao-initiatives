@@ -19,11 +19,21 @@ import type { Deps } from "../middleware/context.ts";
 import type { Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import { HttpError } from "../lib/errors.ts";
 import { ballotClosed, voteState } from "../../shared/vote.ts";
-import { type AddBlocker, addBlocker } from "../../shared/vote/add-plan.ts";
+import {
+  type AddBlocker,
+  addBlocker,
+  addingOpen,
+  nextAddingOpen,
+} from "../../shared/vote/add-plan.ts";
 import { pledgeChainId } from "../../shared/vote/typed-data.ts";
 import { roundKey } from "../../shared/vote/keys.ts";
 import { voteSettings } from "../routes/board.ts";
 import type { VoteRound } from "./vote-chain.ts";
+import type { VoteManifest } from "../../shared/vote/manifest.ts";
+import { adminBatch } from "../../shared/vote/admin-batch.ts";
+import { dropGoalRequest, goalRequests } from "./goal-requests.ts";
+import type { Tier } from "../../shared/vote/ballot.ts";
+import type { Schedule } from "../../shared/vote/quiet-ending.ts";
 import {
   adminPledges,
   onChainAmount,
@@ -82,10 +92,49 @@ export type ToSignJson = {
   /** A change already relayed and not settled yet. */
   inFlight: { hash: Hex | null } | null;
 };
+/** A ballot initiative's goal change waiting for a round admin (#149). */
+export type GoalToSignJson = {
+  rfpId: string;
+  slug: string;
+  title: string;
+  /** The goal the round has now, and the one asked for (dollars). */
+  fromUsd: number;
+  toUsd: number;
+  by: string;
+  at: number;
+  /** `setInitiative`'s arguments, numbers as decimal strings. */
+  call: { id: string; account: string; goalUsd: string; rfp: boolean; groups: string };
+  /** The same call for an admin Safe (Transaction Builder JSON). */
+  batch: ReturnType<typeof adminBatch>;
+  /** The round's configuration revision the call was built at: a wallet send checks it. */
+  configRevision: string | null;
+  /** Why it can't be signed now; null when it can. */
+  blocked: GoalBlock | null;
+};
+export type GoalBlock =
+  | { kind: "settled"; tier: Tier }
+  | { kind: "withdrawn" }
+  | { kind: "settling"; until: number | null };
+
+/** Why a goal change can't be signed now: the initiative settled (its award is final) or
+ * was withdrawn, or a tier is settling (the round takes no changes until `until`). */
+export function goalBlock(
+  slug: string,
+  initiatives: { slug: string; withdrawn: boolean; settledIn: Tier | null }[],
+  s: Schedule,
+  now: number,
+): GoalBlock | null {
+  const x = initiatives.find((y) => y.slug === slug);
+  if (x?.settledIn) return { kind: "settled", tier: x.settledIn };
+  if (x?.withdrawn) return { kind: "withdrawn" };
+  if (!addingOpen(s, now)) return { kind: "settling", until: nextAddingOpen(s, now) };
+  return null;
+}
 export type RoundAdminQueueJson = {
   kind: "real" | "test";
   ready: ReadyJson[];
   toSign: ToSignJson[];
+  goals: GoalToSignJson[];
 };
 
 /** "Record it as it stands": the row's amount put on-chain, the row left as it is. */
@@ -289,9 +338,56 @@ export function roundAdminQueue(deps: Deps) {
   /** The whole list; empty once the round has closed. */
   async function queue(d: VoteRound): Promise<RoundAdminQueueJson> {
     const kind = d.manifest.kind;
-    if (deps.now() >= d.manifest.closesAt) return { kind, ready: [], toSign: [] };
-    const [r, t] = await Promise.all([ready(d), toSign(d)]);
-    return { kind, ready: r, toSign: t };
+    if (deps.now() >= d.manifest.closesAt) return { kind, ready: [], toSign: [], goals: [] };
+    const [r, t, g] = await Promise.all([ready(d), toSign(d), goalsToSign(d.manifest)]);
+    return { kind, ready: r, toSign: t, goals: g };
+  }
+
+  /** Goal requests of the real round (#149), each with the `setInitiative` call that
+   * sets it: the round's account, RFP flag and groups kept as they are. */
+  async function goalsToSign(m: VoteManifest): Promise<GoalToSignJson[]> {
+    if (m.kind !== "real") return [];
+    const out: GoalToSignJson[] = [];
+    for (const r of await goalRequests(db, m)) {
+      const row = await db.initiatives.get(r.rfpId);
+      const i = row ? m.slugs.indexOf(row.slug) : -1;
+      const account = m.accounts?.[i];
+      if (!row || i < 0 || !account) continue;
+      const p = m.projects[i];
+      const goal = BigInt(Math.round(r.goalUsd * 100)) * 10_000n;
+      // The round has it already (signed, or set another way): settled, not listed.
+      if (BigInt(p.goalUsd) === goal) {
+        await dropGoalRequest(db, r.rfpId);
+        continue;
+      }
+      const groups = p.groups.reduce((a, g) => a | (1n << BigInt(g)), 0n);
+      const args = [BigInt(i), account, goal, p.rfp, groups] as const;
+      out.push({
+        rfpId: r.rfpId,
+        slug: row.slug,
+        title: row.title,
+        fromUsd: Number(BigInt(p.goalUsd) / 10_000n) / 100,
+        toUsd: r.goalUsd,
+        by: r.by,
+        at: r.at,
+        call: {
+          id: String(i),
+          account,
+          goalUsd: goal.toString(),
+          rfp: p.rfp,
+          groups: groups.toString(),
+        },
+        configRevision: m.configRevision ?? null,
+        blocked: null,
+        batch: adminBatch(m, `Set ${row.slug}'s goal`, [
+          ...(m.configRevision === undefined
+            ? []
+            : [{ fn: "requireConfigRevision", args: [BigInt(m.configRevision)] }]),
+          { fn: "setInitiative", args },
+        ]),
+      });
+    }
+    return out;
   }
 
   /**

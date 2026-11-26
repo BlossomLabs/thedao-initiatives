@@ -564,6 +564,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     verdict: "accept" | "reject",
     by: string,
     note = "",
+    /** On the ballot (#149): the text goes live, the goal waits for a round admin. */
+    opts: { keepGoal?: boolean } = {},
   ): Promise<{ initiative: Initiative; revision: Revision } | null> {
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Initiative>(K.initiative(id));
@@ -595,7 +597,9 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           ...initiative,
           ...pickText(held.value),
           categories: held.value.categories ?? initiative.categories ?? [],
-          ...(held.value.goalUsd !== undefined ? { goalUsd: held.value.goalUsd } : {}),
+          ...(held.value.goalUsd !== undefined && !opts.keepGoal
+            ? { goalUsd: held.value.goalUsd }
+            : {}),
           revision: m,
           pendingRevision: null,
           lastRevision: Math.max(m, initiative.lastRevision ?? 0),
@@ -641,14 +645,16 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       /** Only when the file has a `affiliations:` line; otherwise the admin's affiliations stay. */
       affiliations?: string[];
     },
+    /** On the ballot (#149): goal, type and affiliations stay as the round has them. */
+    opts: { keepChainFacts?: boolean } = {},
   ): Promise<{ action: "created" | "updated"; id: string }> {
     const origin: RevisionOrigin = { author: "", source: "content" };
     const existing = await bySourceSlug(slug);
     if (existing) {
+      const keep = opts.keepChainFacts === true;
       const patch: Partial<Initiative> = {
-        goalUsd: f.goalUsd,
+        ...(keep ? {} : { goalUsd: f.goalUsd, type: f.type }),
         discourseUrl: f.discourseUrl,
-        type: f.type,
         durationMonths: f.durationMonths,
         recipientTeam: f.recipientTeam,
         recipientUrl: f.recipientUrl,
@@ -656,9 +662,9 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
         milestoneReviewer: f.milestoneReviewer,
       };
       if (f.sortRank !== null) patch.sortRank = f.sortRank;
-      if (f.affiliations !== undefined) patch.affiliations = f.affiliations;
+      if (f.affiliations !== undefined && !keep) patch.affiliations = f.affiliations;
       await update(existing.id, patch);
-      await revise(existing.id, f, origin);
+      await revise(existing.id, keep ? { ...f, goalUsd: undefined } : f, origin);
       return { action: "updated", id: existing.id };
     }
     const row = await insert({ ...f }, slug, origin);

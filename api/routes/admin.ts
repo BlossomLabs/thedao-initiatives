@@ -2,6 +2,14 @@ import { voteEnvironment } from "../../shared/vote/environment.ts";
 import { DatasetAbort, stageDataset } from "../db/dataset.ts";
 import { roundKey } from "../../shared/vote/keys.ts";
 import { voteCorrectionRoutes } from "./vote-corrections.ts";
+import { assertOffBallot, ballotSlugs } from "../services/ballot-lock.ts";
+import {
+  assertGoalOpen,
+  ballotFor,
+  dropGoalRequest,
+  goalRequestJson,
+  requestGoal,
+} from "../services/goal-requests.ts";
 import { parseAffiliations } from "../../shared/affiliations.ts";
 import { type Context, Hono } from "hono";
 import { voteSettings } from "./board.ts";
@@ -85,7 +93,7 @@ import {
 
 import { awaitingPledgesJson, pledgeRequests } from "../services/pledge-requests.ts";
 import { PLEDGE_ROLE_ID } from "../../shared/vote/roles.ts";
-import { roundAdminQueue } from "../services/round-admin-queue.ts";
+import { goalBlock, roundAdminQueue } from "../services/round-admin-queue.ts";
 
 export { pledgeOnChain } from "../services/admin-pledges.ts";
 
@@ -664,7 +672,22 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
    * `/pledges/:pid/settle` on the real round, `/vote-round/test-pledges/:slug/pledges/:pid/
    * settle` on a test round (where nothing touches the site's rows).
    */
-  r.get("/vote-round/queue", async (c) => c.json(await queue.queue(await roundNow())));
+  r.get("/vote-round/queue", async (c) => {
+    const d = await roundNow();
+    const q = await queue.queue(d);
+    if (!q.goals.length) return c.json(q);
+    // A goal change of a settled or withdrawn initiative, or while a tier settles, waits
+    // (#149): its Sign is off, with the reason. Unknown state (the replay failed) blocks
+    // nothing: the contract still refuses what it must.
+    const w = await withdrawals(d).catch(() => ({ initiatives: [] }));
+    return c.json({
+      ...q,
+      goals: q.goals.map((g) => ({
+        ...g,
+        blocked: goalBlock(g.slug, w.initiatives, d.manifest.schedule, deps.now()),
+      })),
+    });
+  });
   /** Put on the ballot, one round admin at a time (services/round-admin-queue.ts): the
    * browser claims the initiative before its run and releases it after, whatever the
    * outcome. A claim lapses after five minutes. */
@@ -955,6 +978,13 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       pendingPledges,
       awaitingPledges,
       awaitingClosed,
+      ...await (async () => {
+        const round = await ballotFor(db, initiative.id);
+        return {
+          onBallot: round.ballot.has(initiative.slug),
+          goalRequest: goalRequestJson(round.goalRequest),
+        };
+      })(),
       donations: (await db.donations.list(initiative.id, false)).map((d) =>
         donationJson(d, decimalsOf)
       ),
@@ -1021,7 +1051,14 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       if (affiliations.length && initiative.type === "rfp") {
         throw new HttpError(400, "RFPs can't have affiliations.");
       }
-      patch.affiliations = affiliations;
+      // On the ballot the round's groups lead (#149): the same list, in any case or
+      // order, is no change and leaves the row as it is.
+      const key = (xs: string[]) => xs.map((x) => x.toLowerCase()).sort().join("\n");
+      const changed = key(affiliations) !== key(initiative.affiliations ?? []);
+      const ballot = await ballotSlugs(db);
+      assertOffBallot(ballot, initiative.slug, changed);
+      // Off the ballot the list saves as sent (a case fix names the next round's group).
+      if (changed || !ballot.has(initiative.slug)) patch.affiliations = affiliations;
     }
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch)
@@ -1062,10 +1099,25 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       const n = Number(c.req.param("n"));
       const note = s((await jsonBody(c, ["note"])).note, 500);
       auditContext(c, { target: `${initiative.id}:${n}`, detail: verdict });
+      // On the ballot the goal follows the round (#149): accepting puts the text live and
+      // leaves the goal it carries waiting for a round admin to sign.
+      const round = await ballotFor(db, initiative.id);
+      const keepGoal = verdict === "accept" && round.ballot.has(initiative.slug);
+      const goal = keepGoal && Number.isInteger(n) && n > 0
+        ? (await db.revisions.get(initiative.id, n))?.goalUsd
+        : undefined;
+      if (goal !== undefined && goal !== initiative.goalUsd) {
+        assertGoalOpen(round.manifest, deps.now());
+      }
       const done = Number.isInteger(n) && n > 0
-        ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note)
+        ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note, {
+          keepGoal,
+        })
         : null;
       if (!done) throw new HttpError(409, "That edit is no longer waiting for review.");
+      if (goal !== undefined) {
+        await requestGoal(db, round.manifest!, done.initiative, goal, c.var.user!.address);
+      }
       // Accepted: the live text changed, the vote card's bullets follow.
       if (verdict === "accept") rewriteBriefSoon(deps, initiative.id);
       return c.json({
@@ -1510,6 +1562,15 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     return c.json({ ok: true });
   });
 
+  /** Discard a ballot initiative's goal request (any site admin, #149). The goal stays. */
+  r.delete("/initiatives/:id/goal-request", async (c) => {
+    await jsonBody(c, []);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    auditContext(c, { target: initiative.id });
+    await dropGoalRequest(db, initiative.id);
+    return c.json({ ok: true });
+  });
+
   /** Discard an awaiting pledge request (any site admin). The pledge row is untouched. */
   r.delete("/initiatives/:id/pledge-requests/:pid", async (c) => {
     await jsonBody(c, []);
@@ -1842,6 +1903,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       clean,
       (name, run) =>
         auditedItem(deps, c, { action: "content.item", targetKind: "content", target: name }, run),
+      await ballotSlugs(db),
     );
     auditContext(c, {
       outcome: result.errors.length

@@ -24,6 +24,7 @@ import { reviewTokenIds } from "./chain/reviewer.ts";
 import { MAINNET_CHAIN_ID, type VoteManifest } from "../shared/vote/manifest.ts";
 import { refreshVoteManifest } from "./services/vote-refresh.ts";
 import { slugsByAccount } from "../shared/vote/round-from-chain.ts";
+import { followRound } from "./services/ballot-follow.ts";
 import {
   createActiveVote,
   migrateVoteSettings,
@@ -94,6 +95,7 @@ export async function createServer(siteOptions?: SiteOptions) {
   const stateSourceFor = (m: VoteManifest) =>
     createStateSource(m, voteRpcUrl(m), undefined, memoFor(m));
   await migrateVoteSettings(db);
+  let followed = false;
   const activeVote = (environment: "production" | "test") =>
     createActiveVote({
       environment,
@@ -106,10 +108,26 @@ export async function createServer(siteOptions?: SiteOptions) {
               await db.initiatives.list(["approved", "archived", "pending", "rejected"]),
             ),
         });
-        if (
-          next.configRevision !== m.configRevision ||
-          next.configAnchor?.hash !== m.configAnchor?.hash
-        ) {
+        const changed = next.configRevision !== m.configRevision ||
+          next.configAnchor?.hash !== m.configAnchor?.hash;
+        // On the ballot the site follows the round (#149): when it changes, and once per
+        // isolate for what changed before it started (again until a run succeeds). Off
+        // the request's path: never slows or fails the refresh.
+        if (environment === "production" && (changed || !followed)) {
+          followed = true;
+          followRound(db, next).then(
+            (changes) => {
+              for (const c of changes) {
+                console.info("ballot-follow", c.slug, c.field, c.from, "→", c.to);
+              }
+            },
+            (e) => {
+              followed = false;
+              console.error("ballot-follow failed", e);
+            },
+          );
+        }
+        if (changed) {
           await db.meta.update<VoteRoundSetting>(voteSettingKey(environment), (cur) => {
             const set = cur?.round ?? cur?.test;
             if (

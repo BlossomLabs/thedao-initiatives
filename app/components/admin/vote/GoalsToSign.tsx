@@ -29,6 +29,9 @@ import { settledGoalText, WITHDRAWN_GOAL } from "../../../../shared/vote/ballot-
 const POLL_MS = 3_000;
 const POLL_FOR_MS = 2 * 60_000;
 
+/** One goal change: the initiative, the goal it sets, and when it was asked. */
+const changeKey = (g: GoalToSignJson) => `${g.rfpId}:${g.call.goalUsd}:${g.at ?? ""}`;
+
 /** Why Sign is off for a goal change, or null. */
 export function blockedReason(g: GoalToSignJson): string | null {
   const b = g.blocked;
@@ -60,10 +63,11 @@ export default function GoalsToSign({ items }: { items: GoalToSignJson[] }) {
   const canSign = !loading && hasAdminRole;
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  /** Signed here: never signed again, and the list is read until the site has it. */
+  /** Signed here, by the change (a later request for the same initiative is another one):
+   * never signed again, and the list is read until the site has it. */
   const [signed, setSigned] = useState<ReadonlySet<string>>(new Set());
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin"] });
-  const waiting = items.some((g) => signed.has(g.rfpId));
+  const waiting = items.some((g) => signed.has(changeKey(g)));
   useEffect(() => {
     if (!waiting) return;
     const start = Date.now();
@@ -106,7 +110,7 @@ export default function GoalsToSign({ items }: { items: GoalToSignJson[] }) {
         timeout: RECEIPT_WAIT_MS,
       });
       if (receipt.status === "reverted") throw new Error("The round refused the change.");
-      setSigned((s) => new Set([...s, g.rfpId]));
+      setSigned((s) => new Set([...s, changeKey(g)]));
       setPhase({ kind: "sent", rfpId: g.rfpId });
     } catch (e) {
       setPhase({ kind: "failed", reason: errorMessage(e) });
@@ -130,7 +134,7 @@ export default function GoalsToSign({ items }: { items: GoalToSignJson[] }) {
     <div>
       {items.map((g) => {
         const reason = blockedReason(g);
-        const done = signed.has(g.rfpId);
+        const done = signed.has(changeKey(g));
         return (
           <TodoRow key={g.rfpId}>
             <div className="flex min-w-0 flex-[999_1_260px] flex-col gap-0.5">

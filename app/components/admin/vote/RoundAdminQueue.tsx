@@ -23,6 +23,7 @@ import { dayTime, plural, shortAddr, usd } from "~/lib/format";
 import { VoteEnvironmentContext } from "~/lib/vote-round";
 import type { VoteEnvironment } from "../../../../shared/vote/environment";
 import { PutOnBallotAction, TxLink } from "./PutOnBallot";
+import GoalsToSign from "./GoalsToSign";
 import {
   dropLock,
   isSending,
@@ -245,10 +246,11 @@ function Queue({ env, title }: { env: VoteEnvironment; title: string }) {
   const started = runs.map((r) => r.ready).filter((r) => !ready.some((x) => x.slug === r.slug));
   const rows = [...ready, ...started];
   const toSign = q.data.toSign;
+  const goals = q.data.goals ?? [];
   return (
     <TodoSection
       title={title}
-      count={ready.length + toSign.length}
+      count={ready.length + toSign.length + goals.length}
       empty="Nothing waits for a round admin."
     >
       {rows.length > 0 && (
@@ -261,6 +263,12 @@ function Queue({ env, title }: { env: VoteEnvironment; title: string }) {
         <>
           <SubHead>Pledges to sign</SubHead>
           <PledgesToSign items={toSign} asOf={q.dataUpdatedAt} />
+        </>
+      )}
+      {goals.length > 0 && (
+        <>
+          <SubHead>Goal changes to sign</SubHead>
+          <GoalsToSign items={goals} />
         </>
       )}
     </TodoSection>

@@ -35,7 +35,12 @@ beforeEach(() => {
 it("is a round admin when the wallet holds both roles on the round's contract", async () => {
   const { result } = renderHook(() => useRoundAdmin(), { wrapper });
   await waitFor(() =>
-    expect(result.current).toEqual({ isRoundAdmin: true, canSignPledges: true, loading: false })
+    expect(result.current).toEqual({
+      isRoundAdmin: true,
+      canSignPledges: true,
+      hasAdminRole: true,
+      loading: false,
+    })
   );
   expect(readContract).toHaveBeenCalledWith(
     expect.objectContaining({ address: CONTRACT, functionName: "hasRole" }),
@@ -53,20 +58,35 @@ it("can sign pledges with only the pledge role, without being a round admin", as
   state.roles = new Set([PLEDGE_ROLE_ID]);
   const { result } = renderHook(() => useRoundAdmin(), { wrapper });
   await waitFor(() => expect(result.current.loading).toBe(false));
-  expect(result.current).toEqual({ isRoundAdmin: false, canSignPledges: true, loading: false });
+  expect(result.current).toEqual({
+    isRoundAdmin: false,
+    canSignPledges: true,
+    hasAdminRole: false,
+    loading: false,
+  });
 });
 
 it("is not one without a wallet, and reads nothing", () => {
   state.address = undefined;
   const { result } = renderHook(() => useRoundAdmin(), { wrapper });
-  expect(result.current).toEqual({ isRoundAdmin: false, canSignPledges: false, loading: false });
+  expect(result.current).toEqual({
+    isRoundAdmin: false,
+    canSignPledges: false,
+    hasAdminRole: false,
+    loading: false,
+  });
   expect(readContract).not.toHaveBeenCalled();
 });
 
 it("is not one without a deployed round, and reads nothing", () => {
   state.round = NO_ROUND;
   const { result } = renderHook(() => useRoundAdmin(), { wrapper });
-  expect(result.current).toEqual({ isRoundAdmin: false, canSignPledges: false, loading: false });
+  expect(result.current).toEqual({
+    isRoundAdmin: false,
+    canSignPledges: false,
+    hasAdminRole: false,
+    loading: false,
+  });
   expect(readContract).not.toHaveBeenCalled();
 });
 

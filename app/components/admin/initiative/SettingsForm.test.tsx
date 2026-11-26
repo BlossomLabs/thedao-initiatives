@@ -28,7 +28,7 @@ it("off the ballot the affiliations can change", () => {
   expect(document.getElementById("s-affiliations")).not.toBeDisabled();
 });
 
-it("an affiliations draft from before the ballot is never sent with another setting", async () => {
+it("an affiliations draft from before the ballot is never sent with another setting", () => {
   const run = vi.fn((fn: () => Promise<unknown>) => fn());
   const { rerender } = render(<SettingsForm r={grant} run={run as never} />);
   fireEvent.change(document.getElementById("s-affiliations")!, { target: { value: "SEAL, Foo" } });

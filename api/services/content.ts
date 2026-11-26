@@ -4,6 +4,8 @@ import { DatasetAbort, stageDataset } from "../db/dataset.ts";
  * header. The filename is a permanent source key; its original proposal ID
  * survives public URL changes. Files own words and goal; admins own lifecycle.
  */
+import type { VoteManifest } from "../../shared/vote/manifest.ts";
+import { ballotSlot } from "./ballot-lock.ts";
 import { parseAffiliations } from "../../shared/affiliations.ts";
 import { MAX_SUMMARY, MAX_TITLE } from "../config.ts";
 import { parseDuration, parseGoal, validateHttpsLink } from "../lib/validate.ts";
@@ -244,6 +246,8 @@ export interface SyncResult {
   /** Pledges added or changed from the files' `backers:` blocks. */
   backers: number;
   errors: string[];
+  /** On the ballot: their goal, type and affiliations stayed as they were (#149). */
+  kept: string[];
 }
 
 /**
@@ -308,12 +312,14 @@ export async function syncContent(
   db: Db,
   files: { name: string; text: string }[],
   audit: <T>(name: string, run: () => Promise<T>) => Promise<T> = (_name, run) => run(),
+  /** The production round: a ballot initiative's goal, type and affiliations stay. */
+  round?: VoteManifest,
 ): Promise<SyncResult> {
   try {
     return await stageDataset(
       db.kv,
       async () => {
-        const out = await syncStaged(db, files, audit);
+        const out = await syncStaged(db, files, audit, round);
         if (out.errors.length) {
           throw new DatasetAbort({ ...out, created: 0, updated: 0, backers: 0 });
         }
@@ -331,8 +337,9 @@ async function syncStaged(
   db: Db,
   files: { name: string; text: string }[],
   audit: <T>(name: string, run: () => Promise<T>) => Promise<T>,
+  round: VoteManifest | undefined,
 ): Promise<SyncResult> {
-  const out: SyncResult = { created: 0, updated: 0, backers: 0, errors: [] };
+  const out: SyncResult = { created: 0, updated: 0, backers: 0, errors: [], kept: [] };
   for (const f of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
     if (!f.name.endsWith(".md") || f.name === "README.md") continue;
     const slug = slugFromFilename(f.name);
@@ -340,7 +347,12 @@ async function syncStaged(
       await audit(f.name, async () => {
         if (!slug) throw new Error("filename makes an empty slug");
         const fields = parseInitiativeFile(f.text);
-        const r = await db.initiatives.upsertContent(slug, fields);
+        // Matched by the row the file updates (its Safe), never by the file's slug.
+        let kept = false;
+        const r = await db.initiatives.upsertContent(slug, fields, {
+          keep: (row) => (kept = ballotSlot(round, row) >= 0),
+        });
+        if (kept) out.kept.push(slug);
         if (r.action === "created") out.created++;
         else out.updated++;
         out.backers += await syncBackers(db, r.id, fields.backers);

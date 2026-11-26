@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { assertOffBallot, ballotSlot, productionManifest } from "../services/ballot-lock.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
@@ -397,6 +398,11 @@ export function initiativeRoutes(deps: Deps) {
     };
     assertUnlocked(initiative);
     const patch = await readPageFacts(body, initiative, deps);
+    // On the ballot the type changes only with the round (#149).
+    assertOffBallot(
+      ballotSlot(await productionManifest(db), initiative) >= 0,
+      patch.type !== undefined && patch.type !== initiative.type,
+    );
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch, assertUnlocked)
       : initiative;

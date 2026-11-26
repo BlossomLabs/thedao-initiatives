@@ -641,14 +641,16 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       /** Only when the file has a `affiliations:` line; otherwise the admin's affiliations stay. */
       affiliations?: string[];
     },
+    /** `keep(row)` true (on the ballot, #149): its goal, type and affiliations stay. */
+    opts: { keep?: (row: Initiative) => boolean } = {},
   ): Promise<{ action: "created" | "updated"; id: string }> {
     const origin: RevisionOrigin = { author: "", source: "content" };
     const existing = await bySourceSlug(slug);
     if (existing) {
+      const keep = opts.keep?.(existing) === true;
       const patch: Partial<Initiative> = {
-        goalUsd: f.goalUsd,
+        ...(keep ? {} : { goalUsd: f.goalUsd, type: f.type }),
         discourseUrl: f.discourseUrl,
-        type: f.type,
         durationMonths: f.durationMonths,
         recipientTeam: f.recipientTeam,
         recipientUrl: f.recipientUrl,
@@ -656,9 +658,9 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
         milestoneReviewer: f.milestoneReviewer,
       };
       if (f.sortRank !== null) patch.sortRank = f.sortRank;
-      if (f.affiliations !== undefined) patch.affiliations = f.affiliations;
+      if (f.affiliations !== undefined && !keep) patch.affiliations = f.affiliations;
       await update(existing.id, patch);
-      await revise(existing.id, f, origin);
+      await revise(existing.id, keep ? { ...f, goalUsd: undefined } : f, origin);
       return { action: "updated", id: existing.id };
     }
     const row = await insert({ ...f }, slug, origin);

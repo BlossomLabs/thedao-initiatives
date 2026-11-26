@@ -10,6 +10,7 @@ import { categoriesOf } from "../../shared/categories.ts";
 import { bodyLimit } from "hono/body-limit";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { assertOffBallot, ballotSlot, productionManifest } from "../services/ballot-lock.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
 import { briefFor, rewriteBriefSoon, writeBrief } from "../services/vote-briefs.ts";
 import { AiError } from "../services/ai.ts";
@@ -1031,7 +1032,13 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       if (affiliations.length && initiative.type === "rfp") {
         throw new HttpError(400, "RFPs can't have affiliations.");
       }
-      patch.affiliations = affiliations;
+      // On the ballot the affiliations change only with the round (#149): the same list,
+      // in any case or order, is no change. Off the ballot it saves as sent.
+      const key = (xs: string[]) => xs.map((x) => x.toLowerCase()).sort().join("\n");
+      const changed = key(affiliations) !== key(initiative.affiliations ?? []);
+      const onBallot = ballotSlot(await productionManifest(db), initiative) >= 0;
+      assertOffBallot(onBallot, changed);
+      if (changed || !onBallot) patch.affiliations = affiliations;
     }
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch)
@@ -1852,6 +1859,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       clean,
       (name, run) =>
         auditedItem(deps, c, { action: "content.item", targetKind: "content", target: name }, run),
+      await productionManifest(db),
     );
     auditContext(c, {
       outcome: result.errors.length

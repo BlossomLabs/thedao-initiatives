@@ -5,7 +5,7 @@
  * code is at it and the Safe verifies, and approval is refused until then.
  */
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness, j, SAFE_ADDR } from "./app-helpers.ts";
+import { ADMIN, j, SAFE_ADDR, safeApiHarness as harness } from "./app-helpers.ts";
 import { SIGNERS } from "./helpers.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
 import { refreshLedgers } from "../services/ledger.ts";

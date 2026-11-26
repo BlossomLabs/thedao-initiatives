@@ -1,6 +1,7 @@
 /** Request-driven donation discovery. Snapshots only read KV; explicit refresh
  * requests claim a shared lease and await persisted results before responding. */
 import { retryDonationMatches } from "./donation-matching.ts";
+import { scanDonations } from "./donation-scan.ts";
 import { K } from "../db/keys.ts";
 import type { SafeSyncState } from "../db/types.ts";
 import {
@@ -35,6 +36,8 @@ const rateLimited = (state: SafeSyncState | null) =>
 
 /** When the shared Safe API pause ends (0 when there is none). */
 export async function safeApiPausedUntil(deps: SafeApiDeps): Promise<number> {
+  // Logs mode: visitor refreshes never call the Safe API, so its 429s pause nothing.
+  if (deps.config.donationDiscovery === "logs") return 0;
   return (await deps.db.meta.getPublic<SafeApiPause>(SAFE_API_PAUSE_KEY))?.until ?? 0;
 }
 
@@ -110,7 +113,13 @@ export async function refreshLedger(
 
   let next: SafeSyncState;
   try {
-    next = await syncSafe(deps, initiative, DEFAULT_BUDGET_MS, getBlockNumber, false);
+    // Logs mode: the shared scan (lock-guarded, one run for every Safe) finds new
+    // donations; only an admin's forced sync still asks the Safe API, as a backfill.
+    const logs = deps.config.donationDiscovery === "logs";
+    const scan = logs ? (await scanDonations(deps)).state : null;
+    next = logs && !force
+      ? { ...saved, ok: scan?.ok ?? true, error: scan?.error ?? "", resumeUrl: "" }
+      : await syncSafe(deps, initiative, DEFAULT_BUDGET_MS, getBlockNumber, false);
     // Manual submissions may not be in the indexer's latest page. Only retry
     // this initiative's pending rows, reusing this request's confirmation head.
     await reverifyPending(deps, getBlockNumber, initiative, PENDING_BUDGET_MS, force);

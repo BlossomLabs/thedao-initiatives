@@ -40,7 +40,8 @@ const transfers = () =>
   });
 
 async function harness(opts?: HarnessOptions) {
-  const h = await appHarness(opts);
+  // The Safe API path: its background refreshes are the ones maintenance must quiet.
+  const h = await appHarness({ ...opts, env: { DONATION_DISCOVERY: "safe-api", ...opts?.env } });
   const logs: string[] = [];
   h.deps.log = (line) => logs.push(line);
   return { ...h, logs };

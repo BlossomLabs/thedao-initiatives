@@ -67,6 +67,20 @@ export interface ChainScript {
   code: Record<string, string>;
   /** Every Safe answers getThreshold() with the wrong number. */
   brokenSafe: boolean;
+  /** Event logs eth_getLogs filters (blockNumber and transactionHash as hex). */
+  logs: {
+    address: string;
+    topics: string[];
+    data: string;
+    blockNumber: string;
+    transactionHash: string;
+  }[];
+  /** eth_getLogs refuses wider ranges, like a free-plan provider. */
+  maxLogSpan: number;
+  /** lowercase address -> deploy block: eth_getCode at an earlier block answers "0x". */
+  deployedAt: Record<string, number>;
+  /** eth_getCode at a past block throws, like a non-archive node. */
+  noArchive: boolean;
 }
 
 export function scriptedRpc(script: ChainScript, now: () => number) {
@@ -119,12 +133,37 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
         );
       case "eth_blockNumber":
         return Promise.resolve("0x" + script.head.toString(16));
-      case "eth_getCode":
-        return Promise.resolve(script.code[String(p0).toLowerCase()] ?? "0x");
+      case "eth_getCode": {
+        const addr = String(p0).toLowerCase();
+        const tag = params[1];
+        if (typeof tag === "string" && tag.startsWith("0x")) {
+          const block = Number(tag);
+          if (script.noArchive && block < script.head - 128) throw new Error("missing trie node");
+          if (block < (script.deployedAt[addr] ?? 0)) return Promise.resolve("0x");
+        }
+        return Promise.resolve(script.code[addr] ?? "0x");
+      }
       case "eth_getTransactionReceipt":
         return Promise.resolve(script.receipts[String(p0).toLowerCase()] ?? null);
       case "eth_getTransactionByHash":
         return Promise.resolve(script.txs[String(p0).toLowerCase()] ?? null);
+      case "eth_getLogs": {
+        const f = p0 as unknown as {
+          fromBlock: string;
+          toBlock: string;
+          address: string[];
+          topics: (string | string[] | null)[];
+        };
+        const from = Number(f.fromBlock), to = Number(f.toBlock);
+        if (to - from + 1 > script.maxLogSpan) throw new Error("range too large");
+        const lower = (v: string | string[]) => [v].flat().map((x) => x.toLowerCase());
+        const addrs = lower(f.address);
+        return Promise.resolve(script.logs.filter((log) => {
+          const b = Number(log.blockNumber);
+          return b >= from && b <= to && addrs.includes(log.address.toLowerCase()) &&
+            f.topics.every((t, i) => t === null || lower(t).includes(log.topics[i]?.toLowerCase()));
+        }));
+      }
       case "eth_getStorageAt": {
         const slot = String(params[1]);
         return Promise.resolve(
@@ -225,6 +264,10 @@ export interface HarnessOptions {
   fetch?: (url: string, init?: RequestInit) => Promise<Response> | Response;
 }
 
+/** A harness on DONATION_DISCOVERY=safe-api, for tests of the Safe API path (the default is logs). */
+export const safeApiHarness = (opts: HarnessOptions = {}): Promise<Harness> =>
+  harness({ ...opts, env: { DONATION_DISCOVERY: "safe-api", ...opts.env } });
+
 export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
   const clock = { now: 1_800_000_000 };
   const now = () => clock.now;
@@ -255,6 +298,10 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     calls: [],
     code: {},
     brokenSafe: false,
+    logs: [],
+    maxLogSpan: Infinity,
+    deployedAt: {},
+    noArchive: false,
   };
   const chain = createChain({ rpc: scriptedRpc(script, now), now });
   const fetchLog: FetchLog = [];

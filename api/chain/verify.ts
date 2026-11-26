@@ -7,6 +7,9 @@ import type { UsdRate } from "./price.ts";
 import { PRICE_UNAVAILABLE_DETAIL } from "../lib/donation-detail.ts";
 
 export const TRANSFER_TOPIC = eventTopic("Transfer(address,address,uint256)");
+/** Safe v1.3+ `receive()`: emitted by the Safe itself for every ETH it takes in,
+ * a contract's internal send included. `sender` is indexed, `value` is data. */
+export const SAFE_RECEIVED_TOPIC = eventTopic("SafeReceived(address,uint256)");
 
 export interface Verification {
   /** Matching metadata is only provided by RPC verification, never indexer fallback. */
@@ -208,6 +211,43 @@ export async function verifyDonationTx(
         r.detail = `verified: ${eth} ETH received`;
         return r;
       }
+    }
+    // ETH through a contract (a router, another Safe): tx.to is not the Safe,
+    // but the Safe's own SafeReceived logs in this receipt carry each amount.
+    const received = (receipt.logs ?? []).filter((log) =>
+      (log.address ?? "").toLowerCase() === recipient.toLowerCase() &&
+      (log.topics?.[0] ?? "").toLowerCase() === SAFE_RECEIVED_TOPIC &&
+      (log.topics?.length ?? 0) >= 2
+    );
+    const wei = received.reduce((s, log) => s + decodeHexInt(log.data), 0n);
+    if (tx && wei > 0n) {
+      const eth = Number(wei) / 1e18;
+      if (eth < minEth) {
+        r.detail = `ETH amount below the minimum donation of ${minEth} ETH`;
+        return r;
+      }
+      let rate: number;
+      try {
+        rate = await usdRate("ETH");
+      } catch {
+        r.pending = true;
+        r.detail = PRICE_UNAVAILABLE_DETAIL;
+        return r;
+      }
+      const senders = [
+        ...new Set(received.map((log) => "0x" + log.topics![1].slice(-40).toLowerCase())),
+      ];
+      r.singleTransfer = received.length === 1;
+      r.ok = true;
+      r.tokenSymbol = "ETH";
+      r.tokenAddress = "";
+      r.amountRaw = wei.toString();
+      r.amount = eth;
+      r.amountUsd = Math.round(eth * rate * 100) / 100;
+      r.donor = senders.length === 1 ? toChecksum(senders[0]) : "";
+      r.detail = `verified: ${eth} ETH received (internal transfer)` +
+        (senders.length > 1 ? " (multiple senders; donor credit is unattributed)" : "");
+      return r;
     }
     if (tx) r.allowIndexerEth = true;
   }

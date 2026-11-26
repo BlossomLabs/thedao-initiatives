@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness, j, SAFE_ADDR } from "./app-helpers.ts";
+import { ADMIN, j, SAFE_ADDR, safeApiHarness as harness } from "./app-helpers.ts";
 import { transferLog } from "./helpers.ts";
 import { TOKENS } from "../config.ts";
 import { type SafeApiDeps, syncSafe } from "../services/safe-api.ts";

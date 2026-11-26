@@ -142,6 +142,9 @@ export interface Config {
   operationalSigners: string[];
   safeApiKey: string;
   safeSyncTtlSecs: number;
+  /** DONATION_DISCOVERY: `logs` (the default) scans the chain's event logs for every Safe at
+   * once (services/donation-scan.ts); `safe-api` asks the Safe Transaction Service per Safe. */
+  donationDiscovery: "safe-api" | "logs";
   /** RATE_LIMIT_MODE: `enforce` refuses over the cap; `observe` counts and logs a breach but
    * allows (except ALWAYS_ENFORCED_RATE_LIMITS); `off` neither counts nor logs (live sessions
    * where a room shares one IP). */
@@ -248,6 +251,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       : [...DEFAULT_ADMIN_ADDRESSES],
     operationalSigners: list(env.OPERATIONAL_SIGNERS),
     safeApiKey: (env.SAFE_API_KEY ?? "").trim(),
+    donationDiscovery: (env.DONATION_DISCOVERY ?? "").trim() === "safe-api" ? "safe-api" : "logs",
     safeSyncTtlSecs: Number.isFinite(syncTtl) && syncTtl > 0
       ? Math.max(60, Math.floor(syncTtl))
       : 600,

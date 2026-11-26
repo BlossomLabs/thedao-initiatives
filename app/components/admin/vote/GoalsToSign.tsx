@@ -23,7 +23,7 @@ import { dayTime, shortAddr, usd } from "~/lib/format";
 import { useRound } from "~/lib/vote-round";
 import { liveConnector } from "~/lib/wallet-store";
 import { SIGNED_BALLOTS_ABI } from "../../../../shared/vote/abi";
-import { tierName } from "../../../../shared/vote/ballot";
+import { settledGoalText, WITHDRAWN_GOAL } from "../../../../shared/vote/ballot-facts";
 
 /** After a Sign: the list is read again this often until the site has the change. */
 const POLL_MS = 3_000;
@@ -35,9 +35,9 @@ export function blockedReason(g: GoalToSignJson): string | null {
   if (!b) return null;
   switch (b.kind) {
     case "settled":
-      return `Settled in ${tierName(b.tier)}: its award is final, so its goal stays.`;
+      return settledGoalText(b.tier);
     case "withdrawn":
-      return "Withdrawn from the vote: undo the withdrawal to change its goal.";
+      return WITHDRAWN_GOAL;
     case "settling":
       return b.until === null
         ? "The vote has ended: the round takes no more changes."

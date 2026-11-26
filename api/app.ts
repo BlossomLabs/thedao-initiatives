@@ -1,4 +1,6 @@
 import { draftRoutes } from "./routes/draft.ts";
+import { currentVote } from "./services/vote-active.ts";
+import { roundStanding } from "./services/round-standing.ts";
 import { withDataset } from "./db/dataset.ts";
 import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
@@ -165,6 +167,12 @@ export function createApp(
 
   app.route("/healthz", healthRoutes(deps));
   const votes = voteRoutes(deps);
+  // The production round's standing per slot, for goal requests (#149).
+  sourceDeps.ballotStanding ??= async () => {
+    const d = await currentVote(deps).catch(() => undefined);
+    if (!d || d.manifest.kind !== "real") return null;
+    return (await roundStanding(d, votes.replay).catch(() => null))?.initiatives ?? null;
+  };
   const testVotes = voteRoutes(testDeps);
   // Before /api/initiatives, so /api/initiatives.json is never read as a slug.
   app.route("/", feedRoutes(feedCache, deps, votes.replay));

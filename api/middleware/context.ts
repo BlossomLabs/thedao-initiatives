@@ -39,7 +39,12 @@ export interface Deps {
   /** Handed work a request starts but doesn't wait for (the vote's gap to the next
    * tier). Absent, it just runs; tests collect it so they can wait for it. */
   background?: (work: Promise<unknown>) => void;
+  /** The production round's standing per slot (#149): withdrawn, and the tier it settled
+   * in. Null when no real round runs or its replay can't be read. Set by createApp. */
+  ballotStanding?: () => Promise<BallotStanding[] | null>;
 }
+
+export type BallotStanding = { withdrawn: boolean; settledIn: "S" | "A" | "B" | null };
 
 export type Vars = {
   Variables: {

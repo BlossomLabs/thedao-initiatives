@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { assertOffBallot } from "../services/ballot-lock.ts";
+import { goalStop } from "../../shared/vote/ballot-facts.ts";
 import {
   assertGoalOpen,
   ballotFor,
@@ -95,6 +96,11 @@ export function editChecks(initiative: Pick<Initiative, "type" | "topup" | "goal
 }
 
 export function initiativeRoutes(deps: Deps) {
+  /** 409 when the ballot initiative in `slot` settled or was withdrawn (#149). */
+  const assertGoalChangeable = async (slot: number) => {
+    const stop = goalStop(await deps.ballotStanding?.() ?? null, slot);
+    if (stop) throw new HttpError(409, stop);
+  };
   const r = new Hono<Vars>();
   const { db, config } = deps;
 
@@ -380,7 +386,10 @@ export function initiativeRoutes(deps: Deps) {
     // its review; an edit that goes live now leaves the goal as it is and asks for it.
     const round = await ballotFor(db, initiative);
     const newGoal = body.goal !== undefined && goalUsd !== initiative.goalUsd && round.slot >= 0;
-    if (newGoal) assertGoalOpen(round.manifest, deps.now());
+    if (newGoal) {
+      assertGoalOpen(round.manifest, deps.now());
+      await assertGoalChangeable(round.slot);
+    }
     const askGoal = newGoal && !holdWhen(initiative);
     const backers = pledgeBackers(await db.pledges.list(initiative.id));
     const findings = mergeFindings(
@@ -444,6 +453,7 @@ export function initiativeRoutes(deps: Deps) {
     if (goalUsd !== undefined && !onBallot) patch.goalUsd = goalUsd;
     if (goalUsd !== undefined && onBallot && goalUsd !== initiative.goalUsd) {
       assertGoalOpen(round.manifest, deps.now());
+      await assertGoalChangeable(round.slot);
     }
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch, assertUnlocked)

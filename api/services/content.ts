@@ -308,6 +308,15 @@ export async function syncBackers(
 
 /** Publish the complete content batch together, or return errors without changes. */
 
+/** For the sync's output: the ballot initiatives whose goal, type and affiliations it left
+ * as they are (#149), or null when there are none. */
+export function syncKeptNote(kept: string[]): string | null {
+  if (!kept.length) return null;
+  return `On the ballot, so their goal, type and affiliations were left as they are: ${
+    kept.join(", ")
+  }. Change a goal from the initiative's edit page; a round admin signs it.`;
+}
+
 export async function syncContent(
   db: Db,
   files: { name: string; text: string }[],

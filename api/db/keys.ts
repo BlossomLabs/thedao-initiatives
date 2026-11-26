@@ -68,6 +68,9 @@ export const K = {
   snapshotChunk: (name: string, origin: string, i: number) =>
     ["snapshot", name, origin, "chunk", i] as const,
   meta: (key: string) => ["meta", key] as const,
+  /** A credential an admin set on the dashboard (services/safe-api-key.ts). Its own prefix:
+   * never in a backup file, never versioned with the dataset. */
+  secret: (name: string) => ["secret", name] as const,
   /** One initiative's vote card bullets (#96, db/vote-briefs.ts). */
   voteBrief: (rfpId: string) => ["vote_brief", rfpId] as const,
   voteBriefs: ["vote_brief"] as const,

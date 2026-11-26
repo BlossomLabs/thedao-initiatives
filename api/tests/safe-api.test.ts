@@ -549,3 +549,59 @@ Deno.test("safe sync: a failed manual verification does not block the indexer fa
   assertEquals(d.amountUsd, 2000);
   h.close();
 });
+
+Deno.test("safe api key: an admin's key wins over SAFE_API_KEY, is never shown, and clears back to it", async () => {
+  const h = await harness({
+    env: { SAFE_API_KEY: "env-key-1234" },
+    fetch: () =>
+      Response.json({ count: 0, next: null, results: [] }, {
+        headers: { "x-ratelimit-remaining": "17" },
+      }),
+  });
+  try {
+    const initiative = await h.db.initiatives.insert({
+      title: "Key override",
+      status: "approved",
+      goalUsd: 1000,
+      safeAddress: SAFE_ADDR,
+    });
+    const bearer = () => new Headers(h.fetchLog.at(-1)?.init?.headers).get("Authorization");
+    const admin = await h.mint(ADMIN, true);
+    const plain = await h.mint("0x" + "55".repeat(20), true);
+    const set = (token: string, key: unknown) =>
+      h.req("/api/admin/safe-api-key", { method: "POST", token, json: { key } });
+    const status = async () =>
+      ((await j(await h.req("/api/admin/status", { token: admin }))) as {
+        safeApi: { configured: boolean; key: Record<string, unknown>; quota: unknown };
+      }).safeApi;
+
+    await syncSafe(h.deps, initiative);
+    assertEquals(bearer(), "Bearer env-key-1234");
+    assertEquals((await status()).key.source, "env");
+
+    assertEquals((await set(plain, "nope")).status, 403);
+    assertEquals((await set(admin, "has space")).status, 400);
+    assertEquals((await set(admin, 42)).status, 400);
+    const saved = await set(admin, "  admin-key-9876  ");
+    assertEquals(saved.status, 200);
+    const text = JSON.stringify(await j(saved)) + JSON.stringify(await status());
+    assertFalse(text.includes("admin-key-9876"));
+    const s = await status();
+    assertEquals([s.key.source, s.key.hint, s.key.setBy, s.quota], [
+      "admin",
+      "9876",
+      ADMIN,
+      null,
+    ]);
+
+    await syncSafe(h.deps, initiative);
+    assertEquals(bearer(), "Bearer admin-key-9876");
+
+    assertEquals((await set(admin, "")).status, 200);
+    assertEquals((await status()).key.source, "env");
+    await syncSafe(h.deps, initiative);
+    assertEquals(bearer(), "Bearer env-key-1234");
+  } finally {
+    h.close();
+  }
+});

@@ -42,6 +42,7 @@ import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import type { CardRow } from "../db/initiatives.ts";
 import { sharedChainState } from "../services/chain-state.ts";
+import { safeApiKeyInfo, setSafeApiKey } from "../services/safe-api-key.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 import type { Hex } from "viem";
 import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts";
@@ -767,15 +768,17 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
 
   /** The services an admin checks now and then: snapshots only, never a chain call. */
   r.get("/status", async (c) => {
-    const [state, quota] = await Promise.all([
+    const [state, quota, key] = await Promise.all([
       sharedChainState(deps, false),
       db.meta.get("safe_api_quota"),
+      safeApiKeyInfo(deps),
     ]);
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     return c.json({
       chain: { detail: state.detail, checkedAt: state.checkedAt },
       safeApi: {
-        configured: Boolean(config.safeApiKey),
+        configured: key.source !== "none",
+        key,
         quota,
         refreshMinutes: config.safeSyncTtlSecs / 60,
       },
@@ -786,6 +789,13 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
         threshold: SAFE_THRESHOLD,
       },
     });
+  });
+
+  /** Override the Safe API key without a redeploy; an empty key goes back to SAFE_API_KEY. */
+  r.post("/safe-api-key", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["key"]);
+    await setSafeApiKey(db, body.key, c.var.user!.address, deps.now());
+    return c.json({ key: await safeApiKeyInfo(deps) });
   });
 
   /**

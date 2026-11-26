@@ -455,11 +455,22 @@ export interface AdminTodo {
   counts: { total: number; approved: number; approvedThisWeek: number };
 }
 
+/** Which Safe API key is in use (api/services/safe-api-key.ts); never the key itself. */
+export interface SafeApiKeyInfo {
+  source: "admin" | "env" | "none";
+  /** Last four characters of the key in use. */
+  hint: string | null;
+  setBy: string | null;
+  setAt: number | null;
+  envConfigured: boolean;
+}
+
 /** GET /api/admin/status: snapshots of the services, never a live chain call. */
 export interface AdminStatus {
   chain: { detail: string; checkedAt: number };
   safeApi: {
     configured: boolean;
+    key: SafeApiKeyInfo;
     quota: { remaining: number; at: number } | null;
     refreshMinutes: number;
   };

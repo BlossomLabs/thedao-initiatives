@@ -99,7 +99,12 @@ const todo: AdminTodo = {
 };
 const status = {
   chain: { detail: "ok", checkedAt: 0 },
-  safeApi: { configured: true, quota: null, refreshMinutes: 5 },
+  safeApi: {
+    configured: true,
+    key: { source: "env", hint: "abcd", setBy: null, setAt: null, envConfigured: true },
+    quota: null,
+    refreshMinutes: 5,
+  },
   signers: { ok: true, detail: "3 of 5", list: [], threshold: 3 },
 };
 const answer = (list = rows, t = todo) => (path: unknown) => {

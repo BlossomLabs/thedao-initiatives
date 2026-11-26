@@ -16,6 +16,7 @@ import type { Verification } from "../chain/verify.ts";
 import { toChecksum } from "../chain/address.ts";
 import { PRICE_UNAVAILABLE_DETAIL } from "../lib/donation-detail.ts";
 import { K } from "../db/keys.ts";
+import { safeApiKey } from "./safe-api-key.ts";
 
 /** What a Safe sync reads from an initiative: a board card row carries these. */
 export type SafeRow = Pick<Initiative, "id" | "safeAddress" | "slug">;
@@ -87,7 +88,8 @@ async function fetchPage(deps: SafeApiDeps, url: string): Promise<Page> {
     Accept: "application/json",
     "User-Agent": "thedao-initiatives/2.0",
   };
-  if (deps.config.safeApiKey) headers.Authorization = "Bearer " + deps.config.safeApiKey;
+  const key = await safeApiKey(deps);
+  if (key) headers.Authorization = "Bearer " + key;
   const res = await deps.fetch(url, {
     headers,
     redirect: "error",

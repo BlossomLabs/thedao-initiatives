@@ -529,9 +529,12 @@ it("on the ballot the type is set on the round, and a goal awaiting signature sh
   const { unmount } = render(page(qc));
   expect(screen.getByLabelText("Facts")).toHaveTextContent("open private");
   expect(screen.getByLabelText("Facts")).not.toHaveTextContent("type");
-  expect(screen.getByText("Awaiting signature: $78,000")).toBeInTheDocument();
-  expect(screen.getByText(/On the ballot: a round admin changes this on the round\./))
-    .toBeInTheDocument();
+  const card = screen.getByRole("group", { name: "New goal awaiting signature" });
+  expect(card).toHaveTextContent("$78,000");
+  expect(card).toHaveTextContent("Awaiting signature");
+  expect(screen.getByText(
+    "Type and affiliations change only on the round. A new goal waits for a round admin to sign it.",
+  )).toBeInTheDocument();
   unmount();
   qc.clear();
 });

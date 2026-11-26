@@ -1,12 +1,10 @@
 /** Goal changes to sign (#149): each ballot initiative with a goal request, and each whose
- * site goal differs from the round's, with the exact setInitiative call and a Safe batch. */
+ * site goal differs from the round's, with the exact setInitiative call. */
 import { assertEquals } from "@std/assert";
-import { decodeFunctionData } from "viem";
 import { ADMIN, harness, j } from "./app-helpers.ts";
 import { fakeChain, NOW, roundOf } from "./pledge-chain.ts";
 import { goalRequestOf, requestGoal } from "../services/goal-requests.ts";
 import { goalBlock, roundAdminQueue } from "../services/round-admin-queue.ts";
-import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 
 const SAFE = "0xA000000000000000000000000000000000000001";
@@ -20,7 +18,6 @@ type Goal = {
   toUsd: number;
   by: string | null;
   call: { id: string; account: string; goalUsd: string; rfp: boolean; groups: string };
-  batch: { transactions: { to: string; data: `0x${string}` }[] };
   configRevision: string | null;
 };
 
@@ -78,11 +75,8 @@ Deno.test("a goal request is listed with the round's account, RFP flag and group
       groups: "2",
     });
     assertEquals(g.configRevision, "130");
-    const calls = g.batch.transactions.map((t) =>
-      decodeFunctionData({ abi: SIGNED_BALLOTS_ABI, data: t.data })
-    );
-    assertEquals(calls.map((c) => c.functionName), ["requireConfigRevision", "setInitiative"]);
-    assertEquals(calls[1].args, [1n, SAFE, 78_000_000_000n, false, 2n]);
+    // Round admins are wallets: there is no Safe batch to download.
+    assertEquals("batch" in g, false);
   } finally {
     s.h.close();
   }

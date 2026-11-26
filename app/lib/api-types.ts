@@ -583,8 +583,6 @@ export interface GoalToSignJson {
   at: number | null;
   /** `setInitiative`'s arguments, numbers as decimal strings. */
   call: { id: string; account: `0x${string}`; goalUsd: string; rfp: boolean; groups: string };
-  /** The same call as Safe Transaction Builder JSON. */
-  batch: unknown;
   /** The round's configuration revision the call was built at (null: a round without it). */
   configRevision: string | null;
   /** Why it can't be signed now; null when it can. */

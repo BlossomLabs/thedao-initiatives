@@ -19,8 +19,7 @@ import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
 import { api, ApiError, errorMessage } from "~/lib/api";
 import type { GoalRequestJson, Initiative, InitiativePage, Pledge } from "~/lib/api-types";
-import { usd } from "~/lib/format";
-import { ON_BALLOT } from "../../shared/vote/ballot-facts";
+import GoalAwaiting from "~/components/admin/initiative/GoalAwaiting";
 import { pageFactsPatch, rowFacts, textBody, textChanged } from "~/lib/edit-initiative";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SITE_NAME } from "~/data/site";
 import { generateMeta } from "~/utils/meta";
@@ -185,6 +184,7 @@ export default function EditInitiative() {
             hold={hold}
             onBallot={Boolean(page.onBallot)}
             goalRequest={page.goalRequest}
+            liveGoal={r.goalUsd}
           />
         )
         : (
@@ -238,17 +238,17 @@ function WhatYouCanChange(
 
 /** On the ballot the round leads (#149): what that means for this form, and a new goal
  * that is waiting for a round admin to sign it. */
-function OnTheBallot({ goalRequest }: { goalRequest?: GoalRequestJson }) {
+function OnTheBallot(
+  { goalRequest, liveGoal }: { goalRequest?: GoalRequestJson; liveGoal: number },
+) {
   return (
     <div className="panel">
       <span className="k">On the ballot</span>
       <p className="m-0 small dim">
-        Type and affiliations: {ON_BALLOT}{" "}
-        A new goal waits for a round admin to sign it before the page shows it.
+        Type and affiliations change only on the round. A new goal waits for a round admin to sign
+        it.
       </p>
-      {goalRequest && (
-        <p className="m-0 mt-2 small">Awaiting signature: {usd(goalRequest.goalUsd)}</p>
-      )}
+      {goalRequest && <GoalAwaiting className="mt-3" request={goalRequest} current={liveGoal} />}
     </div>
   );
 }
@@ -278,6 +278,7 @@ function PrivateEditor(
     hold: boolean;
     onBallot: boolean;
     goalRequest?: GoalRequestJson;
+    liveGoal: number;
   },
 ) {
   const [initial, setInitial] = useState<Initiative | null>(() =>
@@ -301,7 +302,7 @@ function PrivateEditor(
 }
 
 function EditForm(
-  { r, pledges, team, mine, hold, onBallot, goalRequest }: {
+  { r, pledges, team, mine, hold, onBallot, goalRequest, liveGoal }: {
     /** The row with the text the form starts from (the edit in review, if any). */
     r: Initiative;
     pledges: Pledge[];
@@ -312,6 +313,8 @@ function EditForm(
     /** On the production ballot (#149): the round leads the type, affiliations and goal. */
     onBallot: boolean;
     goalRequest?: GoalRequestJson;
+    /** The goal the page has now (an edit in review may carry another). */
+    liveGoal: number;
   },
 ) {
   const navigate = useNavigate();
@@ -382,7 +385,7 @@ function EditForm(
       previewAs={r}
       asideTop={
         <>
-          {onBallot && <OnTheBallot goalRequest={goalRequest} />}
+          {onBallot && <OnTheBallot goalRequest={goalRequest} liveGoal={liveGoal} />}
           <WhatYouCanChange
             status={r.status}
             manage={team ? `/admin/initiatives/${r.slug}` : undefined}

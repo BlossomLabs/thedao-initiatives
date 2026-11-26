@@ -32,7 +32,6 @@ import type { VoteRound } from "./vote-chain.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import type { Tier } from "../../shared/vote/ballot.ts";
 import type { Schedule } from "../../shared/vote/quiet-ending.ts";
-import { adminBatch } from "../../shared/vote/admin-batch.ts";
 import { ballotSlot } from "./ballot-lock.ts";
 import { goalRequests, roundGoalUsd, settleOnRead } from "./goal-requests.ts";
 import {
@@ -108,8 +107,6 @@ export type GoalToSignJson = {
   at: number | null;
   /** `setInitiative`'s arguments, numbers as decimal strings. */
   call: { id: string; account: string; goalUsd: string; rfp: boolean; groups: string };
-  /** The same call for an admin Safe (Transaction Builder JSON). */
-  batch: ReturnType<typeof adminBatch>;
   /** The round's configuration revision the call was built at: a wallet send checks it. */
   configRevision: string | null;
   /** Why it can't be signed now; null when it can. */
@@ -383,7 +380,6 @@ export function roundAdminQueue(deps: Deps) {
       const goal = BigInt(Math.round(toUsd * 100)) * 10_000n;
       const groups = p.groups.reduce((a, g) => a | (1n << BigInt(g)), 0n);
       const account = m.accounts![i];
-      const args = [BigInt(i), account, goal, p.rfp, groups] as const;
       out.push({
         kind: r ? "request" : "record",
         rfpId: row.id,
@@ -403,12 +399,6 @@ export function roundAdminQueue(deps: Deps) {
         configRevision: m.configRevision ?? null,
         // Not signable until the round's state says so (the queue route checks it).
         blocked: { kind: "unknown" },
-        batch: adminBatch(m, `Set ${row.slug}'s goal`, [
-          ...(m.configRevision === undefined
-            ? []
-            : [{ fn: "requireConfigRevision", args: [BigInt(m.configRevision)] }]),
-          { fn: "setInitiative", args },
-        ]),
       });
     }
     return out;

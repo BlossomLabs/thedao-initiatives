@@ -30,7 +30,8 @@ import { CategoryTag } from "~/components/ui/CategoryTag";
 import { api, ApiError, apiText, errorMessage } from "~/lib/api";
 import type { AdminInitiativePage } from "~/lib/api-types";
 import { walletErrorMessage } from "~/lib/donate";
-import { dayTime, dt, shortAddr, usd } from "~/lib/format";
+import { dt } from "~/lib/format";
+import GoalAwaiting from "~/components/admin/initiative/GoalAwaiting";
 import { discussionKind } from "~/lib/discussion";
 import { withReauthentication } from "~/lib/reauthenticate";
 import { roundLoader, useRound } from "~/lib/vote-round";
@@ -191,25 +192,16 @@ export default function ManageInitiative() {
             funded={r.goalUsd > 0 && data.summary.total >= r.goalUsd}
           />
           {data.goalRequest && (
-            <p className="m-0 mt-2 small">
-              Awaiting signature: {usd(data.goalRequest.goalUsd)}{" "}
-              <span className="dim">
-                (asked by {shortAddr(data.goalRequest.by)},{" "}
-                {dayTime(data.goalRequest.at)}; a round admin signs it in the queue)
-              </span>{" "}
-              <Button
-                sm
-                variant="ghost"
-                aria-label="Discard the goal change"
-                onClick={() =>
-                  void runAt("goal")(
-                    () => api(`/api/admin/initiatives/${r.id}/goal-request`, { method: "DELETE" }),
-                    "Goal change discarded.",
-                  )}
-              >
-                Discard
-              </Button>
-            </p>
+            <GoalAwaiting
+              className="mt-3"
+              request={data.goalRequest}
+              current={r.goalUsd}
+              onDiscard={() =>
+                void runAt("goal")(
+                  () => api(`/api/admin/initiatives/${r.id}/goal-request`, { method: "DELETE" }),
+                  "Goal change discarded.",
+                )}
+            />
           )}
           {said("goal")}
 

@@ -29,7 +29,8 @@ it("off the ballot the affiliations can change", () => {
 });
 
 it("an affiliations draft from before the ballot is never sent with another setting", () => {
-  const run = vi.fn((fn: () => Promise<unknown>) => fn());
+  adminApi.mockResolvedValue({});
+  const run = vi.fn((fn: () => Promise<unknown>) => Promise.resolve(fn()));
   const { rerender } = render(<SettingsForm r={grant} run={run as never} />);
   fireEvent.change(document.getElementById("s-affiliations")!, { target: { value: "SEAL, Foo" } });
   rerender(<SettingsForm r={grant} run={run as never} onBallot />);

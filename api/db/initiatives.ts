@@ -587,6 +587,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
         const m = moved ? Math.max(initiative.revision, initiative.lastRevision ?? 0) + 1 : n;
         revision = {
           ...held.value,
+          // Kept for the round (#149): this version of the page doesn't set a goal.
+          ...(opts.keepGoal ? { goalUsd: undefined } : {}),
           n: m,
           state: "live",
           reviewedBy: by,

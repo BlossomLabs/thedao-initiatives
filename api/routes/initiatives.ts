@@ -221,7 +221,11 @@ export function initiativeRoutes(deps: Deps) {
       revisions: revisions.map(revisionMeta),
       summary,
       onBallot: ballot.ballot.has(initiative.slug),
-      goalRequest: goalRequestJson(ballot.goalRequest),
+      // Who asked is an admin's wallet: for the team and the proposer only.
+      goalRequest: goalRequestJson(
+        ballot.goalRequest,
+        Boolean(user?.isAdmin) || isProposer(initiative, user ?? null),
+      ),
       pct: pctOf(summary.total, initiative.goalUsd),
       pledges: pledges.map((p) => pledgeJson(config, p)),
       donations: donations.map((d) => donationJson(d, decimalsOf)),
@@ -391,8 +395,14 @@ export function initiativeRoutes(deps: Deps) {
       origin,
       holdWhen,
     );
+    const goalRequest = askGoal
+      ? await requestGoal(db, round.manifest!, next, goalUsd, user.address)
+      : null;
+    // Only the goal was new: no text revision, the request is the change.
+    if (!revision && goalRequest) {
+      return c.json({ goalRequest: goalRequestJson(goalRequest) }, 202);
+    }
     if (!revision) throw new HttpError(400, "Nothing changed.");
-    if (askGoal) await requestGoal(db, round.manifest!, next, goalUsd, user.address);
     return saved(next, revision, warnings);
   });
 

@@ -5,7 +5,7 @@
 import type { Db } from "../db/mod.ts";
 import type { Initiative } from "../db/types.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
-import { dropGoalRequest, goalRequests } from "./goal-requests.ts";
+import { goalRequests, settleGoalRequest } from "./goal-requests.ts";
 
 export type FollowChange = {
   slug: string;
@@ -69,7 +69,7 @@ export async function followRound(db: Db, m: VoteManifest): Promise<FollowChange
     if (Object.keys(patch).length) await db.initiatives.update(row.id, patch);
   }
   for (const r of await goalRequests(db, m)) {
-    if (goals.get(r.rfpId) === r.goalUsd) await dropGoalRequest(db, r.rfpId);
+    if (goals.get(r.rfpId) === r.goalUsd) await settleGoalRequest(db, r);
   }
   return changes;
 }

@@ -4,7 +4,7 @@ import { assertEquals } from "@std/assert";
 import { type Harness, harness } from "./app-helpers.ts";
 import { NO_ROUND, type VoteManifest } from "../../shared/vote/manifest.ts";
 import { followRound, sharedGroups } from "../services/ballot-follow.ts";
-import { goalRequestOf, requestGoal } from "../services/goal-requests.ts";
+import { goalRequestOf, requestGoal, settleGoalRequest } from "../services/goal-requests.ts";
 
 const SAFE_A = "0xA000000000000000000000000000000000000001";
 const SAFE_B = "0xB000000000000000000000000000000000000002";
@@ -160,6 +160,24 @@ Deno.test("an affiliation only this initiative holds on the round stays on the s
     assertEquals((await h.db.initiatives.get(a.id))!.affiliations, ["Foo", "seal"]);
     const again = await followRound(h.db, m);
     assertEquals(again, []);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("settling a request never drops a newer one written since it was read", async () => {
+  const h = await harness();
+  try {
+    const { a } = await rows(h);
+    const m = round([a.slug, "x"]);
+    const old = (await requestGoal(h.db, m, a, 78_000, "0x1"))!;
+    h.clock.now += 60;
+    await requestGoal(h.db, m, a, 60_000, "0x2");
+    assertEquals(await settleGoalRequest(h.db, old), false);
+    assertEquals((await goalRequestOf(h.db, m, a.id))?.goalUsd, 60_000);
+    const now = (await goalRequestOf(h.db, m, a.id))!;
+    assertEquals(await settleGoalRequest(h.db, now), true);
+    assertEquals(await goalRequestOf(h.db, m, a.id), null);
   } finally {
     h.close();
   }

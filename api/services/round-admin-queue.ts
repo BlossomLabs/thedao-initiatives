@@ -31,7 +31,7 @@ import { voteSettings } from "../routes/board.ts";
 import type { VoteRound } from "./vote-chain.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { adminBatch } from "../../shared/vote/admin-batch.ts";
-import { dropGoalRequest, goalRequests } from "./goal-requests.ts";
+import { goalRequests, settleGoalRequest } from "./goal-requests.ts";
 import type { Tier } from "../../shared/vote/ballot.ts";
 import type { Schedule } from "../../shared/vote/quiet-ending.ts";
 import {
@@ -357,7 +357,7 @@ export function roundAdminQueue(deps: Deps) {
       const goal = BigInt(Math.round(r.goalUsd * 100)) * 10_000n;
       // The round has it already (signed, or set another way): settled, not listed.
       if (BigInt(p.goalUsd) === goal) {
-        await dropGoalRequest(db, r.rfpId);
+        await settleGoalRequest(db, r);
         continue;
       }
       const groups = p.groups.reduce((a, g) => a | (1n << BigInt(g)), 0n);

@@ -79,8 +79,17 @@ export async function ballotFor(db: Db, rfpId: string) {
 }
 
 /** What a page shows of a request. */
-export const goalRequestJson = (r: GoalRequest | null) =>
-  r ? { goalUsd: r.goalUsd, by: r.by, at: r.at } : undefined;
+export const goalRequestJson = (r: GoalRequest | null, withBy = true) =>
+  r ? { goalUsd: r.goalUsd, ...(withBy ? { by: r.by } : {}), at: r.at } : undefined;
+
+/** Settle `r` once the round has its goal: removed only if it is still the waiting
+ * request, so one asked for meanwhile stays. False when another took its place. */
+export async function settleGoalRequest(db: Db, r: GoalRequest): Promise<boolean> {
+  const cur = await db.kv.get<GoalRequest>(key(r.rfpId));
+  const v = cur.value;
+  if (!v || v.at !== r.at || v.goalUsd !== r.goalUsd || v.contract !== r.contract) return false;
+  return (await db.kv.atomic().check(cur).delete(key(r.rfpId)).commit()).ok;
+}
 
 export async function dropGoalRequest(db: Db, rfpId: string): Promise<void> {
   await db.kv.delete(key(rfpId));

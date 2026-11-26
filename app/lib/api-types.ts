@@ -268,7 +268,8 @@ export interface Donation {
 /** A goal change on a ballot initiative waiting for a round admin to sign it (#149). */
 export interface GoalRequestJson {
   goalUsd: number;
-  by: string;
+  /** Who asked: for the team and the proposer only. */
+  by?: string;
   at: number;
 }
 

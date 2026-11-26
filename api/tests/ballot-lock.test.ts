@@ -5,6 +5,7 @@ import { NO_ROUND, type VoteManifest } from "../../shared/vote/manifest.ts";
 import { voteSettingKey } from "../services/vote-active.ts";
 import { assertOffBallot, ballotSlugs, ON_BALLOT } from "../services/ballot-lock.ts";
 import { HttpError } from "../lib/errors.ts";
+import { dropGoalRequest } from "../services/goal-requests.ts";
 
 const test: VoteManifest = { ...NO_ROUND, contract: `0x${"12".repeat(20)}`, slugs: ["t"] };
 const production: VoteManifest = {
@@ -193,8 +194,12 @@ Deno.test("accepting a proposer's held goal change on the ballot: the text goes 
       goal: 78000,
     });
     assertEquals(held.status, 201);
-    const res = await x.accept(((await j(held)).revision as { n: number }).n);
+    const n = ((await j(held)).revision as { n: number }).n;
+    const res = await x.accept(n);
     assertEquals(res.status, 200);
+    // The live revision is the text: the goal it asked for waits, so its history says none.
+    const live = (await j(res)).revision as { n: number };
+    assertEquals((await h.db.revisions.get(x.id, live.n))?.goalUsd, undefined);
     const after = await x.row();
     assertEquals([after.title, after.goalUsd, after.pendingRevision ?? null], [
       "A retitled initiative",
@@ -338,6 +343,44 @@ Deno.test("off the ballot an admin can still fix an affiliation's case", async (
     });
     assertEquals(res.status, 200);
     assertEquals((await h.db.initiatives.get(id))!.affiliations, ["SEAL"]);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("an admin's goal-only edit on the ballot asks for the goal: 202, not Nothing changed", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    // The page already has milestones for $78,000 (an accepted edit whose goal request was
+    // discarded): asking for the goal again changes no text.
+    const x = await onBallot(h);
+    const body = { ...revisionBody(minimalSubmission(78000)), goal: 78000 };
+    const held = await j(await x.edit(body));
+    assertEquals((await x.accept((held.revision as { n: number }).n)).status, 200);
+    await dropGoalRequest(h.db, x.id);
+    const res = await h.req(`/api/initiatives/${x.slug}/revisions`, {
+      method: "POST",
+      token: x.admin,
+      json: body,
+    });
+    assertEquals(res.status, 202, await res.clone().text());
+    assertEquals(((await j(res)).goalRequest as { goalUsd: number }).goalUsd, 78000);
+    assertEquals((await x.row()).goalUsd, 25000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("public page data shows a goal awaiting signature without who asked; admins see it", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const { slug, patch, admin } = await onBallot(h);
+    assertEquals((await patch({ goal: 78000 })).status, 202);
+    const anon = (await j(await h.req(`/api/initiatives/${slug}`))).goalRequest;
+    assertEquals(anon, { goalUsd: 78000, at: (anon as { at: number }).at });
+    const team = (await j(await h.req(`/api/initiatives/${slug}`, { token: admin })))
+      .goalRequest as { by?: string };
+    assertEquals(team.by, ADMIN);
   } finally {
     h.close();
   }

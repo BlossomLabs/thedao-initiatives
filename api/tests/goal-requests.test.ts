@@ -1,0 +1,189 @@
+/** A ballot initiative's goal change waits for a round admin (#149): the page keeps its
+ * goal until the round has the new one, then takes it. */
+import { assertEquals } from "@std/assert";
+import { ADMIN, type Harness, harness, j } from "./app-helpers.ts";
+import { minimalSubmission, revisionBody } from "./fixtures.ts";
+import { approved, onBallot, production, setting } from "./ballot-helpers.ts";
+import { voteSettingKey } from "../services/vote-active.ts";
+import {
+  dropGoalRequest,
+  goalRequestOf,
+  requestGoal,
+  settleGoalRequest,
+} from "../services/goal-requests.ts";
+
+const GOOD = minimalSubmission(25000);
+const goalOf = async (h: Harness, slug: string, token?: string) =>
+  (await j(await h.req(`/api/initiatives/${slug}`, token ? { token } : {}))).goalRequest as
+    | { goalUsd: number; by?: string; at: number }
+    | undefined;
+
+Deno.test("admin PATCH goal on the ballot: 202, the page keeps its goal", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const { slug, patch, row, admin } = await onBallot(h);
+    const res = await patch({ goal: 78000, durationMonths: 12 });
+    assertEquals(res.status, 202);
+    assertEquals(((await j(res)).goalRequest as { goalUsd: number }).goalUsd, 78000);
+    assertEquals([(await row()).goalUsd, (await row()).durationMonths], [25000, 12]);
+    assertEquals((await goalOf(h, slug, admin))?.goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("admin PATCH back to the current goal drops the request", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    assertEquals((await x.patch({ goal: 78000 })).status, 202);
+    assertEquals((await x.patch({ goal: 25000 })).status, 200);
+    assertEquals(await goalOf(h, x.slug), undefined);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("off the ballot a goal edit applies as before", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const y = await approved(h);
+    assertEquals((await y.patch({ goal: 78000 })).status, 200);
+    assertEquals((await y.row()).goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("an admin's live text edit with a new goal: the text goes live, the goal is requested", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const body = { ...revisionBody(minimalSubmission(78000)), title: "A retitled initiative" };
+    assertEquals((await x.edit({ ...body, goal: 78000 }, x.admin)).status, 201);
+    assertEquals([(await x.row()).title, (await x.row()).goalUsd], [
+      "A retitled initiative",
+      25000,
+    ]);
+    assertEquals((await goalOf(h, x.slug))?.goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("accepting a proposer's held goal edit: text live, goal requested, its revision sets none", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const held = await x.edit({
+      ...revisionBody(minimalSubmission(78000)),
+      title: "A retitled initiative",
+      goal: 78000,
+    });
+    assertEquals(held.status, 201);
+    const res = await x.accept(((await j(held)).revision as { n: number }).n);
+    assertEquals(res.status, 200);
+    const live = (await j(res)).revision as { n: number };
+    assertEquals((await h.db.revisions.get(x.id, live.n))?.goalUsd, undefined);
+    assertEquals([(await x.row()).title, (await x.row()).goalUsd], [
+      "A retitled initiative",
+      25000,
+    ]);
+    assertEquals((await goalOf(h, x.slug))?.goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("accepting a held edit without a goal change on the ballot asks for nothing", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const held = await j(
+      await x.edit({ ...revisionBody(GOOD), title: "A retitled initiative", goal: 25000 }),
+    );
+    assertEquals((await x.accept((held.revision as { n: number }).n)).status, 200);
+    assertEquals(await goalOf(h, x.slug), undefined);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("an admin's goal-only edit answers 202 with the request, not Nothing changed", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const body = { ...revisionBody(minimalSubmission(78000)), goal: 78000 };
+    const held = await j(await x.edit(body));
+    assertEquals((await x.accept((held.revision as { n: number }).n)).status, 200);
+    await dropGoalRequest(h.db, x.id);
+    const res = await x.edit(body, x.admin);
+    assertEquals(res.status, 202, await res.clone().text());
+    assertEquals(((await j(res)).goalRequest as { goalUsd: number }).goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("after the vote closes a goal change on the ballot is refused", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h, { closesAt: 1 });
+    const res = await x.patch({ goal: 78000 });
+    assertEquals(res.status, 409);
+    assertEquals((await j(res)).error, "The vote has closed: the round's goal is final.");
+    assertEquals((await x.row()).goalUsd, 25000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("public page data shows a waiting goal without who asked; admins see it", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    assertEquals((await x.patch({ goal: 78000 })).status, 202);
+    const anon = (await goalOf(h, x.slug))!;
+    assertEquals(anon, { goalUsd: 78000, at: anon.at });
+    assertEquals((await goalOf(h, x.slug, x.admin))?.by, ADMIN);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("the page takes the goal once the round has it, and the request goes", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    assertEquals((await x.patch({ goal: 78000 })).status, 202);
+    // The round admin signed: the stored round now has $78,000 for the slot.
+    await x.putOnBallot({
+      projects: [
+        { goalUsd: "1000000", rfp: true, groups: [] },
+        { goalUsd: "78000000000", rfp: true, groups: [] },
+      ],
+    });
+    const page = await j(await h.req(`/api/initiatives/${x.slug}`));
+    assertEquals(page.goalRequest, undefined);
+    assertEquals((page.initiative as { goalUsd: number }).goalUsd, 78000);
+    assertEquals((await x.row()).goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("settling never removes a request asked for after it was read", async () => {
+  const h = await harness();
+  try {
+    const x = await approved(h);
+    const m = production([(await x.row()).safeAddress]);
+    await h.db.meta.set(voteSettingKey("production"), setting(m));
+    const old = (await requestGoal(h.db, m, await x.row(), 78_000, "0x1"))!;
+    h.clock.now += 60;
+    await requestGoal(h.db, m, await x.row(), 60_000, "0x2");
+    assertEquals(await settleGoalRequest(h.db, old), false);
+    assertEquals((await goalRequestOf(h.db, m, x.id))?.goalUsd, 60_000);
+  } finally {
+    h.close();
+  }
+});

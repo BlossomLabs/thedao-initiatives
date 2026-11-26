@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
-import { assertOffBallot, ballotSlot, productionManifest } from "../services/ballot-lock.ts";
+import { assertOffBallot } from "../services/ballot-lock.ts";
+import {
+  assertGoalOpen,
+  ballotFor,
+  goalRequestJson,
+  requestGoal,
+  settleIfOnChain,
+} from "../services/goal-requests.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
@@ -183,21 +190,26 @@ export function initiativeRoutes(deps: Deps) {
 
   r.get("/:slug", async (c) => {
     const user = c.var.user;
-    const initiative = await visibleOr404(c.req.param("slug"), user);
+    let initiative = await visibleOr404(c.req.param("slug"), user);
     // A pending row has no Safe and takes no money: its link (#73) reads, and
     // never starts a ledger or chain refresh.
     const asked = c.req.query("refresh") === "1" && isPublished(initiative);
     const paused = asked && await deps.maintenance.on();
     const refresh = asked && !paused;
     if (refresh) await refreshLedger(deps, initiative);
-    const [pledges, donations, chainState, revisions, ledger, pausedUntil] = await Promise.all([
-      db.pledges.list(initiative.id),
-      db.donations.list(initiative.id),
-      sharedChainState(deps, refresh),
-      db.revisions.list(initiative.id, Boolean(user?.isAdmin)),
-      ledgerStatus(deps, initiative),
-      safeApiPausedUntil(deps),
-    ]);
+    const [pledges, donations, chainState, revisions, ledger, pausedUntil, ballot] = await Promise
+      .all([
+        db.pledges.list(initiative.id),
+        db.donations.list(initiative.id),
+        sharedChainState(deps, refresh),
+        db.revisions.list(initiative.id, Boolean(user?.isAdmin)),
+        ledgerStatus(deps, initiative),
+        safeApiPausedUntil(deps),
+        ballotFor(db, initiative),
+      ]);
+    // A goal the round has now: the page takes it (#149).
+    const settled = await settleIfOnChain(db, ballot.manifest, initiative, ballot.goalRequest);
+    initiative = settled.row;
     // While the Safe API is rate limiting us, the ledger is not due (ledgerStatus).
     if (ledger && pausedUntil > deps.now()) ledger.refreshDue = false;
     const summary = await deps.funding.summaryFrom(initiative, pledges, donations, refresh);
@@ -212,6 +224,12 @@ export function initiativeRoutes(deps: Deps) {
         : publicInitiative(initiative),
       revisions: revisions.map(revisionMeta),
       summary,
+      onBallot: ballot.slot >= 0,
+      // Who asked is an admin's wallet: for the team and the proposer only.
+      goalRequest: goalRequestJson(
+        settled.request,
+        Boolean(user?.isAdmin) || isProposer(initiative, user ?? null),
+      ),
       pct: pctOf(summary.total, initiative.goalUsd),
       pledges: pledges.map((p) => pledgeJson(config, p)),
       donations: donations.map((d) => donationJson(d, decimalsOf)),
@@ -352,6 +370,12 @@ export function initiativeRoutes(deps: Deps) {
       if (err) throw new HttpError(400, err);
       goalUsd = goal!;
     }
+    // On the ballot a new goal waits for a round admin (#149): a held edit carries it to
+    // its review; an edit that goes live now leaves the goal as it is and asks for it.
+    const round = await ballotFor(db, initiative);
+    const newGoal = body.goal !== undefined && goalUsd !== initiative.goalUsd && round.slot >= 0;
+    if (newGoal) assertGoalOpen(round.manifest, deps.now());
+    const askGoal = newGoal && !holdWhen(initiative);
     const backers = pledgeBackers(await db.pledges.list(initiative.id));
     const findings = mergeFindings(
       caps,
@@ -366,11 +390,18 @@ export function initiativeRoutes(deps: Deps) {
         ...base,
         ...structured,
         categories: categories ?? undefined,
-        goalUsd: body.goal === undefined ? undefined : goalUsd,
+        goalUsd: body.goal === undefined || askGoal ? undefined : goalUsd,
       },
       origin,
       holdWhen,
     );
+    const goalRequest = askGoal
+      ? await requestGoal(db, round.manifest!, next, goalUsd, user.address)
+      : null;
+    // Only the goal was new: no text revision, the request is the change.
+    if (!revision && goalRequest) {
+      return c.json({ goalRequest: goalRequestJson(goalRequest) }, 202);
+    }
     if (!revision) throw new HttpError(400, "Nothing changed.");
     return saved(next, revision, warnings);
   });
@@ -397,18 +428,27 @@ export function initiativeRoutes(deps: Deps) {
       }
     };
     assertUnlocked(initiative);
-    const patch = await readPageFacts(body, initiative, deps);
-    // On the ballot the type changes only with the round (#149).
-    assertOffBallot(
-      ballotSlot(await productionManifest(db), initiative) >= 0,
-      patch.type !== undefined && patch.type !== initiative.type,
-    );
+    const { goalUsd, ...facts } = await readPageFacts(body, initiative, deps);
+    const patch: Partial<Initiative> = facts;
+    // On the ballot (#149) the type changes only with the round, and a new goal waits for a
+    // round admin to sign it (asking for the current one drops a waiting request).
+    const round = await ballotFor(db, initiative);
+    const onBallot = round.slot >= 0;
+    assertOffBallot(onBallot, patch.type !== undefined && patch.type !== initiative.type);
+    if (goalUsd !== undefined && !onBallot) patch.goalUsd = goalUsd;
+    if (goalUsd !== undefined && onBallot && goalUsd !== initiative.goalUsd) {
+      assertGoalOpen(round.manifest, deps.now());
+    }
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch, assertUnlocked)
       : initiative;
+    const goalRequest = goalUsd !== undefined && onBallot
+      ? await requestGoal(db, round.manifest!, next, goalUsd, user.address)
+      : null;
     return c.json({
       initiative: adminInitiative(next, canReadPrivateFields(next, user, deps.now())),
-    });
+      goalRequest: goalRequestJson(goalRequest),
+    }, goalRequest ? 202 : 200);
   });
 
   /**

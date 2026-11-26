@@ -11,6 +11,14 @@ import { bodyLimit } from "hono/body-limit";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { assertOffBallot, ballotSlot, productionManifest } from "../services/ballot-lock.ts";
+import {
+  assertGoalOpen,
+  ballotFor,
+  dropGoalRequest,
+  goalRequestJson,
+  requestGoal,
+  settleIfOnChain,
+} from "../services/goal-requests.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
 import { briefFor, rewriteBriefSoon, writeBrief } from "../services/vote-briefs.ts";
 import { AiError } from "../services/ai.ts";
@@ -943,7 +951,11 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
   });
 
   r.get("/initiatives/:id", async (c) => {
-    const initiative = await initiativeOr404(c.req.param("id"));
+    const found = await initiativeOr404(c.req.param("id"));
+    // A goal the round has now: the page takes it (#149).
+    const round = await ballotFor(db, found);
+    const settled = await settleIfOnChain(db, round.manifest, found, round.goalRequest);
+    const initiative = settled.row;
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     // Pledge changes that landed on-chain since are applied before the list is read.
     const pendingPledges = await pledges.settleAll(initiative.id);
@@ -966,6 +978,8 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       pendingPledges,
       awaitingPledges,
       awaitingClosed,
+      onBallot: round.slot >= 0,
+      goalRequest: goalRequestJson(settled.request),
       donations: (await db.donations.list(initiative.id, false)).map((d) =>
         donationJson(d, decimalsOf)
       ),
@@ -1079,10 +1093,25 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       const n = Number(c.req.param("n"));
       const note = s((await jsonBody(c, ["note"])).note, 500);
       auditContext(c, { target: `${initiative.id}:${n}`, detail: verdict });
+      // On the ballot (#149) accepting puts the text live and leaves the goal it carries
+      // waiting for a round admin to sign; refused once the vote has closed.
+      const round = await ballotFor(db, initiative);
+      const keepGoal = verdict === "accept" && round.slot >= 0;
+      const goal = keepGoal && Number.isInteger(n) && n > 0
+        ? (await db.revisions.get(initiative.id, n))?.goalUsd
+        : undefined;
+      if (goal !== undefined && goal !== initiative.goalUsd) {
+        assertGoalOpen(round.manifest, deps.now());
+      }
       const done = Number.isInteger(n) && n > 0
-        ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note)
+        ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note, {
+          keepGoal,
+        })
         : null;
       if (!done) throw new HttpError(409, "That edit is no longer waiting for review.");
+      if (goal !== undefined) {
+        await requestGoal(db, round.manifest!, done.initiative, goal, c.var.user!.address);
+      }
       // Accepted: the live text changed, the vote card's bullets follow.
       if (verdict === "accept") rewriteBriefSoon(deps, initiative.id);
       return c.json({
@@ -1524,6 +1553,15 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     }
     await pledges.settleLeftover(initiative.id, pid);
     await db.pledges.remove(initiative.id, pid);
+    return c.json({ ok: true });
+  });
+
+  /** Discard a ballot initiative's goal request (any site admin, #149). The goal stays. */
+  r.delete("/initiatives/:id/goal-request", async (c) => {
+    await jsonBody(c, []);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    auditContext(c, { target: initiative.id });
+    await dropGoalRequest(db, initiative.id);
     return c.json({ ok: true });
   });
 

@@ -265,6 +265,14 @@ export interface Donation {
   confirmedAt: number | null;
 }
 
+/** A goal change on a ballot initiative waiting for a round admin to sign it (#149). */
+export interface GoalRequestJson {
+  goalUsd: number;
+  /** Who asked: for the team and the proposer only. */
+  by?: string;
+  at: number;
+}
+
 export interface InitiativePage {
   /** The server's token verification needs a background refresh. */
   refreshDue?: boolean;
@@ -272,6 +280,10 @@ export interface InitiativePage {
   /** Public history, oldest first (archived entries only for admins). */
   revisions: RevisionMeta[];
   summary: Summary;
+  /** On the production ballot (#149): its goal waits for a round admin; its type and
+   * affiliations change only with the round. */
+  onBallot?: boolean;
+  goalRequest?: GoalRequestJson;
   pct: number;
   pledges: Pledge[];
   donations: Donation[];
@@ -575,6 +587,9 @@ export interface AdminInitiativePage {
   /** The real vote has closed: awaiting pledges can't be signed any more, only saved as
    * they are or discarded. */
   awaitingClosed?: boolean;
+  /** On the production ballot (#149). */
+  onBallot?: boolean;
+  goalRequest?: GoalRequestJson;
   donations: Donation[];
   safeSync: SafeSyncState | null;
   signers: { ok: boolean; detail: string; list: string[]; threshold: number };

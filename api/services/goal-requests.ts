@@ -110,8 +110,9 @@ export async function settleIfOnChain(
   const next = row.goalUsd === r.goalUsd
     ? row
     : await db.initiatives.update(row.id, { goalUsd: r.goalUsd });
-  await settleGoalRequest(db, r);
-  return { row: next, request: null };
+  // Replaced meanwhile: the newer request stays, and is the one to show.
+  const request = await settleGoalRequest(db, r) ? null : await goalRequestOf(db, m, row.id);
+  return { row: next, request };
 }
 
 /** `settleIfOnChain` from a page read: best-effort, never during maintenance, and a

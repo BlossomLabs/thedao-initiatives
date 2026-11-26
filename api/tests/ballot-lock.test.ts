@@ -139,3 +139,28 @@ Deno.test("syncKeptNote names the ballot initiatives whose round facts the sync 
       "Change a goal from the initiative's edit page; a round admin signs it.",
   );
 });
+
+Deno.test("sync-content refuses a file that would change a ballot initiative's type", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const admin = await h.mint(ADMIN, true);
+    const sync = (files: { name: string; text: string }[]) =>
+      h.req("/api/admin/sync-content", { method: "POST", token: admin, json: { files } });
+    const [rfp, grant] = syntheticContentFiles();
+    assertEquals((await sync([grant])).status, 200);
+    const before = (await h.db.initiatives.bySlug("synthetic-grant"))!;
+    await h.db.initiatives.update(before.id, { safeAddress: SAFE });
+    await putRound(h, production([SAFE]));
+    // The grant's file now holds an RFP: its grant sections would be replaced.
+    const out = await j(await sync([{ name: grant.name, text: rfp.text }]));
+    assertEquals((out.errors as string[]).length, 1);
+    assertEquals(
+      (out.errors as string[])[0],
+      "synthetic-grant.md: On the ballot, its type changes only with the round: keep this file a grant.",
+    );
+    const after = (await h.db.initiatives.get(before.id))!;
+    assertEquals([after.type, after.sections], [before.type, before.sections]);
+  } finally {
+    h.close();
+  }
+});

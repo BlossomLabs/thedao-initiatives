@@ -10,6 +10,7 @@ import {
   goalRequestOf,
   requestGoal,
   settleGoalRequest,
+  settleIfOnChain,
 } from "../services/goal-requests.ts";
 
 const GOOD = minimalSubmission(25000);
@@ -320,6 +321,72 @@ Deno.test("accepting a held edit whose goal the page already has keeps another w
     assertEquals((await x.patch({ goal: 78000 })).status, 202);
     assertEquals((await x.accept((held.revision as { n: number }).n)).status, 200);
     assertEquals((await goalOf(h, x.slug))?.goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("if the goal request can't be saved, the held edit stays waiting to be accepted again", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const held = await j(
+      await x.edit({
+        ...revisionBody(minimalSubmission(78000)),
+        title: "A retitled initiative",
+        goal: 78000,
+      }),
+    );
+    const n = (held.revision as { n: number }).n;
+    const set = h.db.kv.set.bind(h.db.kv);
+    h.db.kv.set = ((key: Deno.KvKey, value: unknown) =>
+      key[0] === "goal-request"
+        ? Promise.reject(new Error("KV write failed"))
+        : set(key, value)) as typeof h.db.kv.set;
+    const res = await x.accept(n);
+    h.db.kv.set = set;
+    assertEquals(res.status >= 500, true);
+    assertEquals([(await x.row()).pendingRevision, (await x.row()).title], [
+      n,
+      "A proper initiative title",
+    ]);
+    assertEquals((await x.accept(n)).status, 200);
+    assertEquals((await goalOf(h, x.slug))?.goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("if accepting fails after the request was saved, no stray request is left", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const held = await j(
+      await x.edit({ ...revisionBody(minimalSubmission(78000)), goal: 78000 }),
+    );
+    const review = h.db.initiatives.review;
+    h.db.initiatives.review = () => Promise.resolve(null);
+    assertEquals((await x.accept((held.revision as { n: number }).n)).status, 409);
+    h.db.initiatives.review = review;
+    assertEquals(await goalOf(h, x.slug), undefined);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("settling a request that was replaced meanwhile returns the newer one", async () => {
+  const h = await harness();
+  try {
+    const x = await approved(h);
+    const m = production([(await x.row()).safeAddress], {
+      projects: [{ goalUsd: "78000000000", rfp: true, groups: [] }],
+    });
+    await h.db.meta.set(voteSettingKey("production"), setting(m));
+    const old = (await requestGoal(h.db, m, await x.row(), 78_000, "0x1"))!;
+    h.clock.now += 60;
+    await requestGoal(h.db, m, await x.row(), 60_000, "0x2");
+    const out = await settleIfOnChain(h.db, m, await x.row(), old);
+    assertEquals(out.request?.goalUsd, 60_000);
   } finally {
     h.close();
   }

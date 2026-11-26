@@ -654,6 +654,14 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     const existing = await bySourceSlug(slug);
     if (existing) {
       const keep = opts.keep?.(existing) === true;
+      // Its sections follow its type: a file of the other type would replace them.
+      if (keep && f.type !== existing.type) {
+        throw new Error(
+          `On the ballot, its type changes only with the round: keep this file a${
+            existing.type === "rfp" ? "n RFP" : " grant"
+          }.`,
+        );
+      }
       const patch: Partial<Initiative> = {
         ...(keep ? {} : { goalUsd: f.goalUsd, type: f.type }),
         discourseUrl: f.discourseUrl,

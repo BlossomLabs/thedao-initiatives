@@ -40,7 +40,9 @@ export default function SettingsForm(
     setSaved(next);
     setForm(next);
   }, [r.proposer, r.sortRank, r.paidOutUsd, r.affiliations?.join(", ")]);
-  const keys = Object.keys(saved) as (keyof typeof saved)[];
+  // On the ballot the affiliations are the round's: a draft of them is never sent (#149).
+  const keys = (Object.keys(saved) as (keyof typeof saved)[])
+    .filter((k) => !(onBallot && k === "affiliations"));
   const changed = Object.fromEntries(
     keys.filter((k) => form[k].trim() !== saved[k]).map((k) => [k, form[k].trim()]),
   );

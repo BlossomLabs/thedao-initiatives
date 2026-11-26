@@ -16,6 +16,7 @@ import {
   dropGoalRequest,
   goalRequestJson,
   requestGoal,
+  settleGoalRequest,
   settleOnRead,
 } from "../services/goal-requests.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
@@ -1110,15 +1111,23 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       const goal = keepGoal && !closed && !stopped && Number.isInteger(n) && n > 0
         ? (await db.revisions.get(initiative.id, n))?.goalUsd
         : undefined;
+      // The request is saved before the text goes live: if saving it fails, the edit is still
+      // waiting and can be accepted again; if accepting fails, the request goes. A goal the
+      // page already has asks for nothing (and keeps another waiting request).
+      const asked = goal !== undefined && goal !== initiative.goalUsd
+        ? await requestGoal(db, round.manifest!, initiative, goal, c.var.user!.address)
+        : null;
       const done = Number.isInteger(n) && n > 0
         ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note, {
           keepGoal,
+        }).catch(async (e) => {
+          if (asked) await settleGoalRequest(db, asked);
+          throw e;
         })
         : null;
-      if (!done) throw new HttpError(409, "That edit is no longer waiting for review.");
-      // A goal the page already has asks for nothing (and keeps another waiting request).
-      if (goal !== undefined && goal !== done.initiative.goalUsd) {
-        await requestGoal(db, round.manifest!, done.initiative, goal, c.var.user!.address);
+      if (!done) {
+        if (asked) await settleGoalRequest(db, asked);
+        throw new HttpError(409, "That edit is no longer waiting for review.");
       }
       // Accepted: the live text changed, the vote card's bullets follow.
       if (verdict === "accept") rewriteBriefSoon(deps, initiative.id);

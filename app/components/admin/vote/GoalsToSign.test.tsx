@@ -157,3 +157,20 @@ it("when the round's state couldn't be read, Sign is off, saying so", () => {
     "The round's state couldn't be read. Try again shortly.",
   );
 });
+
+it("a new request for an initiative already signed for can still be signed", async () => {
+  const qc = new QueryClient();
+  const view = mount([goal], qc);
+  fireEvent.click(screen.getByRole("button", { name: "Sign ValOS's goal change" }));
+  await screen.findByText("Set on the round. The list updates once the site has it.");
+  const next = { ...goal, fromUsd: 72_000, toUsd: 70_000, at: goal.at! + 600 };
+  view.rerender(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <GoalsToSign items={[next]} />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(screen.getByRole("button", { name: "Sign ValOS's goal change" })).not.toBeDisabled();
+  expect(screen.getByRole("button", { name: "Discard ValOS's goal change" })).not.toBeDisabled();
+});

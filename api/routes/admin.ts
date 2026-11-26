@@ -61,10 +61,11 @@ import {
   voteSettingKey,
 } from "../services/vote-active.ts";
 import { adminBatch } from "../../shared/vote/admin-batch.ts";
-import { type Tier, tierName } from "../../shared/vote/ballot.ts";
+import { tierName } from "../../shared/vote/ballot.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
 import type { VoteReplay } from "./vote.ts";
-import { roundJson as replayJson } from "../../shared/vote/replay-round.ts";
+import { roundStanding } from "../services/round-standing.ts";
+import { goalStop } from "../../shared/vote/ballot-facts.ts";
 import { readRoundOnChain } from "../services/vote-round-read.ts";
 import { errorText, sendNext, withRelayer } from "./vote.ts";
 import { TEST_USD_MAX_MINT } from "../../shared/vote/test-usd.ts";
@@ -376,30 +377,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
    * settled in (funded or covered at a settlement), which closes the withdrawal. Read from
    * the public round (its few-second cache), so it agrees with what voters see.
    */
-  const withdrawals = async (d: VoteRound) => {
-    const st = await voteReplay(d);
-    const body = replayJson(st, d.manifest.slugs);
-    const settled = new Map<string, Tier>();
-    for (const t of body.tiers) {
-      if (t.status !== "settled") continue;
-      for (const slug of [...t.funded, ...t.covered]) {
-        if (!settled.has(slug)) settled.set(slug, t.tier);
-      }
-    }
-    const withdrawn = new Set(body.live.withdrawn);
-    // Every tier settled: the tally is final (and `live` is empty), nothing to withdraw from.
-    const final = body.tiers.every((t) => t.status === "settled");
-    const last = body.tiers[2];
-    const lastWithdrawn = new Set(last.status === "settled" ? last.withdrawn : []);
-    return {
-      final,
-      initiatives: d.manifest.slugs.map((slug) => ({
-        slug,
-        withdrawn: final ? lastWithdrawn.has(slug) : withdrawn.has(slug),
-        settledIn: settled.get(slug) ?? null,
-      })),
-    };
-  };
+  const withdrawals = (d: VoteRound) => roundStanding(d, voteReplay);
   /** Whether the round's contract has withdrawals at all (the first test round doesn't). */
   const canWithdraw = (d: VoteRound) => d.chain.canWithdraw?.() ?? Promise.resolve(true);
   const roundNow = async () => {
@@ -678,18 +656,21 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     if (!q.goals.length) return c.json(q);
     // A goal change of a settled or withdrawn initiative, or while a tier settles, waits
     // (#149). If the round's state can't be read, every Sign waits: never signed blind.
-    const w = await withdrawals(d).catch(() => null);
+    const standing = deps.ballotStanding && d.manifest.kind === "real"
+      ? await deps.ballotStanding().catch(() => null)
+      : (await withdrawals(d).catch(() => null))?.initiatives ?? null;
     return c.json({
       ...q,
-      goals: q.goals.map((g) => ({
-        ...g,
-        blocked: goalBlock(
-          Number(g.call.id),
-          w?.initiatives ?? null,
-          d.manifest.schedule,
-          deps.now(),
+      goals: q.goals
+        .map((g) => ({
+          ...g,
+          blocked: goalBlock(Number(g.call.id), standing, d.manifest.schedule, deps.now()),
+        }))
+        // A difference that can never be signed (settled or withdrawn) has nothing to do.
+        .filter((g) =>
+          !(g.kind === "record" &&
+            (g.blocked?.kind === "settled" || g.blocked?.kind === "withdrawn"))
         ),
-      })),
     });
   });
   /** Put on the ballot, one round admin at a time (services/round-admin-queue.ts): the
@@ -1113,7 +1094,10 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       const round = await ballotFor(db, initiative);
       const keepGoal = verdict === "accept" && round.slot >= 0;
       const closed = !!round.manifest && deps.now() >= round.manifest.closesAt;
-      const goal = keepGoal && !closed && Number.isInteger(n) && n > 0
+      // Settled or withdrawn: the same, the goal can't change any more.
+      const stopped = keepGoal && !closed &&
+        goalStop(await deps.ballotStanding?.() ?? null, round.slot) !== null;
+      const goal = keepGoal && !closed && !stopped && Number.isInteger(n) && n > 0
         ? (await db.revisions.get(initiative.id, n))?.goalUsd
         : undefined;
       const done = Number.isInteger(n) && n > 0
@@ -1122,7 +1106,8 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
         })
         : null;
       if (!done) throw new HttpError(409, "That edit is no longer waiting for review.");
-      if (goal !== undefined) {
+      // A goal the page already has asks for nothing (and keeps another waiting request).
+      if (goal !== undefined && goal !== done.initiative.goalUsd) {
         await requestGoal(db, round.manifest!, done.initiative, goal, c.var.user!.address);
       }
       // Accepted: the live text changed, the vote card's bullets follow.

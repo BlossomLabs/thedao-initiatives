@@ -173,3 +173,24 @@ Deno.test("the queue service never offers a goal change as signable before the r
     s.h.close();
   }
 });
+
+Deno.test("a difference item that can never be signed (settled or withdrawn) isn't listed", async () => {
+  const s = await setup(78_000, "108000000000");
+  try {
+    s.h.deps.ballotStanding = () =>
+      Promise.resolve([{ withdrawn: false, settledIn: null }, {
+        withdrawn: false,
+        settledIn: "S",
+      }]);
+    assertEquals(await s.goals(), []);
+    // A request stays, Sign off, so it can still be discarded.
+    await requestGoal(s.h.db, s.m, { ...s.row, goalUsd: 78_000 }, 60_000, ADMIN);
+    const [g] = await s.goals();
+    assertEquals([g.kind, (g as unknown as { blocked: unknown }).blocked], ["request", {
+      kind: "settled",
+      tier: "S",
+    }]);
+  } finally {
+    s.h.close();
+  }
+});

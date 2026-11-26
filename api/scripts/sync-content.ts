@@ -10,6 +10,7 @@
  * (resolved like the API does), CONTENT_DIR (default content/initiatives at the
  * repo root).
  */
+import { syncKeptNote } from "../services/content.ts";
 import { env, siweLogin } from "./lib.ts";
 import { webOriginsFrom } from "../config.ts";
 
@@ -97,4 +98,6 @@ if (!res.ok) {
   Deno.exit(1);
 }
 console.log(JSON.stringify(body, null, 2));
+const keptNote = syncKeptNote(body.kept ?? []);
+if (keptNote) console.error(keptNote);
 if (body.errors?.length) Deno.exit(2);

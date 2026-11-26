@@ -253,3 +253,74 @@ Deno.test("after the vote closes a held edit carrying a goal still goes live, wi
     h.close();
   }
 });
+
+Deno.test("a settled or withdrawn ballot initiative's goal can't be asked for", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    h.deps.ballotStanding = () =>
+      Promise.resolve([{ withdrawn: false, settledIn: null }, {
+        withdrawn: false,
+        settledIn: "A",
+      }]);
+    const res = await x.patch({ goal: 78000 });
+    assertEquals(res.status, 409);
+    assertEquals((await j(res)).error, "Settled in A-Tier: its award is final, so its goal stays.");
+    h.deps.ballotStanding = () =>
+      Promise.resolve([{ withdrawn: false, settledIn: null }, {
+        withdrawn: true,
+        settledIn: null,
+      }]);
+    const again = await x.patch({ goal: 78000 });
+    assertEquals(again.status, 409);
+    assertEquals(
+      (await j(again)).error,
+      "Withdrawn from the vote: undo the withdrawal to change its goal.",
+    );
+    assertEquals(await goalOf(h, x.slug), undefined);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("accepting a held goal edit for a settled initiative puts the text live, without the goal", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const held = await j(
+      await x.edit({
+        ...revisionBody(minimalSubmission(78000)),
+        title: "A retitled initiative",
+        goal: 78000,
+      }),
+    );
+    h.deps.ballotStanding = () =>
+      Promise.resolve([{ withdrawn: false, settledIn: null }, {
+        withdrawn: false,
+        settledIn: "S",
+      }]);
+    assertEquals((await x.accept((held.revision as { n: number }).n)).status, 200);
+    assertEquals((await x.row()).title, "A retitled initiative");
+    assertEquals(await goalOf(h, x.slug), undefined);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("accepting a held edit whose goal the page already has keeps another waiting request", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    // A held edit asked for $25,000 when the page had another goal; it has $25,000 now.
+    await h.db.initiatives.update(x.id, { goalUsd: 20_000 });
+    const held = await j(
+      await x.edit({ ...revisionBody(minimalSubmission(25000)), title: "Retitled", goal: 25000 }),
+    );
+    await h.db.initiatives.update(x.id, { goalUsd: 25_000 });
+    assertEquals((await x.patch({ goal: 78000 })).status, 202);
+    assertEquals((await x.accept((held.revision as { n: number }).n)).status, 200);
+    assertEquals((await goalOf(h, x.slug))?.goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});

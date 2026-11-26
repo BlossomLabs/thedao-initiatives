@@ -592,3 +592,20 @@ it("a goal awaiting signature shows by the funding, and any admin can discard it
     })
   );
 });
+
+it("a failed goal-change Discard says why (#149)", async () => {
+  current = {
+    ...page({ status: "approved" }),
+    onBallot: true,
+    goalRequest: { goalUsd: 78_000, by: ADMIN, at: 1_795_521_533 },
+  };
+  const base = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, init) =>
+    String(path).endsWith("/goal-request")
+      ? Promise.reject(new Error("Couldn't reach the server."))
+      : base(path, init)
+  );
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Discard the goal change" }));
+  expect(await screen.findByText(/Couldn't reach the server\./)).toBeInTheDocument();
+});

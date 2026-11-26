@@ -202,13 +202,16 @@ export default function ManageInitiative() {
                 variant="ghost"
                 aria-label="Discard the goal change"
                 onClick={() =>
-                  void api(`/api/admin/initiatives/${r.id}/goal-request`, { method: "DELETE" })
-                    .finally(() => qc.invalidateQueries({ queryKey: ["admin"] }))}
+                  void runAt("goal")(
+                    () => api(`/api/admin/initiatives/${r.id}/goal-request`, { method: "DELETE" }),
+                    "Goal change discarded.",
+                  )}
               >
                 Discard
               </Button>
             </p>
           )}
+          {said("goal")}
 
           <PendingEdit r={r} run={runAt("edit")} />
           {said("edit")}

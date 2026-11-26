@@ -6,6 +6,7 @@ import { grantBody, syntheticContentFiles } from "./fixtures.ts";
 import { approved, onBallot, OTHER_SAFE, production, putRound, SAFE } from "./ballot-helpers.ts";
 import { assertOffBallot, ballotSlot, ON_BALLOT } from "../services/ballot-lock.ts";
 import { HttpError } from "../lib/errors.ts";
+import { syncKeptNote } from "../services/content.ts";
 
 Deno.test("ballotSlot matches by Safe, in any case; -1 off the ballot, for a test round, or none", () => {
   const m = production([OTHER_SAFE, SAFE]);
@@ -128,4 +129,13 @@ Deno.test("sync-content keeps a ballot initiative's goal, type and affiliations,
   } finally {
     h.close();
   }
+});
+
+Deno.test("syncKeptNote names the ballot initiatives whose round facts the sync left alone", () => {
+  assertEquals(syncKeptNote([]), null);
+  assertEquals(
+    syncKeptNote(["valos", "remix"]),
+    "On the ballot, so their goal, type and affiliations were left as they are: valos, remix. " +
+      "Change a goal from the initiative's edit page; a round admin signs it.",
+  );
 });

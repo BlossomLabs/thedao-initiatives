@@ -16,7 +16,7 @@ import {
   dropGoalRequest,
   goalRequestJson,
   requestGoal,
-  settleGoalRequest,
+  rollbackGoalRequest,
   settleOnRead,
 } from "../services/goal-requests.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
@@ -1104,19 +1104,22 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       // The request is saved before the text goes live: if saving it fails, the edit is still
       // waiting and can be accepted again; if accepting fails, the request goes. A goal the
       // page already has asks for nothing (and keeps another waiting request).
-      const asked = goal !== undefined && goal !== initiative.goalUsd
+      // Only the edit that is waiting asks; on rollback the request waiting before comes back.
+      const asked = goal !== undefined && goal !== initiative.goalUsd &&
+          n === initiative.pendingRevision
         ? await requestGoal(db, round.manifest!, initiative, goal, c.var.user!.address)
         : null;
+      const undo = () => asked ? rollbackGoalRequest(db, asked, round.goalRequest) : undefined;
       const done = Number.isInteger(n) && n > 0
         ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note, {
           keepGoal,
         }).catch(async (e) => {
-          if (asked) await settleGoalRequest(db, asked);
+          await undo();
           throw e;
         })
         : null;
       if (!done) {
-        if (asked) await settleGoalRequest(db, asked);
+        await undo();
         throw new HttpError(409, "That edit is no longer waiting for review.");
       }
       // Accepted: the live text changed, the vote card's bullets follow.

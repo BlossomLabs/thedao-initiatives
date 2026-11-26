@@ -135,6 +135,22 @@ export async function settleOnRead(
   }
 }
 
+/** Undo `asked` if it is still the waiting request: the one waiting before it (`previous`)
+ * comes back, or none. A request asked for since is left alone. */
+export async function rollbackGoalRequest(
+  db: Db,
+  asked: GoalRequest,
+  previous: GoalRequest | null,
+): Promise<void> {
+  const cur = await db.kv.get<GoalRequest>(key(asked.rfpId));
+  const v = cur.value;
+  if (!v || v.at !== asked.at || v.goalUsd !== asked.goalUsd || v.contract !== asked.contract) {
+    return;
+  }
+  const op = db.kv.atomic().check(cur);
+  await (previous ? op.set(key(asked.rfpId), previous) : op.delete(key(asked.rfpId))).commit();
+}
+
 export async function dropGoalRequest(db: Db, rfpId: string): Promise<void> {
   await db.kv.delete(key(rfpId));
 }

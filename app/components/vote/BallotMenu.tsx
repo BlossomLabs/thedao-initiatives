@@ -1,6 +1,7 @@
 import { useVoteBase } from "~/lib/vote-round";
 import { useEffect, useState } from "react";
-import { Bot, Copy, ListOrdered } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
+import { Bot, Check, ChevronDown, Copy } from "lucide-react";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { cn } from "~/lib/utils";
@@ -66,10 +67,11 @@ function GiveRow(
   );
 }
 
-/** "Use an LLM…": a button by the ballot that opens what an LLM needs to draft this
- * ballot (a prompt with the /vote/llms.txt guide and this ballot to start from) and
- * where to paste its answer back (YAML, a list of slugs per tier). Pasting only replaces
- * the draft; nothing is sent. */
+/** "Use an LLM… [v]": a split button by the ballot. The main half opens what an LLM
+ * needs to draft this ballot (one prompt: the /vote/llms.txt guide and this ballot to
+ * start from) and where to paste its answer back (YAML, a list of slugs per tier).
+ * Pasting only replaces the draft; nothing is sent. The chevron's menu copies the ballot
+ * alone, as the same YAML (#150). */
 export default function BallotMenu({ slugs, tiers, onApply }: {
   slugs: string[];
   tiers: Partial<Record<string, Tier>>;
@@ -87,7 +89,6 @@ export default function BallotMenu({ slugs, tiers, onApply }: {
   const LLMS = `${useVoteBase()}/llms.txt`;
   const llmsUrl = typeof location === "undefined" ? LLMS : `${location.origin}${LLMS}`;
   const placed = Object.keys(tiers).length;
-  const tierCount = new Set(Object.values(tiers)).size;
   const prompt = [
     `Help me review or build my TheDAO ballot using ${llmsUrl}.`,
     "",
@@ -124,20 +125,61 @@ export default function BallotMenu({ slugs, tiers, onApply }: {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={show}
-        className="inline-flex h-7 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2 font-inter-tight text-[12px] text-white/80 hover:bg-white/10 hover:text-white"
-      >
-        <Bot className="size-3.5 opacity-80" aria-hidden="true" />
-        Use an LLM…
-      </button>
+      <div className="inline-flex h-7 items-stretch rounded-md border border-white/15 bg-white/5 font-inter-tight text-[12px] text-white/80">
+        <button
+          type="button"
+          onClick={show}
+          className="inline-flex items-center gap-1.5 rounded-l-md px-2 hover:bg-white/10 hover:text-white"
+        >
+          {ballotCopied === "Copied."
+            ? <Check className="size-3.5 text-dao-green" aria-hidden="true" />
+            : <Bot className="size-3.5 opacity-80" aria-hidden="true" />}
+          {/* A copy from the menu says how it went here, for a moment. */}
+          <span
+            aria-live="polite"
+            className={cn(ballotCopied && ballotCopied !== "Copied." && "text-amber-200")}
+          >
+            {!ballotCopied
+              ? "Use an LLM…"
+              : ballotCopied === "Copied."
+              ? "Ballot copied"
+              : "Couldn't copy"}
+          </span>
+        </button>
+        <Menu.Root>
+          <Menu.Trigger
+            aria-label="More ballot actions"
+            className="grid w-6 place-items-center rounded-r-md border-l border-white/15 hover:bg-white/10 hover:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white"
+          >
+            <ChevronDown className="size-3.5" aria-hidden="true" />
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner side="bottom" align="end" sideOffset={6} className="z-[210]">
+              <Menu.Popup className="min-w-[180px] origin-(--transform-origin) rounded-[14px] border border-edge2 bg-panel p-1.5 shadow-menu outline-none transition-[opacity,scale] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+                <Menu.Item
+                  disabled={!placed}
+                  onClick={() =>
+                    void copy(
+                      formatBallotText(tiers, slugs),
+                      flashBallot,
+                      "Couldn't copy: your browser blocked it.",
+                    )}
+                  className="flex w-full cursor-pointer select-none items-center gap-2.5 rounded-[9px] px-3 py-2.5 font-inter-tight text-[14px] text-soft outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-[rgba(92,183,90,.08)] data-[highlighted]:text-dao-green"
+                >
+                  <Copy className="size-4" aria-hidden="true" />
+                  Copy ballot
+                </Menu.Item>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+      </div>
 
       <Dialog
         open={open}
         onOpenChange={setOpen}
         title="Build your ballot with an LLM"
-        description="Copy the prompt into any LLM that can read web pages. Discuss your priorities, then paste its ballot back here."
+        description="Copy this prompt into any LLM that can read web pages, talk through your priorities, then paste its ballot back here."
         className="w-[min(520px,100%)] gap-[18px] max-sm:p-5"
         focusField={false}
         icon={<Bot className="size-5" />}
@@ -152,7 +194,7 @@ export default function BallotMenu({ slugs, tiers, onApply }: {
               title="A prompt to start"
               note={
                 <>
-                  Includes the guide and your ballot ·{" "}
+                  Includes your current ballot ·{" "}
                   <a
                     href={LLMS}
                     target="_blank"
@@ -163,7 +205,7 @@ export default function BallotMenu({ slugs, tiers, onApply }: {
                   </a>
                 </>
               }
-              button="Copy"
+              button="Copy prompt"
               copyLabel="Copy prompt"
               flash={promptCopied}
               onCopy={() =>
@@ -173,29 +215,7 @@ export default function BallotMenu({ slugs, tiers, onApply }: {
                   "Couldn't copy: your browser blocked it.",
                 )}
             />
-            <GiveRow
-              icon={<ListOrdered className="size-4" />}
-              title="Your ballot"
-              note={placed
-                ? `${placed} ${placed === 1 ? "initiative" : "initiatives"} in ${tierCount} ${
-                  tierCount === 1 ? "tier" : "tiers"
-                }: copy separately`
-                : "Empty so far"}
-              button="Copy"
-              copyLabel="Copy your ballot"
-              disabled={!placed}
-              flash={ballotCopied}
-              onCopy={() =>
-                void copy(
-                  formatBallotText(tiers, slugs),
-                  flashBallot,
-                  "Couldn't copy: your browser blocked it.",
-                )}
-            />
           </ul>
-          <p className="m-0 pt-1 text-[12.5px] leading-snug text-white/55">
-            Add any priorities or star ratings you want the LLM to consider.
-          </p>
         </section>
 
         <section className="space-y-2">

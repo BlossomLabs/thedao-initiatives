@@ -26,7 +26,9 @@ it("one button opens it: what to give the LLM, and where to paste its answer", (
   expect(within(dialog).getByRole("region", { name: "Give the LLM" })).toHaveTextContent(
     "A prompt to start",
   );
-  expect(within(dialog).getByText("1 initiative in 1 tier: copy separately")).toBeInTheDocument();
+  // One thing to copy: the prompt already holds the ballot (#150).
+  expect(within(dialog).queryByRole("button", { name: "Copy your ballot" })).toBeNull();
+  expect(within(dialog).getByText(/Includes your current ballot/)).toBeInTheDocument();
   expect(within(dialog).getByRole("link", { name: "open guide" })).toHaveAttribute(
     "href",
     "/vote/llms.txt",
@@ -52,19 +54,39 @@ it("copies a prompt with the guide and current ballot as YAML", async () => {
   expect(
     within(dialog).getByRole("button", { name: "Copy prompt" }),
   ).toHaveTextContent("Copied");
-  fireEvent.click(within(dialog).getByRole("button", { name: "Copy your ballot" }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
-  expect(String((writeText.mock.calls[1] as unknown[])[0])).toBe(
-    "S-Tier:\n  - alpha\n  - beta\nA-Tier: []\nB-Tier:\n  - gamma",
-  );
 });
 
-it("an empty ballot still gets a starter prompt, while copying it separately stays disabled", async () => {
+it("the chevron's menu copies the ballot alone, as YAML", async () => {
+  const writeText = vi.fn(() => Promise.resolve());
+  Object.assign(navigator, { clipboard: { writeText } });
+  render(
+    <BallotMenu
+      slugs={slugs}
+      tiers={{ alpha: "S", beta: "S", gamma: "B" }}
+      onApply={vi.fn(() => false)}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "More ballot actions" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Copy ballot" }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+  expect(String((writeText.mock.calls[0] as unknown[])[0])).toBe(
+    "S-Tier:\n  - alpha\n  - beta\nA-Tier: []\nB-Tier:\n  - gamma",
+  );
+  expect(await screen.findByText("Ballot copied")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("an empty ballot can't be copied alone", async () => {
+  render(<BallotMenu slugs={slugs} tiers={{}} onApply={vi.fn(() => false)} />);
+  fireEvent.click(screen.getByRole("button", { name: "More ballot actions" }));
+  expect(await screen.findByRole("menuitem", { name: "Copy ballot" }))
+    .toHaveAttribute("aria-disabled", "true");
+});
+
+it("an empty ballot still gets a starter prompt", async () => {
   const writeText = vi.fn(() => Promise.resolve());
   Object.assign(navigator, { clipboard: { writeText } });
   const { dialog } = show(vi.fn(() => false), {});
-  expect(within(dialog).getByRole("button", { name: "Copy your ballot" })).toBeDisabled();
-  expect(within(dialog).getByText("Empty so far")).toBeInTheDocument();
   fireEvent.click(within(dialog).getByRole("button", { name: "Copy prompt" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
   expect(String((writeText.mock.calls[0] as unknown[])[0])).toContain(

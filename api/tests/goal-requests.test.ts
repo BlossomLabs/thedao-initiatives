@@ -187,3 +187,69 @@ Deno.test("settling never removes a request asked for after it was read", async 
     h.close();
   }
 });
+
+const signedOnRound = (x: Awaited<ReturnType<typeof onBallot>>) =>
+  x.putOnBallot({
+    projects: [
+      { goalUsd: "1000000", rfp: true, groups: [] },
+      { goalUsd: "78000000000", rfp: true, groups: [] },
+    ],
+  });
+
+Deno.test("settling on a page read never fails the read: a failed write leaves the request", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    assertEquals((await x.patch({ goal: 78000 })).status, 202);
+    await signedOnRound(x);
+    const update = h.db.initiatives.update;
+    h.db.initiatives.update = () => Promise.reject(new Error("update conflict"));
+    const res = await h.req(`/api/initiatives/${x.slug}`);
+    h.db.initiatives.update = update;
+    assertEquals(res.status, 200);
+    assertEquals(((await j(res)).goalRequest as { goalUsd: number }).goalUsd, 78000);
+    assertEquals((await x.row()).goalUsd, 25000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("during maintenance a page read settles nothing", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    assertEquals((await x.patch({ goal: 78000 })).status, 202);
+    await signedOnRound(x);
+    h.deps.maintenance.on = () => Promise.resolve(true);
+    const res = await h.req(`/api/initiatives/${x.slug}`);
+    assertEquals(res.status, 200);
+    assertEquals((await x.row()).goalUsd, 25000);
+    assertEquals(((await j(res)).goalRequest as { goalUsd: number }).goalUsd, 78000);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("after the vote closes a held edit carrying a goal still goes live, without the goal", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  try {
+    const x = await onBallot(h);
+    const held = await j(
+      await x.edit({
+        ...revisionBody(minimalSubmission(78000)),
+        title: "A retitled initiative",
+        goal: 78000,
+      }),
+    );
+    await x.putOnBallot({ closesAt: 1 });
+    const res = await x.accept((held.revision as { n: number }).n);
+    assertEquals(res.status, 200);
+    assertEquals([(await x.row()).title, (await x.row()).goalUsd], [
+      "A retitled initiative",
+      25000,
+    ]);
+    assertEquals(await goalOf(h, x.slug), undefined);
+  } finally {
+    h.close();
+  }
+});

@@ -5,7 +5,7 @@ import { decodeFunctionData } from "viem";
 import { ADMIN, harness, j } from "./app-helpers.ts";
 import { fakeChain, NOW, roundOf } from "./pledge-chain.ts";
 import { goalRequestOf, requestGoal } from "../services/goal-requests.ts";
-import { goalBlock } from "../services/round-admin-queue.ts";
+import { goalBlock, roundAdminQueue } from "../services/round-admin-queue.ts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 
@@ -142,9 +142,10 @@ Deno.test("discard drops a goal request", async () => {
   }
 });
 
-Deno.test("goalBlock: settled, withdrawn, a tier settling, or the state unknown", () => {
+Deno.test("goalBlock reads the slot, not the slug: settled, withdrawn, settling, unknown", () => {
+  // The replay's list is in the round's slot order, under the slugs the round had.
   const w = [
-    { slug: "a", withdrawn: false, settledIn: "S" as const },
+    { slug: "old-name", withdrawn: false, settledIn: "S" as const },
     { slug: "b", withdrawn: true, settledIn: null },
     { slug: "c", withdrawn: false, settledIn: null },
   ];
@@ -154,9 +155,21 @@ Deno.test("goalBlock: settled, withdrawn, a tier settling, or the state unknown"
     initialWindow: 100,
     maxWindows: 1,
   };
-  assertEquals(goalBlock("a", w, s, 10), { kind: "settled", tier: "S" });
-  assertEquals(goalBlock("b", w, s, 10), { kind: "withdrawn" });
-  assertEquals(goalBlock("c", w, s, 10), null);
-  assertEquals(goalBlock("c", w, s, 1050), { kind: "settling", until: 1100 });
-  assertEquals(goalBlock("c", null, s, 10), { kind: "unknown" });
+  assertEquals(goalBlock(0, w, s, 10), { kind: "settled", tier: "S" });
+  assertEquals(goalBlock(1, w, s, 10), { kind: "withdrawn" });
+  assertEquals(goalBlock(2, w, s, 10), null);
+  assertEquals(goalBlock(2, w, s, 1050), { kind: "settling", until: 1100 });
+  assertEquals(goalBlock(2, null, s, 10), { kind: "unknown" });
+  assertEquals(goalBlock(5, w, s, 10), { kind: "unknown" });
+});
+
+Deno.test("the queue service never offers a goal change as signable before the route checks it", async () => {
+  const s = await setup();
+  try {
+    await requestGoal(s.h.db, s.m, s.row, 78_000, ADMIN);
+    const q = await roundAdminQueue(s.h.deps).queue({ manifest: s.m } as never);
+    assertEquals(q.goals.map((g) => g.blocked), [{ kind: "unknown" }]);
+  } finally {
+    s.h.close();
+  }
 });

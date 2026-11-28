@@ -238,6 +238,30 @@ Deno.test("verifyDonationTx: native ETH", async () => {
   assertStringIncludes(dust.detail, "minimum");
 });
 
+Deno.test("verifyDonationTx: WETH is priced as ETH, with ETH's minimum", async () => {
+  const WETH = config.TOKENS.WETH[0];
+  const run = (raw: bigint) => {
+    const rpc = fakeRpc({
+      eth_getTransactionReceipt: () => receipt("0x1", [transferLog(WETH, DONOR, SAFE, raw)]),
+      eth_blockNumber: () => "0x6e",
+      eth_call: (p) => {
+        assertEquals((p[0] as { to: string }).to, config.CHAINLINK_FEEDS.ETH);
+        return chainlinkRound(1769e8, NOW);
+      },
+    });
+    return verifyDonationTx(rpc, createPricer(rpc, () => NOW), TX, SAFE, config.TOKENS);
+  };
+  const half = await run(5n * 10n ** 17n);
+  assert(half.ok);
+  assertEquals(half.tokenSymbol, "WETH");
+  assertEquals(half.amount, 0.5);
+  assertEquals(half.amountUsd, 884.5);
+  assertEquals(half.donor.toLowerCase(), DONOR);
+  const dust = await run(10n ** 12n);
+  assertFalse(dust.ok);
+  assertStringIncludes(dust.detail, "minimum donation of 0.0005 WETH");
+});
+
 Deno.test("usdRate: stables are 1, feeds via Chainlink, guards", async () => {
   const rate = createPricer(fakeRpc({}), () => NOW);
   for (const s of ["USDC", "USDT", "DAI", "USDS", "crvUSD", "BOLD", "fxUSD"]) {

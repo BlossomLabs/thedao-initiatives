@@ -1,4 +1,4 @@
-import { MIN_CONFIRMATIONS, MIN_ETH_DONATION, NATIVE_ETH } from "../config.ts";
+import { MIN_CONFIRMATIONS, MIN_ETH_DONATION, MIN_TOKEN_DONATION, NATIVE_ETH } from "../config.ts";
 import { addressTopic, toChecksum } from "./address.ts";
 import { decodeHexInt } from "./abi.ts";
 import { eventTopic } from "./keccak.ts";
@@ -153,9 +153,11 @@ export async function verifyDonationTx(
   }
 
   if (creditedSym !== null && totalRaw > 0n) {
-    const minRaw = 10n ** BigInt(creditedDec); // dust floor: 1 whole token
+    // Dust floor: 1 whole token, or the token's own minimum (WETH follows ETH's).
+    const min = MIN_TOKEN_DONATION[creditedSym] ?? 1;
+    const minRaw = BigInt(Math.round(min * 1e6)) * 10n ** BigInt(creditedDec) / 1_000_000n;
     if (totalRaw < minRaw) {
-      r.detail = `transfer below the minimum donation of 1 ${creditedSym}`;
+      r.detail = `transfer below the minimum donation of ${min} ${creditedSym}`;
       return r;
     }
     let rate: number;

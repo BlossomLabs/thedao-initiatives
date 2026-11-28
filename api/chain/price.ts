@@ -5,7 +5,7 @@ import { ethCall, type Rpc, RpcError } from "./rpc.ts";
 export const RATE_TTL = 600;
 /** Reject a Chainlink answer older than its feed's heartbeat plus a margin. */
 export const RATE_MAX_STALENESS = 90_000; // 25h (slow FX feeds)
-export const RATE_STALENESS: Record<string, number> = { ETH: 2 * 3600 };
+export const RATE_STALENESS: Record<string, number> = { ETH: 2 * 3600, WETH: 2 * 3600 };
 
 export type UsdRate = (symbol: string) => Promise<number>;
 

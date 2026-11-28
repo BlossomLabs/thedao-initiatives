@@ -7,7 +7,7 @@
 import type { Deps } from "../middleware/context.ts";
 import type { Initiative, Pledge } from "../db/types.ts";
 import type { Card } from "../routes/board.ts";
-import { CHAIN_ID, NATIVE_ETH, TOKENS } from "../config.ts";
+import { CHAIN_ID, COUNTED_ONLY, NATIVE_ETH, TOKENS } from "../config.ts";
 import { FIELDS, milestonesToMd, SECTIONS } from "../../shared/draft/mod.ts";
 import { categoriesOf, categoryOf } from "../../shared/categories.ts";
 import { pickText } from "../db/initiatives.ts";
@@ -71,7 +71,8 @@ export interface Feed {
 
 const TOKEN_LIST = [
   ...(NATIVE_ETH ? [{ symbol: "ETH", address: null, decimals: 18 }] : []),
-  ...Object.entries(TOKENS).map(([symbol, [address, decimals]]) => ({ symbol, address, decimals })),
+  ...Object.entries(TOKENS).filter(([symbol]) => !COUNTED_ONLY.has(symbol))
+    .map(([symbol, [address, decimals]]) => ({ symbol, address, decimals })),
 ];
 
 export function feedInitiative(

@@ -1,5 +1,5 @@
 /** Bundles the chain helpers with the per-process token state. */
-import { NATIVE_ETH, REVIEW_BADGE_CONTRACT, TOKENS } from "../config.ts";
+import { COUNTED_ONLY, NATIVE_ETH, REVIEW_BADGE_CONTRACT, TOKENS } from "../config.ts";
 import { createRpc, getBlockNumber, type Rpc } from "./rpc.ts";
 import { activeTokens, type TokenCheck, verifyTokens } from "./tokens.ts";
 import { createPricer, type UsdRate } from "./price.ts";
@@ -38,7 +38,10 @@ export interface Chain {
   /** Adopt a token check another instance saved, when it is newer than ours. */
   seed(state: ChainState): void;
   activeTokens(): Promise<Record<string, [string, number]>>;
+  /** What the donate form offers: the verified tokens without COUNTED_ONLY, plus ETH. */
   donorTokens(): Promise<Record<string, [string, number]>>;
+  /** What a Safe's balance counts: every verified token, plus ETH. */
+  countedTokens(): Promise<Record<string, [string, number]>>;
   verifyDonation(
     txHash: string,
     recipient: string,
@@ -116,6 +119,13 @@ export function createChain(opts: ChainOptions = {}): Chain {
     seed,
     activeTokens: active,
     donorTokens: async () => {
+      const out = Object.fromEntries(
+        Object.entries(await active()).filter(([sym]) => !COUNTED_ONLY.has(sym)),
+      );
+      if (NATIVE_ETH) out.ETH = ["native", 18];
+      return out;
+    },
+    countedTokens: async () => {
       const out = { ...(await active()) };
       if (NATIVE_ETH) out.ETH = ["native", 18];
       return out;

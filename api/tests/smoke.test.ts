@@ -7,6 +7,6 @@ Deno.test("healthz verifies tokens through the scripted rpc", async () => {
   assertEquals(res.status, 200);
   const body = await j(res);
   assertEquals(body.ok, true);
-  assertEquals((body.tokensOk as string[]).length, 9);
+  assertEquals((body.tokensOk as string[]).length, 10);
   h.close();
 });

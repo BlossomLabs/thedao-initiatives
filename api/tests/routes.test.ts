@@ -477,6 +477,7 @@ Deno.test("donate: params, confirm, status, totals", async () => {
   assertEquals(params.rates.ETH, 2000);
   assertEquals(params.rates.USDC, 1);
   assertEquals(Object.keys(params.tokens).length, 10);
+  assertFalse("WETH" in params.tokens, "WETH is counted, never offered");
   const tx = "0x" + "ab".repeat(32);
   h.script.receipts[tx] = {
     status: "0x1",

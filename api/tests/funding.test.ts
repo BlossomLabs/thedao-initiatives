@@ -85,7 +85,7 @@ Deno.test("funding: old values return during a slow refresh, with one lease acro
     gate.resolve();
     assertEquals((await refreshing)?.usd, 2);
     assertEquals((await second.summary(initiative)).donated, 2);
-    assertEquals(h.script.calls.length - warmCalls, 11, "one batch of 10 balance reads");
+    assertEquals(h.script.calls.length - warmCalls, 12, "one batch of 11 balance reads");
   } finally {
     gate.resolve();
     h.close();
@@ -140,17 +140,17 @@ Deno.test("funding: 30-second board polls share one two-minute refresh across 19
     const batches = () => h.script.calls.filter((m) => m === "multicall").length;
     await h.req("/api/board?refresh=1");
     assertEquals(batches(), 1, "all 19 Safes' balances in one RPC request");
-    assertEquals(h.script.calls.length, 191, "190 balance reads inside it");
+    assertEquals(h.script.calls.length, 210, "209 balance reads inside it");
     for (let i = 0; i < 3; i++) {
       h.clock.now += 30;
       await h.req("/api/board");
       await h.req("/api/board?refresh=1");
     }
-    assertEquals(h.script.calls.length, 191, "even redundant refresh requests reuse the snapshot");
+    assertEquals(h.script.calls.length, 210, "even redundant refresh requests reuse the snapshot");
     h.clock.now += 30;
     await h.req("/api/board?refresh=1");
     assertEquals(batches(), 2);
-    assertEquals(h.script.calls.length, 382);
+    assertEquals(h.script.calls.length, 420);
   } finally {
     h.close();
   }
@@ -272,6 +272,23 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
     json: { paidOutUsd: "-5" },
   });
   assertEquals(bad.status, 400);
+  h.close();
+});
+
+Deno.test("funding: WETH in the Safe counts toward raised at the ETH price", async () => {
+  const h = await harness();
+  const initiative = await h.db.initiatives.insert({
+    title: "WETH initiative",
+    status: "approved",
+    goalUsd: 3000,
+    safeAddress: SAFE_ADDR,
+  });
+  h.script.tokenBalances["WETH:" + safeKey] = 5n * 10n ** 17n; // 0.5 WETH at $2000
+  const page = await j(await h.req("/api/initiatives/" + initiative.slug + "?refresh=1")) as {
+    summary: Record<string, number | boolean>;
+  };
+  assertEquals(page.summary.donated, 1000);
+  assertEquals(page.summary.live, true);
   h.close();
 });
 

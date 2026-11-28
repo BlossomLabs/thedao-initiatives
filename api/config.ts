@@ -20,14 +20,27 @@ export const TOKENS: Record<string, [string, number]> = {
   // non-USD stables: priced by the Chainlink feeds below, never assumed 1:1
   EURC: ["0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c", 6],
   ZCHF: ["0xB58E61C3098d85632Df34EecfB899A1Ed80921cB", 18],
+  // counted but not offered (COUNTED_ONLY): priced by the ETH/USD feed
+  WETH: ["0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 18],
 };
+
+/**
+ * Tokens the site counts and shows when a Safe receives them, but never offers
+ * in the donate form. The vote round's currencies froze without WETH, so WETH
+ * in a Safe does not lower an initiative's ask in the vote; offering it there
+ * would promise a donor a move the round cannot make.
+ */
+export const COUNTED_ONLY: ReadonlySet<string> = new Set(["WETH"]);
 
 export const NATIVE_ETH = true;
 export const MIN_ETH_DONATION = 0.0005;
+/** The smallest transfer credited, in whole tokens, where it is not one token. */
+export const MIN_TOKEN_DONATION: Record<string, number> = { WETH: MIN_ETH_DONATION };
 
 /** Chainlink price feeds (mainnet, all 8 decimals). */
 export const CHAINLINK_FEEDS: Record<string, string> = {
   ETH: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419", // ETH/USD
+  WETH: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419", // ETH/USD (1 WETH = 1 ETH)
   EURC: "0xb49f677943BC038e9857d61E7d053CaA2C1734C1", // EUR/USD
   ZCHF: "0x449d117117838fFA61263B61dA6301AA2a88B13A", // CHF/USD
 };

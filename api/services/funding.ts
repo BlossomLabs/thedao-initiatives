@@ -71,11 +71,11 @@ export function createFunding(deps: FundingDeps) {
   const inflight = new Map<string, Promise<CachedBalances | null>>();
   const kv = deps.db.kv;
 
-  /** Every Safe's balance of every donor token in one Multicall3 batch (chunked),
+  /** Every Safe's balance of every counted token in one Multicall3 batch (chunked),
    * then one price per symbol held. A Safe with any failed read is an Error, so
    * its last good snapshot stays rather than dropping to a partial total. */
   async function readMany(safes: string[]): Promise<(SafeBalances | Error)[]> {
-    const tokens = Object.entries(await deps.chain.donorTokens());
+    const tokens = Object.entries(await deps.chain.countedTokens());
     const calls = safes.flatMap((safe) =>
       tokens.map(([symbol, [address]]) =>
         balanceCall(symbol === "ETH" ? "native" : address as Address, safe as Address)

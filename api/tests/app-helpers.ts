@@ -87,8 +87,9 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
   const tokensByAddr = new Map(
     Object.entries(config.TOKENS).map(([sym, [a, d]]) => [a.toLowerCase(), { sym, d }]),
   );
+  // WETH reads ETH's feed: the first symbol of an address names its scripted rate.
   const feeds = new Map(
-    Object.entries(config.CHAINLINK_FEEDS).map(([sym, a]) => [a.toLowerCase(), sym]),
+    Object.entries(config.CHAINLINK_FEEDS).reverse().map(([sym, a]) => [a.toLowerCase(), sym]),
   );
   const encodedOwners = "0x" + word(32) + word(SIGNERS.length) +
     SIGNERS.map((a) => "0".repeat(24) + a.slice(2).toLowerCase()).join("");
